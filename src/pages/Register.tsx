@@ -25,16 +25,29 @@ export default function Register() {
     e.preventDefault();
     try {
       setLoading(true);
+      console.log("Starting signup process...");
       await signUp(email, password, fullName);
+      console.log("Signup successful");
       toast({
         title: "Conta criada com sucesso!",
         description: "Verifique seu email para confirmar sua conta.",
       });
       navigate("/login");
     } catch (error: any) {
+      console.error("Signup error:", error);
+      let errorMessage = "Erro ao criar conta";
+      
+      if (error.message) {
+        if (error.message.includes("Invalid API key")) {
+          errorMessage = "Erro de configuração do servidor. Por favor, tente novamente mais tarde.";
+        } else {
+          errorMessage = error.message;
+        }
+      }
+      
       toast({
         title: "Erro ao criar conta",
-        description: error.message,
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
