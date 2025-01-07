@@ -11,3 +11,6 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     flowType: "pkce"
   }
 });
+
+// Add console logs to help with debugging
+console.log("Supabase client initialized with URL:", supabaseUrl);
