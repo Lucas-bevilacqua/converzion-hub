@@ -59,7 +59,7 @@ const plans = [
 
 export const PricingSection = () => {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, session } = useAuth();
   const { toast } = useToast();
 
   const handleSubscribe = async (priceId?: string) => {
@@ -84,7 +84,7 @@ export const PricingSection = () => {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${user.session?.access_token}`,
+            Authorization: `Bearer ${session?.access_token}`,
           },
           body: JSON.stringify({ priceId }),
         }
