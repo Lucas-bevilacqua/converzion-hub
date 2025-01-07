@@ -2,6 +2,8 @@ import { Button } from "@/components/ui/button";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
+import { useToast } from "@/components/ui/use-toast";
 import {
   Card,
   CardContent,
@@ -34,6 +36,7 @@ const plans = [
   {
     name: "Starter",
     price: "4,97",
+    priceId: "price_1QbuUiKkjJ7tububpw8Vpsrp",
     description: "Perfeito para começar",
     features: [
       "1 Instância",
@@ -47,6 +50,7 @@ const plans = [
   {
     name: "Professional",
     price: "9,97",
+    priceId: "price_1QbuUvKkjJ7tububiklS9tAc",
     description: "Para negócios em crescimento",
     features: [
       "3 Instâncias",
@@ -76,6 +80,50 @@ const plans = [
 
 const Index = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const { toast } = useToast();
+
+  const handleSubscribe = async (priceId?: string) => {
+    if (!priceId) {
+      navigate("/contact");
+      return;
+    }
+
+    if (!user) {
+      toast({
+        title: "Login necessário",
+        description: "Faça login para assinar um plano",
+      });
+      navigate("/login");
+      return;
+    }
+
+    try {
+      const response = await fetch(
+        "https://vodexhppkasbulogmcqb.functions.supabase.co/stripe-checkout",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${user.access_token}`,
+          },
+          body: JSON.stringify({ priceId }),
+        }
+      );
+
+      const { url } = await response.json();
+      if (url) {
+        window.location.href = url;
+      }
+    } catch (error) {
+      console.error("Erro ao criar sessão de checkout:", error);
+      toast({
+        title: "Erro",
+        description: "Não foi possível processar sua assinatura",
+        variant: "destructive",
+      });
+    }
+  };
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -171,7 +219,7 @@ const Index = () => {
                     </ul>
                     <Button
                       className="w-full mt-6"
-                      onClick={() => navigate("/register")}
+                      onClick={() => handleSubscribe(plan.priceId)}
                     >
                       {plan.price === "Personalizado"
                         ? "Falar com Vendas"
