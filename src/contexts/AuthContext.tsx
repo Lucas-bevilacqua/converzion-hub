@@ -43,27 +43,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signIn = async (email: string, password: string) => {
     console.log("Attempting sign in...");
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
+      const response = await supabase.auth.signInWithPassword({
         email,
         password,
       });
 
-      if (error) {
-        console.error("Sign in error:", error);
-        if (error.message.includes("Invalid login credentials")) {
-          throw new Error(JSON.stringify({
-            code: "invalid_credentials",
-            message: "Email ou senha inválidos"
-          }));
+      if (response.error) {
+        console.error("Sign in error:", response.error);
+        
+        // Handle specific error cases
+        if (response.error.message.includes("Invalid login credentials")) {
+          throw new Error("Email ou senha inválidos");
         }
-        throw error;
+        
+        throw new Error(response.error.message);
       }
 
-      if (!data?.user) {
-        throw new Error(JSON.stringify({
-          code: "unknown",
-          message: "Erro ao fazer login"
-        }));
+      if (!response.data?.user) {
+        throw new Error("Erro ao fazer login");
       }
 
       console.log("Sign in successful");
@@ -76,7 +73,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signUp = async (email: string, password: string, fullName: string) => {
     console.log("Attempting sign up...");
     try {
-      const { data, error } = await supabase.auth.signUp({
+      const response = await supabase.auth.signUp({
         email,
         password,
         options: {
@@ -86,16 +83,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         },
       });
 
-      if (error) {
-        console.error("Sign up error:", error);
-        throw error;
+      if (response.error) {
+        console.error("Sign up error:", response.error);
+        throw response.error;
       }
 
-      if (!data?.user) {
-        throw new Error(JSON.stringify({
-          code: "unknown",
-          message: "Erro ao criar conta"
-        }));
+      if (!response.data?.user) {
+        throw new Error("Erro ao criar conta");
       }
 
       console.log("Sign up successful");
