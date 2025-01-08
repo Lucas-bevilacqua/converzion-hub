@@ -1,6 +1,8 @@
 import { createContext, useContext, useEffect, useState } from "react";
-import { Session, User, AuthError } from "@supabase/supabase-js";
+import { Session, User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
+import { parseAuthError } from "@/utils/auth/errorHandling";
+import { createOrUpdateProfile } from "@/utils/auth/profileManagement";
 
 interface AuthContextType {
   session: Session | null;
@@ -25,6 +27,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.log("Session retrieved:", session ? "Session found" : "No session");
       setSession(session);
       setUser(session?.user ?? null);
+      if (session?.user) {
+        createOrUpdateProfile(session.user).catch(console.error);
+      }
       setLoading(false);
     });
 
@@ -35,35 +40,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setSession(session);
       setUser(session?.user ?? null);
 
-      // Verificar e criar perfil se necessário
       if (session?.user) {
-        const { data: profile, error: profileError } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', session.user.id)
-          .maybeSingle();
-
-        if (profileError) {
-          console.error("Error checking profile:", profileError);
-        }
-
-        if (!profile) {
-          console.log("Profile not found, creating...");
-          const { error: createError } = await supabase
-            .from('profiles')
-            .insert([
-              {
-                id: session.user.id,
-                full_name: session.user.user_metadata.full_name,
-              }
-            ]);
-
-          if (createError) {
-            console.error("Error creating profile:", createError);
-          } else {
-            console.log("Profile created successfully");
-          }
-        }
+        await createOrUpdateProfile(session.user);
       }
 
       setLoading(false);
@@ -71,46 +49,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     return () => subscription.unsubscribe();
   }, []);
-
-  const parseAuthError = (error: AuthError | Error) => {
-    console.log("Parsing auth error:", error);
-    
-    try {
-      if ('error' in error && typeof error.error === 'string') {
-        const errorBody = JSON.parse(error.error);
-        if (errorBody.code === "invalid_credentials") {
-          return "Email ou senha inválidos";
-        }
-      }
-      
-      if ('message' in error) {
-        const message = error.message;
-        if (typeof message === 'string') {
-          if (message.includes("Invalid login credentials")) {
-            return "Email ou senha inválidos";
-          }
-          if (message.includes("Email not confirmed")) {
-            return "Por favor, confirme seu email antes de fazer login";
-          }
-          if (message.includes("User not found")) {
-            return "Usuário não encontrado";
-          }
-          try {
-            const parsedMessage = JSON.parse(message);
-            if (parsedMessage.code === "invalid_credentials") {
-              return "Email ou senha inválidos";
-            }
-          } catch (e) {
-            // If message is not JSON, use it as is
-          }
-        }
-      }
-    } catch (e) {
-      console.error("Error parsing auth error:", e);
-    }
-    
-    return "Erro ao autenticar. Por favor, tente novamente.";
-  };
 
   const signIn = async (email: string, password: string) => {
     console.log("Attempting sign in...");
@@ -130,42 +68,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         throw new Error("Erro ao fazer login");
       }
 
-      // Verificar e criar perfil se necessário
-      const { data: profile, error: profileError } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', data.user.id)
-        .maybeSingle();
-
-      if (profileError) {
-        console.error("Error checking profile:", profileError);
-      }
-
-      if (!profile) {
-        console.log("Profile not found during signin, creating...");
-        const { error: createError } = await supabase
-          .from('profiles')
-          .insert([
-            {
-              id: data.user.id,
-              full_name: data.user.user_metadata.full_name,
-            }
-          ]);
-
-        if (createError) {
-          console.error("Error creating profile during signin:", createError);
-        } else {
-          console.log("Profile created successfully during signin");
-        }
-      }
-
+      await createOrUpdateProfile(data.user);
       console.log("Sign in successful");
     } catch (error) {
       console.error("Sign in catch block error:", error);
       if (error instanceof Error) {
         throw error;
       }
-      const errorMessage = parseAuthError(error as AuthError);
+      const errorMessage = parseAuthError(error as any);
       throw new Error(errorMessage);
     }
   };
@@ -193,30 +103,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         throw new Error("Erro ao criar conta");
       }
 
-      // Criar perfil manualmente
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .insert([
-          {
-            id: data.user.id,
-            full_name: fullName,
-          }
-        ]);
-
-      if (profileError) {
-        console.error("Error creating profile:", profileError);
-        // Não lançamos erro aqui pois o perfil pode já existir devido ao trigger
-      } else {
-        console.log("Profile created successfully during signup");
-      }
-
+      await createOrUpdateProfile(data.user);
       console.log("Sign up successful");
     } catch (error) {
       console.error("Sign up catch block error:", error);
       if (error instanceof Error) {
         throw error;
       }
-      const errorMessage = parseAuthError(error as AuthError);
+      const errorMessage = parseAuthError(error as any);
       throw new Error(errorMessage);
     }
   };
@@ -233,7 +127,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.log("Sign out successful");
     } catch (error) {
       console.error("Sign out catch block error:", error);
-      const errorMessage = parseAuthError(error as AuthError);
+      const errorMessage = parseAuthError(error as any);
       throw new Error(errorMessage);
     }
   };
