@@ -8,50 +8,50 @@ import { Bot, MessageSquare, BarChart3, Settings2, Brain, Zap, Shield, Users } f
 
 const features = [
   {
-    title: "IA de Última Geração",
-    description: "Tecnologia avançada que entende o contexto e personaliza respostas para cada cliente, garantindo interações naturais e eficientes.",
+    title: "Vendas Automáticas",
+    description: "Nossa IA identifica oportunidades e fecha vendas automaticamente, convertendo leads em clientes 24 horas por dia.",
     icon: Brain,
     color: "bg-[#9b87f5]/10 text-[#9b87f5]",
   },
   {
-    title: "WhatsApp Business API",
-    description: "Integração oficial e segura com a API do WhatsApp Business, mantendo sua conta verificada e protegida.",
+    title: "WhatsApp Oficial",
+    description: "Integração segura e verificada com WhatsApp Business API, mantendo sua conta protegida e profissional.",
     icon: MessageSquare,
     color: "bg-[#9b87f5]/10 text-[#9b87f5]",
   },
   {
-    title: "Analytics em Tempo Real",
-    description: "Acompanhe métricas detalhadas de atendimento, taxa de conversão e satisfação dos clientes para otimizar resultados.",
+    title: "Métricas em Tempo Real",
+    description: "Acompanhe vendas, conversões e desempenho em tempo real. Tome decisões baseadas em dados concretos.",
     icon: BarChart3,
     color: "bg-[#9b87f5]/10 text-[#9b87f5]",
   },
   {
     title: "Personalização Total",
-    description: "Configure a IA com o tom de voz da sua marca e regras específicas do seu negócio para um atendimento único.",
+    description: "IA treinada com o DNA do seu negócio, garantindo atendimento personalizado e alinhado com sua marca.",
     icon: Settings2,
     color: "bg-[#9b87f5]/10 text-[#9b87f5]",
   },
   {
-    title: "Disponibilidade 24/7",
-    description: "Atendimento ininterrupto todos os dias, garantindo que nenhuma oportunidade de venda seja perdida.",
+    title: "Escala Ilimitada",
+    description: "Atenda milhares de clientes simultaneamente sem perder qualidade ou aumentar custos.",
     icon: Zap,
     color: "bg-[#9b87f5]/10 text-[#9b87f5]",
   },
   {
-    title: "Multi-atendentes",
-    description: "Gerencie múltiplos atendentes virtuais para diferentes setores e necessidades do seu negócio.",
+    title: "Multicanal Integrado",
+    description: "Gerencie todos seus canais de atendimento em um só lugar, com respostas consistentes e profissionais.",
     icon: Users,
     color: "bg-[#9b87f5]/10 text-[#9b87f5]",
   },
   {
-    title: "Segurança Avançada",
-    description: "Proteção total dos seus dados com criptografia de ponta a ponta e conformidade com LGPD.",
+    title: "100% Seguro",
+    description: "Seus dados e conversas protegidos com criptografia de ponta a ponta e conformidade total com LGPD.",
     icon: Shield,
     color: "bg-[#9b87f5]/10 text-[#9b87f5]",
   },
   {
-    title: "IA Evolutiva",
-    description: "Sistema que aprende continuamente com as interações, melhorando o atendimento ao longo do tempo.",
+    title: "Resultados Comprovados",
+    description: "Aumento médio de 40% nas vendas e redução de 80% nos custos de atendimento dos nossos clientes.",
     icon: Bot,
     color: "bg-[#9b87f5]/10 text-[#9b87f5]",
   },
@@ -63,14 +63,14 @@ export const FeaturesSection = () => {
       <div className="container">
         <div className="text-center max-w-3xl mx-auto mb-16">
           <h2 className="text-4xl font-bold mb-6 text-white">
-            Tecnologia de Ponta para seus{" "}
+            Tecnologia que{" "}
             <span className="bg-gradient-to-r from-[#9b87f5] to-[#b8a2ff] bg-clip-text text-transparent">
-              Resultados
+              Multiplica Resultados
             </span>
           </h2>
           <p className="text-gray-300 text-lg leading-relaxed">
-            Uma plataforma completa que combina inteligência artificial com WhatsApp
-            para automatizar seu atendimento e aumentar suas vendas
+            Automatize seu atendimento e transforme cada conversa em uma oportunidade de venda, 
+            24 horas por dia, 7 dias por semana
           </p>
         </div>
         

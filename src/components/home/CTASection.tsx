@@ -3,12 +3,12 @@ import { useNavigate } from "react-router-dom";
 import { ArrowRight, Check } from "lucide-react";
 
 const benefits = [
-  "7 dias para testar",
-  "Configuração rápida",
+  "7 dias grátis sem compromisso",
+  "Setup em 5 minutos",
   "Suporte especializado",
   "Cancele quando quiser",
   "Treinamento incluído",
-  "Atualizações constantes",
+  "ROI garantido",
 ];
 
 export const CTASection = () => {
@@ -20,13 +20,13 @@ export const CTASection = () => {
       <div className="container relative">
         <div className="text-center max-w-3xl mx-auto">
           <h2 className="text-4xl font-bold text-white mb-6">
-            Comece a Transformar seu{" "}
+            Comece a{" "}
             <span className="bg-gradient-to-r from-[#9b87f5] to-[#b8a2ff] bg-clip-text text-transparent">
-              Atendimento
+              Vender Mais Hoje
             </span>
           </h2>
           <p className="text-gray-300 text-lg mb-8">
-            Junte-se às empresas que já multiplicaram suas vendas com atendimento automatizado inteligente
+            Junte-se a centenas de empresas que já multiplicaram suas vendas com atendimento automático inteligente
           </p>
           
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 max-w-2xl mx-auto mb-12">
@@ -49,7 +49,7 @@ export const CTASection = () => {
               Começar Agora <ArrowRight className="h-5 w-5 group-hover:translate-x-1 transition-transform" />
             </Button>
             <p className="text-gray-400 text-sm">
-              Não é necessário cartão de crédito
+              Teste grátis por 7 dias, sem cartão de crédito
             </p>
           </div>
         </div>
