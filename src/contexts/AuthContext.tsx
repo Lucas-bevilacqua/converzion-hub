@@ -132,6 +132,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         throw new Error("Erro ao criar conta");
       }
 
+      // Criar perfil manualmente caso o trigger não funcione
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .insert([
+          {
+            id: data.user.id,
+            full_name: fullName,
+          }
+        ]);
+
+      if (profileError) {
+        console.error("Error creating profile:", profileError);
+        // Não lançamos erro aqui pois o perfil pode já existir devido ao trigger
+      }
+
       console.log("Sign up successful");
     } catch (error) {
       console.error("Sign up catch block error:", error);
