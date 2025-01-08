@@ -6,9 +6,11 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { supabase } from "@/integrations/supabase/client"
 import { useAuth } from "@/contexts/AuthContext"
 import { useState } from "react"
+import { useToast } from "@/components/ui/use-toast"
 
 export function InstancesCard() {
   const { user } = useAuth()
+  const { toast } = useToast()
   const queryClient = useQueryClient()
   const [newInstance, setNewInstance] = useState({
     name: "",
@@ -19,12 +21,16 @@ export function InstancesCard() {
   const { data: instances, isLoading } = useQuery({
     queryKey: ['instances', user?.id],
     queryFn: async () => {
+      console.log('Fetching instances for user:', user?.id)
       const { data, error } = await supabase
         .from('evolution_instances')
         .select('*')
         .eq('user_id', user?.id)
       
-      if (error) throw error
+      if (error) {
+        console.error('Error fetching instances:', error)
+        throw error
+      }
       return data
     },
     enabled: !!user?.id
@@ -32,19 +38,43 @@ export function InstancesCard() {
 
   const addMutation = useMutation({
     mutationFn: async (instance: typeof newInstance) => {
+      console.log('Adding new instance for user:', user?.id)
       const { error } = await supabase
         .from('evolution_instances')
         .insert([{ ...instance, user_id: user?.id }])
       
-      if (error) throw error
+      if (error) {
+        console.error('Error adding instance:', error)
+        throw error
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['instances'] })
       setNewInstance({ name: "", api_url: "", api_key: "" })
+      toast({
+        title: "Sucesso",
+        description: "Instância adicionada com sucesso",
+      })
+    },
+    onError: (error) => {
+      console.error('Mutation error:', error)
+      toast({
+        title: "Erro",
+        description: "Não foi possível adicionar a instância. Tente novamente.",
+        variant: "destructive",
+      })
     }
   })
 
   const handleAdd = () => {
+    if (!newInstance.name || !newInstance.api_url || !newInstance.api_key) {
+      toast({
+        title: "Erro",
+        description: "Preencha todos os campos",
+        variant: "destructive",
+      })
+      return
+    }
     addMutation.mutate(newInstance)
   }
 
