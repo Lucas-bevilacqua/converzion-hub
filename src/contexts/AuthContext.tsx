@@ -30,10 +30,42 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    } = supabase.auth.onAuthStateChange(async (_event, session) => {
       console.log("Auth state changed:", _event);
       setSession(session);
       setUser(session?.user ?? null);
+
+      // Verificar e criar perfil se necessário
+      if (session?.user) {
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', session.user.id)
+          .maybeSingle();
+
+        if (profileError) {
+          console.error("Error checking profile:", profileError);
+        }
+
+        if (!profile) {
+          console.log("Profile not found, creating...");
+          const { error: createError } = await supabase
+            .from('profiles')
+            .insert([
+              {
+                id: session.user.id,
+                full_name: session.user.user_metadata.full_name,
+              }
+            ]);
+
+          if (createError) {
+            console.error("Error creating profile:", createError);
+          } else {
+            console.log("Profile created successfully");
+          }
+        }
+      }
+
       setLoading(false);
     });
 
@@ -98,6 +130,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         throw new Error("Erro ao fazer login");
       }
 
+      // Verificar e criar perfil se necessário
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', data.user.id)
+        .maybeSingle();
+
+      if (profileError) {
+        console.error("Error checking profile:", profileError);
+      }
+
+      if (!profile) {
+        console.log("Profile not found during signin, creating...");
+        const { error: createError } = await supabase
+          .from('profiles')
+          .insert([
+            {
+              id: data.user.id,
+              full_name: data.user.user_metadata.full_name,
+            }
+          ]);
+
+        if (createError) {
+          console.error("Error creating profile during signin:", createError);
+        } else {
+          console.log("Profile created successfully during signin");
+        }
+      }
+
       console.log("Sign in successful");
     } catch (error) {
       console.error("Sign in catch block error:", error);
@@ -132,7 +193,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         throw new Error("Erro ao criar conta");
       }
 
-      // Criar perfil manualmente caso o trigger não funcione
+      // Criar perfil manualmente
       const { error: profileError } = await supabase
         .from('profiles')
         .insert([
@@ -145,6 +206,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (profileError) {
         console.error("Error creating profile:", profileError);
         // Não lançamos erro aqui pois o perfil pode já existir devido ao trigger
+      } else {
+        console.log("Profile created successfully during signup");
       }
 
       console.log("Sign up successful");
