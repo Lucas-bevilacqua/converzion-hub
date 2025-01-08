@@ -104,15 +104,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(null);
     
     try {
-      // Attempt to clear Supabase session
+      // Clear local storage and session storage
+      localStorage.clear();
+      sessionStorage.clear();
+      
+      // Attempt to clear Supabase session with local scope only
       const { error } = await supabase.auth.signOut({ scope: 'local' });
       
       if (error) {
         console.error("Sign out error:", error);
-        // Don't throw for non-critical errors
-        if (error.message.includes("User not found") || 
-            error.status === 403 || 
-            error.message.includes("JWT")) {
+        // Don't throw for JWT validation errors
+        if (error.message.includes("JWT") || 
+            error.message.includes("User not found") || 
+            error.status === 403) {
           console.log("Non-critical sign out error:", error.message);
           return;
         }
@@ -124,9 +128,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.error("Sign out catch block error:", error);
       // Only throw for critical errors
       if (error instanceof Error && 
-          !error.message.includes("User not found") && 
-          !error.message.includes("403") &&
-          !error.message.includes("JWT")) {
+          !error.message.includes("JWT") && 
+          !error.message.includes("User not found") &&
+          error.message.includes("403")) {
         throw new Error("Erro ao fazer logout");
       }
     }
