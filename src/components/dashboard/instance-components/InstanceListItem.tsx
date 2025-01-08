@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button"
-import { QrCode, MessageSquare } from "lucide-react"
+import { QrCode, MessageSquare, LogOut } from "lucide-react"
 import { Database } from "@/integrations/supabase/types"
-import { useQuery } from "@tanstack/react-query"
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { supabase } from "@/integrations/supabase/client"
 import { useToast } from "@/components/ui/use-toast"
 
@@ -14,6 +14,7 @@ interface InstanceListItemProps {
 
 export function InstanceListItem({ instance, onConnect }: InstanceListItemProps) {
   const { toast } = useToast()
+  const queryClient = useQueryClient()
 
   // Poll for instance state every 5 seconds
   const { data: stateData } = useQuery({
@@ -45,6 +46,34 @@ export function InstanceListItem({ instance, onConnect }: InstanceListItemProps)
     retry: false
   })
 
+  // Disconnect mutation
+  const disconnectMutation = useMutation({
+    mutationFn: async () => {
+      console.log('Disconnecting instance:', instance.id)
+      const { data, error } = await supabase.functions.invoke('disconnect-evolution-instance', {
+        body: { instanceId: instance.id }
+      })
+      
+      if (error) throw error
+      return data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['instances'] })
+      toast({
+        title: "Success",
+        description: "Instance disconnected successfully",
+      })
+    },
+    onError: (error) => {
+      console.error('Error disconnecting instance:', error)
+      toast({
+        title: "Error",
+        description: "Failed to disconnect instance. Please try again.",
+        variant: "destructive",
+      })
+    }
+  })
+
   const connectionStatus = stateData?.state || instance.connection_status
 
   return (
@@ -61,21 +90,27 @@ export function InstanceListItem({ instance, onConnect }: InstanceListItemProps)
           </p>
         </div>
       </div>
-      <Button
-        variant="outline"
-        onClick={() => onConnect(instance.id)}
-        disabled={connectionStatus === 'connected'}
-        className="min-w-[120px]"
-      >
+      <div className="flex gap-2">
         {connectionStatus === 'connected' ? (
-          'Connected'
+          <Button
+            variant="destructive"
+            onClick={() => disconnectMutation.mutate()}
+            disabled={disconnectMutation.isPending}
+          >
+            <LogOut className="mr-2 h-4 w-4" />
+            Disconnect
+          </Button>
         ) : (
-          <>
+          <Button
+            variant="outline"
+            onClick={() => onConnect(instance.id)}
+            className="min-w-[120px]"
+          >
             <QrCode className="mr-2 h-4 w-4" />
             Connect
-          </>
+          </Button>
         )}
-      </Button>
+      </div>
     </div>
   )
 }
