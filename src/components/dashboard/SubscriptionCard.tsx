@@ -14,19 +14,38 @@ export function SubscriptionCard() {
     queryKey: ['subscription', user?.id],
     queryFn: async () => {
       console.log('Fetching subscription for user:', user?.id)
-      const { data, error } = await supabase
-        .from('subscriptions')
-        .select('*')
-        .eq('user_id', user?.id)
-        .maybeSingle()
-      
-      if (error) {
-        console.error('Error fetching subscription:', error)
+      try {
+        // First, ensure profile exists
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('id', user?.id)
+          .maybeSingle()
+
+        if (profileError) throw profileError
+
+        if (!profile) {
+          console.log('Profile not found, waiting for creation...')
+          return null
+        }
+
+        const { data, error } = await supabase
+          .from('subscriptions')
+          .select('*')
+          .eq('user_id', user?.id)
+          .maybeSingle()
+        
+        if (error) {
+          console.error('Error fetching subscription:', error)
+          throw error
+        }
+
+        console.log('Subscription data:', data)
+        return data
+      } catch (error) {
+        console.error('Error in subscription query:', error)
         throw error
       }
-
-      console.log('Subscription data:', data)
-      return data
     },
     enabled: !!user?.id
   })

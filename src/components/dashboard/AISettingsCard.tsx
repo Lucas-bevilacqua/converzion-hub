@@ -5,7 +5,7 @@ import { Bot, Loader2 } from "lucide-react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { supabase } from "@/integrations/supabase/client"
 import { useAuth } from "@/contexts/AuthContext"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useToast } from "@/components/ui/use-toast"
 
 export function AISettingsCard() {
@@ -18,43 +18,47 @@ export function AISettingsCard() {
     queryKey: ['ai-settings', user?.id],
     queryFn: async () => {
       console.log('Fetching AI settings for user:', user?.id)
-      const { data, error } = await supabase
-        .from('ai_settings')
-        .select('*')
-        .eq('user_id', user?.id)
-        .maybeSingle()
-      
-      if (error) {
-        console.error('Error fetching AI settings:', error)
+      try {
+        // First, ensure profile exists
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('id', user?.id)
+          .maybeSingle()
+
+        if (profileError) throw profileError
+
+        if (!profile) {
+          console.log('Profile not found, waiting for creation...')
+          return null
+        }
+
+        const { data, error } = await supabase
+          .from('ai_settings')
+          .select('*')
+          .eq('user_id', user?.id)
+          .maybeSingle()
+        
+        if (error) {
+          console.error('Error fetching AI settings:', error)
+          throw error
+        }
+
+        console.log('AI settings found:', data)
+        return data
+      } catch (error) {
+        console.error('Error in AI settings query:', error)
         throw error
       }
-
-      if (!data) {
-        console.log('No AI settings found, creating default settings')
-        const { data: newSettings, error: createError } = await supabase
-          .from('ai_settings')
-          .insert([{ user_id: user?.id }])
-          .select()
-          .single()
-        
-        if (createError) {
-          console.error('Error creating AI settings:', createError)
-          throw createError
-        }
-        
-        return newSettings
-      }
-
-      console.log('AI settings found:', data)
-      return data
     },
     enabled: !!user?.id,
-    onSuccess: (data) => {
-      if (data?.system_prompt) {
-        setPrompt(data.system_prompt)
-      }
-    }
   })
+
+  useEffect(() => {
+    if (settings?.system_prompt) {
+      setPrompt(settings.system_prompt)
+    }
+  }, [settings])
 
   const mutation = useMutation({
     mutationFn: async (newPrompt: string) => {
