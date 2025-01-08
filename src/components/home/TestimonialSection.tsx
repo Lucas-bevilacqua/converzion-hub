@@ -7,21 +7,21 @@ const testimonials = [
     role: "CEO, TechStart",
     content: "A plataforma revolucionou nosso atendimento. Reduzimos o tempo de resposta em 80% e aumentamos a satisfação dos clientes.",
     rating: 5,
-    image: "https://i.pravatar.cc/150?img=1",
+    image: "/photo-1581092795360-fd1ca04f0952", // Professional man in office chair
   },
   {
     name: "Maria Santos",
     role: "Gerente de Marketing, E-commerce Plus",
     content: "Impressionante como a IA entende o contexto e responde naturalmente. Nossos clientes nem percebem que é um bot.",
     rating: 5,
-    image: "https://i.pravatar.cc/150?img=2",
+    image: "/photo-1581091226825-a6a2a5aee158", // Professional woman with laptop
   },
   {
     name: "Pedro Oliveira",
     role: "Diretor Comercial, Vendas.co",
     content: "A melhor decisão que tomamos. O atendimento 24/7 multiplicou nossas conversões e a IA é fantástica na condução das conversas.",
     rating: 5,
-    image: "https://i.pravatar.cc/150?img=3",
+    image: "/photo-1486312338219-ce68d2c6f44d", // Professional person with MacBook
   },
 ];
 
@@ -56,7 +56,7 @@ export const TestimonialSection = () => {
                   <img
                     src={testimonial.image}
                     alt={testimonial.name}
-                    className="h-12 w-12 rounded-full"
+                    className="h-12 w-12 rounded-full object-cover"
                   />
                   <div>
                     <p className="font-semibold text-[#333333]">{testimonial.name}</p>
