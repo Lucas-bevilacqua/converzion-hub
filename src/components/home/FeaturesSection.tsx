@@ -78,7 +78,7 @@ export const FeaturesSection = () => {
           {features.map((feature) => (
             <Card 
               key={feature.title} 
-              className="border border-[#333333]/10 bg-[#F5F7FA] hover:bg-white transition-all duration-300 group hover:-translate-y-1"
+              className="border border-[#333333]/10 bg-gradient-to-b from-white to-[#F5F7FA] hover:bg-white transition-all duration-300 group hover:-translate-y-1"
             >
               <CardHeader>
                 <div className={`h-12 w-12 rounded-lg ${feature.color} flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300`}>

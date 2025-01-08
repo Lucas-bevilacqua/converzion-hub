@@ -15,13 +15,13 @@ export const CTASection = () => {
   const navigate = useNavigate();
 
   return (
-    <section className="py-24 bg-[#0056D2] relative overflow-hidden">
+    <section className="py-24 bg-gradient-to-br from-[#0056D2] via-[#0056D2] to-[#00C896] relative overflow-hidden">
       <div className="absolute inset-0 bg-[url('/grid.svg')] bg-center [mask-image:linear-gradient(180deg,white,rgba(255,255,255,0))]" />
       <div className="container relative">
         <div className="text-center max-w-3xl mx-auto">
           <h2 className="text-4xl font-bold text-white mb-6">
             Comece a{" "}
-            <span className="bg-gradient-to-r from-[#00C896] to-[#00C896] bg-clip-text text-transparent">
+            <span className="bg-gradient-to-r from-[#00C896] to-white bg-clip-text text-transparent">
               Vender Mais Hoje
             </span>
           </h2>

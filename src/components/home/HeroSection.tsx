@@ -6,17 +6,17 @@ export const HeroSection = () => {
   const navigate = useNavigate();
 
   return (
-    <section className="pt-32 pb-24 px-4 bg-[#F5F7FA] relative overflow-hidden">
+    <section className="pt-32 pb-24 px-4 bg-gradient-to-b from-[#F5F7FA] to-white relative overflow-hidden">
       <div className="absolute inset-0 bg-[url('/grid.svg')] bg-center [mask-image:linear-gradient(180deg,white,rgba(255,255,255,0))]" />
       
       <div className="container relative">
         <div className="text-center max-w-4xl mx-auto">
-          <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[#0056D2]/10 text-[#0056D2] text-sm mb-6 font-medium">
+          <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[#0056D2]/10 text-[#0056D2] text-sm mb-6 font-medium animate-float">
             <Zap className="h-4 w-4" />
             Aumente suas vendas com atendimento inteligente
           </span>
 
-          <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold tracking-tight mb-8 text-[#333333]">
+          <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold tracking-tight mb-8 text-[#333333] leading-tight">
             Transforme Atendimentos em{" "}
             <span className="bg-gradient-to-r from-[#0056D2] to-[#00C896] bg-clip-text text-transparent">
               Vendas Automáticas
@@ -48,19 +48,19 @@ export const HeroSection = () => {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <div className="flex items-center gap-3 justify-center">
+            <div className="flex items-center gap-3 justify-center bg-white p-4 rounded-lg shadow-sm hover:shadow-md transition-all">
               <div className="p-2 rounded-full bg-[#00C896]/20">
                 <Bot className="h-5 w-5 text-[#00C896]" />
               </div>
               <span className="text-[#333333] font-medium">Vendas Automáticas 24/7</span>
             </div>
-            <div className="flex items-center gap-3 justify-center">
+            <div className="flex items-center gap-3 justify-center bg-white p-4 rounded-lg shadow-sm hover:shadow-md transition-all">
               <div className="p-2 rounded-full bg-[#00C896]/20">
                 <Shield className="h-5 w-5 text-[#00C896]" />
               </div>
               <span className="text-[#333333] font-medium">Resultados Garantidos</span>
             </div>
-            <div className="flex items-center gap-3 justify-center">
+            <div className="flex items-center gap-3 justify-center bg-white p-4 rounded-lg shadow-sm hover:shadow-md transition-all">
               <div className="p-2 rounded-full bg-[#00C896]/20">
                 <Zap className="h-5 w-5 text-[#00C896]" />
               </div>
