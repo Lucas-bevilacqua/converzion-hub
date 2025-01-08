@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button"
 import { Crown, Loader2, AlertTriangle, CheckCircle2 } from "lucide-react"
 import { useQuery } from "@tanstack/react-query"
 import { supabase } from "@/integrations/supabase/client"
-import { useAuth } from "@/contexts/AuthContext"
+import { useAuth } from "@/contexts/auth/AuthContext"
 import { useToast } from "@/components/ui/use-toast"
 
 export function SubscriptionCard() {
