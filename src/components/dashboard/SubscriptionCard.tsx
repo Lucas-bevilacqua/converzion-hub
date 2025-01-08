@@ -42,7 +42,7 @@ export function SubscriptionCard() {
       console.log('Initiating checkout process')
       const { data, error } = await supabase.functions.invoke('stripe-checkout', {
         body: { 
-          priceId: subscription?.plan_id?.includes('professional') 
+          priceId: subscription?.plan_id === 'professional' 
             ? 'price_1QbuUiKkjJ7tububpw8Vpsrp' // Professional plan
             : 'price_1QbuUiKkjJ7tububpw8Vpsrp' // Starter plan
         },
