@@ -40,6 +40,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => subscription.unsubscribe();
   }, []);
 
+  const handleAuthError = (error: AuthError | Error) => {
+    console.error("Auth error:", error);
+    
+    if ('message' in error) {
+      if (error.message.includes("Invalid login credentials")) {
+        throw new Error("Email ou senha inválidos");
+      }
+      if (error.message.includes("Email not confirmed")) {
+        throw new Error("Por favor, confirme seu email antes de fazer login");
+      }
+      if (error.message.includes("User not found")) {
+        throw new Error("Usuário não encontrado");
+      }
+    }
+    
+    throw new Error("Erro ao autenticar. Por favor, tente novamente.");
+  };
+
   const signIn = async (email: string, password: string) => {
     console.log("Attempting sign in...");
     try {
@@ -49,13 +67,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
 
       if (error) {
-        console.error("Sign in error:", error);
-        
-        if (error.message.includes("Invalid login credentials")) {
-          throw new Error("Email ou senha inválidos");
-        }
-        
-        throw error;
+        handleAuthError(error);
       }
 
       if (!data?.user) {
@@ -64,11 +76,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       console.log("Sign in successful");
     } catch (error) {
-      console.error("Sign in error:", error);
       if (error instanceof Error) {
         throw error;
       }
-      throw new Error("Erro ao fazer login");
+      handleAuthError(error as AuthError);
     }
   };
 
@@ -86,8 +97,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
 
       if (error) {
-        console.error("Sign up error:", error);
-        throw error;
+        handleAuthError(error);
       }
 
       if (!data?.user) {
@@ -96,11 +106,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       console.log("Sign up successful");
     } catch (error) {
-      console.error("Sign up error:", error);
       if (error instanceof Error) {
         throw error;
       }
-      throw new Error("Erro ao criar conta");
+      handleAuthError(error as AuthError);
     }
   };
 
@@ -109,13 +118,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const { error } = await supabase.auth.signOut();
       if (error) {
-        console.error("Sign out error:", error);
-        throw error;
+        handleAuthError(error);
       }
       console.log("Sign out successful");
     } catch (error) {
-      console.error("Sign out error:", error);
-      throw error;
+      handleAuthError(error as AuthError);
     }
   };
 
