@@ -97,6 +97,7 @@ export function InstancesCard() {
       })
       
       if (error) throw error
+      console.log('Connect response:', response)
       return response
     },
     onSuccess: (data) => {

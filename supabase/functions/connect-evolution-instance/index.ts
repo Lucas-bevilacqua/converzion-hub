@@ -64,21 +64,18 @@ serve(async (req) => {
 
     // Connect to Evolution API
     const evolutionApiUrl = Deno.env.get('EVOLUTION_API_URL')
-    if (!evolutionApiUrl) {
-      throw new Error('Evolution API URL not configured')
+    const evolutionApiKey = Deno.env.get('EVOLUTION_API_KEY')
+    
+    if (!evolutionApiUrl || !evolutionApiKey) {
+      throw new Error('Evolution API configuration not found')
     }
 
-    // Remove trailing slash if present
-    const baseUrl = evolutionApiUrl.endsWith('/') 
-      ? evolutionApiUrl.slice(0, -1) 
-      : evolutionApiUrl
+    console.log('Making request to Evolution API:', `${evolutionApiUrl}/instance/connect/${instance.name}`)
 
-    console.log('Making request to Evolution API:', `${baseUrl}/instance/connect/${instance.name}`)
-
-    const evolutionResponse = await fetch(`${baseUrl}/instance/connect/${instance.name}`, {
+    const evolutionResponse = await fetch(`${evolutionApiUrl}/instance/connect/${instance.name}`, {
       method: 'GET',
       headers: {
-        'apikey': Deno.env.get('EVOLUTION_API_KEY') ?? '',
+        'apikey': evolutionApiKey,
       }
     })
 
@@ -88,7 +85,7 @@ serve(async (req) => {
       return new Response(
         JSON.stringify({ error: 'Failed to connect to Evolution API', details: errorText }),
         { 
-          status: 400, 
+          status: evolutionResponse.status, 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         }
       )
