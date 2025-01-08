@@ -32,11 +32,28 @@ serve(async (req) => {
 
     console.log('Checking subscription for user:', user.id)
 
-    // Check subscription status
+    // Get user profile first
+    const { data: profile, error: profileError } = await supabaseClient
+      .from('profiles')
+      .select('id')
+      .eq('id', user.id)
+      .single()
+
+    if (profileError) {
+      console.error('Error fetching profile:', profileError)
+      throw profileError
+    }
+
+    if (!profile) {
+      console.error('Profile not found for user:', user.id)
+      throw new Error('User profile not found')
+    }
+
+    // Check subscription status using profile.id
     const { data: subscription, error: subError } = await supabaseClient
       .from('subscriptions')
       .select('*')
-      .eq('user_id', user.id)
+      .eq('user_id', profile.id)
       .maybeSingle()
 
     if (subError) {
@@ -55,7 +72,7 @@ serve(async (req) => {
     const { count, error: countError } = await supabaseClient
       .from('evolution_instances')
       .select('*', { count: 'exact' })
-      .eq('user_id', user.id)
+      .eq('user_id', profile.id)
 
     if (countError) {
       console.error('Error counting instances:', countError)
@@ -109,7 +126,7 @@ serve(async (req) => {
     const { data: instance, error: insertError } = await supabaseClient
       .from('evolution_instances')
       .insert({
-        user_id: user.id,
+        user_id: profile.id,
         name: instanceName,
         phone_number: phoneNumber,
         connection_status: 'disconnected'
