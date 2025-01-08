@@ -13,13 +13,19 @@ export function SubscriptionCard() {
   const { data: subscription, isLoading } = useQuery({
     queryKey: ['subscription', user?.id],
     queryFn: async () => {
+      console.log('Fetching subscription for user:', user?.id)
       const { data, error } = await supabase
         .from('subscriptions')
         .select('*')
         .eq('user_id', user?.id)
-        .single()
+        .maybeSingle()
       
-      if (error) throw error
+      if (error) {
+        console.error('Error fetching subscription:', error)
+        throw error
+      }
+
+      console.log('Subscription data:', data)
       return data
     },
     enabled: !!user?.id
@@ -27,6 +33,7 @@ export function SubscriptionCard() {
 
   const handleUpgrade = async () => {
     try {
+      console.log('Initiating checkout process')
       const { data, error } = await supabase.functions.invoke('stripe-checkout', {
         body: { priceId: subscription?.plan_id },
       })
@@ -41,8 +48,8 @@ export function SubscriptionCard() {
     } catch (error) {
       console.error('Error creating checkout session:', error)
       toast({
-        title: "Error",
-        description: "Could not initiate checkout. Please try again.",
+        title: "Erro",
+        description: "Não foi possível iniciar o checkout. Tente novamente.",
         variant: "destructive",
       })
     }

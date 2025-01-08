@@ -2,39 +2,84 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Bot, Loader2 } from "lucide-react"
-import { useQuery, useMutation } from "@tanstack/react-query"
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { supabase } from "@/integrations/supabase/client"
 import { useAuth } from "@/contexts/AuthContext"
 import { useState } from "react"
+import { useToast } from "@/components/ui/use-toast"
 
 export function AISettingsCard() {
   const { user } = useAuth()
+  const { toast } = useToast()
+  const queryClient = useQueryClient()
   const [prompt, setPrompt] = useState("")
 
   const { data: settings, isLoading } = useQuery({
     queryKey: ['ai-settings', user?.id],
     queryFn: async () => {
+      console.log('Fetching AI settings for user:', user?.id)
       const { data, error } = await supabase
         .from('ai_settings')
         .select('*')
         .eq('user_id', user?.id)
-        .single()
+        .maybeSingle()
       
-      if (error) throw error
-      if (data) setPrompt(data.system_prompt || "")
+      if (error) {
+        console.error('Error fetching AI settings:', error)
+        throw error
+      }
+
+      if (!data) {
+        console.log('No AI settings found, creating default settings')
+        const { data: newSettings, error: createError } = await supabase
+          .from('ai_settings')
+          .insert([{ user_id: user?.id }])
+          .select()
+          .single()
+        
+        if (createError) {
+          console.error('Error creating AI settings:', createError)
+          throw createError
+        }
+        
+        return newSettings
+      }
+
+      console.log('AI settings found:', data)
       return data
     },
-    enabled: !!user?.id
+    enabled: !!user?.id,
+    onSuccess: (data) => {
+      if (data?.system_prompt) {
+        setPrompt(data.system_prompt)
+      }
+    }
   })
 
   const mutation = useMutation({
     mutationFn: async (newPrompt: string) => {
+      console.log('Updating AI settings with new prompt:', newPrompt)
       const { error } = await supabase
         .from('ai_settings')
         .update({ system_prompt: newPrompt })
         .eq('user_id', user?.id)
       
       if (error) throw error
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['ai-settings'] })
+      toast({
+        title: "Configurações salvas",
+        description: "As configurações da IA foram atualizadas com sucesso.",
+      })
+    },
+    onError: (error) => {
+      console.error('Error updating AI settings:', error)
+      toast({
+        title: "Erro",
+        description: "Não foi possível salvar as configurações. Tente novamente.",
+        variant: "destructive",
+      })
     }
   })
 
