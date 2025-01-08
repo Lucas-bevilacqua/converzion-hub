@@ -13,9 +13,9 @@ import { Check } from "lucide-react";
 
 const plans = [
   {
-    name: "Starter",
-    price: "4,97",
-    priceId: "price_1OgbQkKkjJ7tubuZGJjcvq4M", // Updated to actual test mode price ID
+    name: "Starter Plan",
+    price: "497,00",
+    priceId: "price_1QbuUiKkjJ7tububpw8Vpsrp", // Updated to actual test mode price ID
     description: "Perfeito para começar",
     features: [
       "1 Instância",
@@ -27,9 +27,9 @@ const plans = [
     ],
   },
   {
-    name: "Professional",
-    price: "9,97",
-    priceId: "price_1OgbRPKkjJ7tubuZzYUWrqxN", // Updated to actual test mode price ID
+    name: "Professional Plan",
+    price: "997,00",
+    priceId: "price_1QbuUvKkjJ7tububiklS9tAc", // Updated to actual test mode price ID
     description: "Para negócios em crescimento",
     features: [
       "3 Instâncias",
