@@ -15,20 +15,6 @@ export function SubscriptionCard() {
     queryFn: async () => {
       console.log('Fetching subscription for user:', user?.id)
       try {
-        // First, ensure profile exists
-        const { data: profile, error: profileError } = await supabase
-          .from('profiles')
-          .select('id')
-          .eq('id', user?.id)
-          .maybeSingle()
-
-        if (profileError) throw profileError
-
-        if (!profile) {
-          console.log('Profile not found, waiting for creation...')
-          return null
-        }
-
         const { data, error } = await supabase
           .from('subscriptions')
           .select('*')
