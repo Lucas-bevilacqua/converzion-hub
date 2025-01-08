@@ -38,25 +38,33 @@ serve(async (req) => {
       .from('profiles')
       .select('id')
       .eq('id', user.id)
-      .maybeSingle()
+      .single()
 
     if (profileError) {
       console.error('Error fetching profile:', profileError)
-      throw profileError
-    }
+      // If profile doesn't exist, try to create it
+      const { data: newProfile, error: createProfileError } = await supabaseClient
+        .from('profiles')
+        .insert([{ 
+          id: user.id,
+          full_name: user.user_metadata.full_name || ''
+        }])
+        .select()
+        .single()
 
-    if (!profile) {
-      console.error('Profile not found for user:', user.id)
-      throw new Error('User profile not found')
-    }
+      if (createProfileError) {
+        console.error('Error creating profile:', createProfileError)
+        throw new Error('Could not create user profile')
+      }
 
-    console.log('Found profile:', profile.id)
+      console.log('Created new profile for user:', user.id)
+    }
 
     // Check subscription status using profile.id
     const { data: subscription, error: subError } = await supabaseClient
       .from('subscriptions')
       .select('*')
-      .eq('user_id', profile.id)
+      .eq('user_id', user.id)
       .maybeSingle()
 
     if (subError) {
@@ -83,7 +91,7 @@ serve(async (req) => {
     const { count, error: countError } = await supabaseClient
       .from('evolution_instances')
       .select('*', { count: 'exact' })
-      .eq('user_id', profile.id)
+      .eq('user_id', user.id)
 
     if (countError) {
       console.error('Error counting instances:', countError)
@@ -129,7 +137,7 @@ serve(async (req) => {
     const { data: instance, error: insertError } = await supabaseClient
       .from('evolution_instances')
       .insert({
-        user_id: profile.id,
+        user_id: user.id,
         name: instanceName,
         phone_number: phoneNumber,
         connection_status: 'disconnected'
