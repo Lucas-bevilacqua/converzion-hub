@@ -13,6 +13,12 @@ serve(async (req) => {
   }
 
   try {
+    const stripeKey = Deno.env.get('STRIPE_SECRET_KEY')
+    if (!stripeKey) {
+      console.error('STRIPE_SECRET_KEY is not set')
+      throw new Error('Stripe configuration error')
+    }
+
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
@@ -26,10 +32,12 @@ serve(async (req) => {
       throw new Error('No email found')
     }
 
-    const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') || '', {
+    console.log('Creating Stripe instance with secret key...')
+    const stripe = new Stripe(stripeKey, {
       apiVersion: '2023-10-16',
     })
 
+    console.log('Checking for existing customer...')
     const customers = await stripe.customers.list({
       email: user.email,
       limit: 1
@@ -38,6 +46,9 @@ serve(async (req) => {
     let customer_id = undefined
     if (customers.data.length > 0) {
       customer_id = customers.data[0].id
+      console.log('Found existing customer:', customer_id)
+    } else {
+      console.log('No existing customer found')
     }
 
     console.log('Creating checkout session...')
@@ -65,8 +76,12 @@ serve(async (req) => {
     )
   } catch (error) {
     console.error('Error creating checkout session:', error)
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred'
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ 
+        error: errorMessage,
+        details: error instanceof Error ? error.stack : undefined
+      }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 500,
