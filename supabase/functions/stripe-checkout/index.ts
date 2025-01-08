@@ -19,11 +19,6 @@ serve(async (req) => {
       throw new Error('Stripe secret key is not configured')
     }
 
-    if (!stripeKey.startsWith('sk_')) {
-      console.error('Invalid Stripe secret key format')
-      throw new Error('Invalid Stripe secret key configuration')
-    }
-
     console.log('Initializing Supabase client...')
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
