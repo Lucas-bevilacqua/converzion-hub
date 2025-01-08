@@ -18,7 +18,14 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   console.log("Protected route - User:", user?.id, "Loading:", loading);
 
   if (loading) {
-    return <div>Carregando...</div>;
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto"></div>
+          <p className="mt-4 text-gray-600">Carregando...</p>
+        </div>
+      </div>
+    );
   }
 
   if (!user) {
@@ -35,7 +42,14 @@ const PublicRoute = ({ children }: { children: React.ReactNode }) => {
   console.log("Public route - User:", user?.id, "Loading:", loading);
 
   if (loading) {
-    return <div>Carregando...</div>;
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto"></div>
+          <p className="mt-4 text-gray-600">Carregando...</p>
+        </div>
+      </div>
+    );
   }
 
   if (user) {

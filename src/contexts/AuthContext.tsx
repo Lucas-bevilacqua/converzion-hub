@@ -65,6 +65,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signIn = async (email: string, password: string) => {
     console.log("Attempting sign in for email:", email);
+    setLoading(true);
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
@@ -85,6 +86,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.log("Sign in successful for user:", data.user.id);
     } catch (error) {
       console.error("Sign in catch block error:", error);
+      setLoading(false);
       if (error instanceof Error) {
         throw error;
       }
@@ -95,6 +97,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signUp = async (email: string, password: string, fullName: string) => {
     console.log("Attempting sign up for email:", email);
+    setLoading(true);
     try {
       const { data, error } = await supabase.auth.signUp({
         email,
@@ -120,6 +123,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.log("Sign up successful for user:", data.user.id);
     } catch (error) {
       console.error("Sign up catch block error:", error);
+      setLoading(false);
       if (error instanceof Error) {
         throw error;
       }
@@ -130,6 +134,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signOut = async () => {
     console.log("Attempting sign out...");
+    setLoading(true);
     try {
       const { error } = await supabase.auth.signOut();
       if (error) {
@@ -142,6 +147,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.error("Sign out catch block error:", error);
       const errorMessage = parseAuthError(error as any);
       throw new Error(errorMessage);
+    } finally {
+      setLoading(false);
     }
   };
 
