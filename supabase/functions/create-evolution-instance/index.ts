@@ -90,9 +90,14 @@ serve(async (req) => {
       throw new Error('Evolution API URL not configured')
     }
 
-    console.log('Making request to Evolution API:', `${evolutionApiUrl}/instance/create`)
+    // Remove trailing slash if present and construct URL properly
+    const baseUrl = evolutionApiUrl.endsWith('/') 
+      ? evolutionApiUrl.slice(0, -1) 
+      : evolutionApiUrl
+
+    console.log('Making request to Evolution API:', `${baseUrl}/instance/create`)
     
-    const evolutionResponse = await fetch(`${evolutionApiUrl}/instance/create`, {
+    const evolutionResponse = await fetch(`${baseUrl}/instance/create`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
