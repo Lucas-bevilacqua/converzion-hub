@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -19,15 +19,24 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { signIn } = useAuth();
+  const { signIn, session } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
+
+  // Redireciona se já estiver logado
+  useEffect(() => {
+    if (session) {
+      console.log("User already logged in, redirecting to dashboard");
+      navigate("/dashboard");
+    }
+  }, [session, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     try {
       setLoading(true);
+      console.log("Attempting sign in...");
       await signIn(email, password);
       navigate("/dashboard");
     } catch (error: any) {
