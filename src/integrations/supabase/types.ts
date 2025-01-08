@@ -54,6 +54,7 @@ export type Database = {
           phone_number: string | null
           qr_code: string | null
           status: string | null
+          system_prompt: string | null
           updated_at: string
           user_id: string | null
         }
@@ -66,6 +67,7 @@ export type Database = {
           phone_number?: string | null
           qr_code?: string | null
           status?: string | null
+          system_prompt?: string | null
           updated_at?: string
           user_id?: string | null
         }
@@ -78,6 +80,7 @@ export type Database = {
           phone_number?: string | null
           qr_code?: string | null
           status?: string | null
+          system_prompt?: string | null
           updated_at?: string
           user_id?: string | null
         }

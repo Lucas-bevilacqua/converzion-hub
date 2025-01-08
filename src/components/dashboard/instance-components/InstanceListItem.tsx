@@ -1,9 +1,11 @@
 import { Button } from "@/components/ui/button"
-import { QrCode, MessageSquare, LogOut } from "lucide-react"
+import { QrCode, MessageSquare, LogOut, Settings } from "lucide-react"
 import { Database } from "@/integrations/supabase/types"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { supabase } from "@/integrations/supabase/client"
 import { useToast } from "@/components/ui/use-toast"
+import { useState } from "react"
+import { InstancePromptDialog } from "./InstancePromptDialog"
 
 type Instance = Database['public']['Tables']['evolution_instances']['Row']
 
@@ -15,8 +17,8 @@ interface InstanceListItemProps {
 export function InstanceListItem({ instance, onConnect }: InstanceListItemProps) {
   const { toast } = useToast()
   const queryClient = useQueryClient()
+  const [showPromptDialog, setShowPromptDialog] = useState(false)
 
-  // Poll for instance state every 5 seconds
   const { data: stateData } = useQuery({
     queryKey: ['instanceState', instance.id],
     queryFn: async () => {
@@ -91,6 +93,14 @@ export function InstanceListItem({ instance, onConnect }: InstanceListItemProps)
         </div>
       </div>
       <div className="flex gap-2">
+        <Button
+          variant="outline"
+          size="icon"
+          onClick={() => setShowPromptDialog(true)}
+          title="Configurar Prompt"
+        >
+          <Settings className="h-4 w-4" />
+        </Button>
         {connectionStatus === 'connected' ? (
           <Button
             variant="destructive"
@@ -111,6 +121,13 @@ export function InstanceListItem({ instance, onConnect }: InstanceListItemProps)
           </Button>
         )}
       </div>
+
+      <InstancePromptDialog
+        open={showPromptDialog}
+        onOpenChange={setShowPromptDialog}
+        instanceId={instance.id}
+        currentPrompt={instance.system_prompt}
+      />
     </div>
   )
 }

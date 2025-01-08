@@ -4,7 +4,6 @@ import { useAuth } from "@/contexts/auth/AuthContext";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { SubscriptionCard } from "@/components/dashboard/SubscriptionCard";
-import { AISettingsCard } from "@/components/dashboard/AISettingsCard";
 import { InstancesCard } from "@/components/dashboard/InstancesCard";
 import { Loader2, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -15,7 +14,6 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  // Fetch subscription status
   const { data: subscription, isLoading: isLoadingSubscription } = useQuery({
     queryKey: ['subscription', user?.id],
     queryFn: async () => {
@@ -85,15 +83,10 @@ export default function Dashboard() {
           </Button>
         </div>
         
-        <div className="grid gap-6 md:grid-cols-2">
+        <div className="grid gap-6">
           <SubscriptionCard />
           {subscription?.status === 'active' && (
-            <>
-              <AISettingsCard />
-              <div className="md:col-span-2">
-                <InstancesCard />
-              </div>
-            </>
+            <InstancesCard />
           )}
         </div>
       </div>
