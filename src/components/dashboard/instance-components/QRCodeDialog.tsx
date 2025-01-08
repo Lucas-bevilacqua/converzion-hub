@@ -23,8 +23,10 @@ export function QRCodeDialog({ open, onOpenChange, qrCode }: QRCodeDialogProps) 
                 className="w-64 h-64"
               />
               <p className="text-sm text-muted-foreground text-center">
-                Escaneie o QR Code com seu WhatsApp para conectar.<br/>
-                O código será atualizado automaticamente a cada 30 segundos.
+                Abra o WhatsApp no seu celular<br/>
+                Toque em Menu ou Configurações e selecione Aparelhos Conectados<br/>
+                Toque em Conectar um Aparelho<br/>
+                Aponte seu celular para esta tela para capturar o código QR
               </p>
             </>
           ) : (

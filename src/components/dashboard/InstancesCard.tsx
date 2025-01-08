@@ -22,7 +22,6 @@ export function InstancesCard() {
     phone_number: ""
   })
 
-  // Fetch subscription status
   const { data: subscription } = useQuery({
     queryKey: ['subscription', user?.id],
     queryFn: async () => {
@@ -63,8 +62,7 @@ export function InstancesCard() {
       console.log('Creating new instance:', newInstance)
       const { data: response, error } = await supabase.functions.invoke('create-evolution-instance', {
         body: { 
-          instanceName: newInstance.name,
-          phoneNumber: newInstance.phone_number
+          instanceName: newInstance.name
         }
       })
       
@@ -194,7 +192,6 @@ export function InstancesCard() {
           </div>
         ) : (
           <div className="space-y-6">
-            {/* Existing Instances */}
             {instances && instances.length > 0 && (
               <div className="space-y-4">
                 {instances.map((instance) => (
@@ -207,7 +204,6 @@ export function InstancesCard() {
               </div>
             )}
             
-            {/* Instance Slots */}
             {subscription?.status === 'active' && (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {instances?.map((instance) => (
@@ -227,7 +223,6 @@ export function InstancesCard() {
               </div>
             )}
             
-            {/* New Instance Form */}
             {showNewInstanceForm && (
               <NewInstanceForm
                 newInstance={newInstance}
