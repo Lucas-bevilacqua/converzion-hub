@@ -15,7 +15,6 @@ const plans = [
   {
     name: "Starter Plan",
     price: "497,00",
-    priceId: "price_1QbuUiKkjJ7tububpw8Vpsrp", // Updated to actual test mode price ID
     description: "Perfeito para começar",
     features: [
       "1 Instância",
@@ -29,7 +28,6 @@ const plans = [
   {
     name: "Professional Plan",
     price: "997,00",
-    priceId: "price_1QbuUvKkjJ7tububiklS9tAc", // Updated to actual test mode price ID
     description: "Para negócios em crescimento",
     features: [
       "3 Instâncias",
@@ -62,8 +60,8 @@ export const PricingSection = () => {
   const { user, session } = useAuth();
   const { toast } = useToast();
 
-  const handleSubscribe = async (priceId?: string) => {
-    if (!priceId) {
+  const handleSubscribe = async (plan: typeof plans[0]) => {
+    if (plan.price === "Personalizado") {
       navigate("/contact");
       return;
     }
@@ -78,6 +76,7 @@ export const PricingSection = () => {
     }
 
     try {
+      console.log("Creating checkout session for plan:", plan.name);
       const response = await fetch(
         "https://vodexhppkasbulogmcqb.functions.supabase.co/stripe-checkout",
         {
@@ -86,12 +85,22 @@ export const PricingSection = () => {
             "Content-Type": "application/json",
             Authorization: `Bearer ${session?.access_token}`,
           },
-          body: JSON.stringify({ priceId }),
+          body: JSON.stringify({ 
+            planName: plan.name,
+            priceAmount: plan.price
+          }),
         }
       );
 
+      if (!response.ok) {
+        const error = await response.json();
+        console.error("Checkout error:", error);
+        throw new Error(error.message || "Failed to create checkout session");
+      }
+
       const { url } = await response.json();
       if (url) {
+        console.log("Redirecting to checkout URL:", url);
         window.location.href = url;
       }
     } catch (error) {
@@ -143,7 +152,7 @@ export const PricingSection = () => {
                 </ul>
                 <Button
                   className="w-full mt-6"
-                  onClick={() => handleSubscribe(plan.priceId)}
+                  onClick={() => handleSubscribe(plan)}
                 >
                   {plan.price === "Personalizado"
                     ? "Falar com Vendas"
