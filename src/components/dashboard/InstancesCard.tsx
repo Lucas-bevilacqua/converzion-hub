@@ -8,6 +8,7 @@ import { useToast } from "@/components/ui/use-toast"
 import { InstanceListItem } from "./instance-components/InstanceListItem"
 import { NewInstanceForm } from "./instance-components/NewInstanceForm"
 import { QRCodeDialog } from "./instance-components/QRCodeDialog"
+import { InstanceSlotCard } from "./instance-components/InstanceSlotCard"
 
 export function InstancesCard() {
   const { user } = useAuth()
@@ -15,6 +16,7 @@ export function InstancesCard() {
   const queryClient = useQueryClient()
   const [showQRCode, setShowQRCode] = useState(false)
   const [selectedInstance, setSelectedInstance] = useState<any>(null)
+  const [showNewInstanceForm, setShowNewInstanceForm] = useState(false)
   const [newInstance, setNewInstance] = useState({
     name: "",
     phone_number: ""
@@ -50,7 +52,7 @@ export function InstancesCard() {
         console.error('Error fetching instances:', error)
         throw error
       }
-      return data
+      return data || []
     },
     enabled: !!user?.id
   })
@@ -72,6 +74,7 @@ export function InstancesCard() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['instances'] })
       setNewInstance({ name: "", phone_number: "" })
+      setShowNewInstanceForm(false)
       toast({
         title: "Sucesso",
         description: "Instância criada com sucesso",
@@ -148,6 +151,15 @@ export function InstancesCard() {
     connectMutation.mutate(instanceId)
   }
 
+  const getInstanceLimit = () => {
+    if (!subscription || subscription.status !== 'active') return 0
+    return subscription.plan_id?.includes('professional') ? 3 : 1
+  }
+
+  const instanceLimit = getInstanceLimit()
+  const usedSlots = instances?.length || 0
+  const availableSlots = Math.max(0, instanceLimit - usedSlots)
+
   // Auto-refresh QR code every 30 seconds when dialog is open
   useQuery({
     queryKey: ['qrCode', selectedInstance?.id],
@@ -172,7 +184,7 @@ export function InstancesCard() {
           Instâncias WhatsApp
         </CardTitle>
         <CardDescription>
-          Gerencie suas instâncias do WhatsApp
+          Gerencie suas instâncias do WhatsApp ({usedSlots}/{instanceLimit} em uso)
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -182,22 +194,49 @@ export function InstancesCard() {
           </div>
         ) : (
           <div className="space-y-6">
-            <div className="space-y-4">
-              {instances?.map((instance) => (
-                <InstanceListItem
-                  key={instance.id}
-                  instance={instance}
-                  onConnect={handleConnect}
-                />
-              ))}
-            </div>
+            {/* Existing Instances */}
+            {instances && instances.length > 0 && (
+              <div className="space-y-4">
+                {instances.map((instance) => (
+                  <InstanceListItem
+                    key={instance.id}
+                    instance={instance}
+                    onConnect={handleConnect}
+                  />
+                ))}
+              </div>
+            )}
             
-            <NewInstanceForm
-              newInstance={newInstance}
-              onChange={(field, value) => setNewInstance(prev => ({ ...prev, [field]: value }))}
-              onAdd={handleAdd}
-              isLoading={createMutation.isPending}
-            />
+            {/* Instance Slots */}
+            {subscription?.status === 'active' && (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {instances?.map((instance) => (
+                  <InstanceSlotCard
+                    key={instance.id}
+                    isUsed={true}
+                    onClick={() => {}}
+                  />
+                ))}
+                {Array.from({ length: availableSlots }).map((_, index) => (
+                  <InstanceSlotCard
+                    key={`empty-${index}`}
+                    isUsed={false}
+                    onClick={() => setShowNewInstanceForm(true)}
+                  />
+                ))}
+              </div>
+            )}
+            
+            {/* New Instance Form */}
+            {showNewInstanceForm && (
+              <NewInstanceForm
+                newInstance={newInstance}
+                onChange={(field, value) => setNewInstance(prev => ({ ...prev, [field]: value }))}
+                onAdd={handleAdd}
+                isLoading={createMutation.isPending}
+                onCancel={() => setShowNewInstanceForm(false)}
+              />
+            )}
           </div>
         )}
       </CardContent>

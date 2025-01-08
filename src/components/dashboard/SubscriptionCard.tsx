@@ -1,6 +1,6 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Crown, Loader2 } from "lucide-react"
+import { Crown, Loader2, AlertTriangle } from "lucide-react"
 import { useQuery } from "@tanstack/react-query"
 import { supabase } from "@/integrations/supabase/client"
 import { useAuth } from "@/contexts/AuthContext"
@@ -39,8 +39,9 @@ export function SubscriptionCard() {
   const handleUpgrade = async () => {
     try {
       console.log('Initiating checkout process')
-      // Default to starter plan if no current plan
-      const priceId = 'price_1QbuUiKkjJ7tububpw8Vpsrp' // Updated to actual test mode price ID
+      const priceId = subscription?.plan_id?.includes('professional') 
+        ? 'price_1QbuUiKkjJ7tububpw8Vpsrp' // Professional plan
+        : 'price_1QbuUiKkjJ7tububpw8Vpsrp' // Starter plan
       
       console.log('Using price ID:', priceId)
       const { data, error } = await supabase.functions.invoke('stripe-checkout', {
@@ -67,11 +68,35 @@ export function SubscriptionCard() {
     }
   }
 
+  const getPlanDetails = () => {
+    if (!subscription || subscription.status !== 'active') {
+      return {
+        name: 'Gratuito',
+        instances: 0,
+        color: 'text-gray-500'
+      }
+    }
+
+    return subscription.plan_id?.includes('professional')
+      ? {
+          name: 'Profissional',
+          instances: 3,
+          color: 'text-purple-500'
+        }
+      : {
+          name: 'Inicial',
+          instances: 1,
+          color: 'text-blue-500'
+        }
+  }
+
+  const planDetails = getPlanDetails()
+
   return (
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <Crown className="h-5 w-5 text-yellow-500" />
+          <Crown className={`h-5 w-5 ${planDetails.color}`} />
           Plano Atual
         </CardTitle>
         <CardDescription>
@@ -83,25 +108,37 @@ export function SubscriptionCard() {
           <div className="flex justify-center">
             <Loader2 className="h-6 w-6 animate-spin" />
           </div>
-        ) : subscription ? (
-          <div className="space-y-4">
-            <div>
-              <p className="font-medium">Status: {subscription.status}</p>
-              <p className="text-sm text-muted-foreground">
-                Válido até: {new Date(subscription.current_period_end).toLocaleDateString()}
-              </p>
-            </div>
-            <Button onClick={handleUpgrade}>
-              Fazer Upgrade
-            </Button>
-          </div>
         ) : (
           <div className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              Você ainda não tem uma assinatura ativa
-            </p>
-            <Button onClick={handleUpgrade}>
-              Assinar Agora
+            <div className="p-4 border rounded-lg">
+              <h3 className={`text-lg font-semibold ${planDetails.color}`}>
+                Plano {planDetails.name}
+              </h3>
+              <p className="text-sm text-muted-foreground mt-1">
+                {planDetails.instances} instância{planDetails.instances !== 1 ? 's' : ''} disponíve{planDetails.instances !== 1 ? 'is' : 'l'}
+              </p>
+              {subscription?.status === 'active' && (
+                <p className="text-sm text-muted-foreground mt-1">
+                  Válido até: {new Date(subscription.current_period_end!).toLocaleDateString()}
+                </p>
+              )}
+            </div>
+
+            {subscription?.status !== 'active' && (
+              <div className="flex items-center gap-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                <AlertTriangle className="h-5 w-5 text-yellow-500" />
+                <p className="text-sm text-yellow-700">
+                  Você precisa de uma assinatura ativa para usar as instâncias
+                </p>
+              </div>
+            )}
+
+            <Button 
+              onClick={handleUpgrade} 
+              className="w-full"
+              variant={subscription?.status === 'active' ? 'outline' : 'default'}
+            >
+              {subscription?.status === 'active' ? 'Fazer Upgrade' : 'Assinar Agora'}
             </Button>
           </div>
         )}
