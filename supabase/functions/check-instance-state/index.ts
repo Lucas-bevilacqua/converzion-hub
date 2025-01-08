@@ -73,17 +73,22 @@ serve(async (req) => {
     })
 
     if (!stateResponse.ok) {
-      throw new Error(`Failed to get instance state: ${await stateResponse.text()}`)
+      const errorText = await stateResponse.text()
+      console.error('Evolution API state check error:', errorText)
+      throw new Error(`Failed to get instance state: ${errorText}`)
     }
 
     const stateData = await stateResponse.json()
     console.log('State response:', stateData)
 
+    // Map Evolution API state to our connection status
+    const connectionStatus = stateData.instance?.state === 'open' ? 'connected' : 'disconnected'
+
     // Update instance state in database
     const { error: updateError } = await supabaseClient
       .from('evolution_instances')
       .update({
-        connection_status: stateData.state,
+        connection_status: connectionStatus,
         updated_at: new Date().toISOString()
       })
       .eq('id', instanceId)
@@ -93,14 +98,17 @@ serve(async (req) => {
     }
 
     return new Response(
-      JSON.stringify({ state: stateData.state }),
+      JSON.stringify({ state: connectionStatus }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
 
   } catch (error) {
     console.error('Error in check-instance-state:', error)
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ 
+        error: error.message,
+        details: error.cause || error.stack
+      }),
       { 
         status: 400, 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
