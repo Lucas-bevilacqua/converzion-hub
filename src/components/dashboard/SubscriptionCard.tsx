@@ -39,11 +39,18 @@ export function SubscriptionCard() {
   const handleUpgrade = async () => {
     try {
       console.log('Initiating checkout process')
+      // Default to starter plan if no current plan
+      const priceId = 'price_1QbuUiKkjJ7tububpw8Vpsrp_test'
+      
+      console.log('Using price ID:', priceId)
       const { data, error } = await supabase.functions.invoke('stripe-checkout', {
-        body: { priceId: subscription?.plan_id },
+        body: { priceId },
       })
 
-      if (error) throw error
+      if (error) {
+        console.error('Error from stripe-checkout:', error)
+        throw error
+      }
       
       if (data?.url) {
         window.location.href = data.url
