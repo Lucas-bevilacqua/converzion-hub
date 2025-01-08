@@ -1,6 +1,6 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Crown, Loader2, AlertTriangle } from "lucide-react"
+import { Crown, Loader2, AlertTriangle, CheckCircle2 } from "lucide-react"
 import { useQuery } from "@tanstack/react-query"
 import { supabase } from "@/integrations/supabase/client"
 import { useAuth } from "@/contexts/AuthContext"
@@ -39,13 +39,12 @@ export function SubscriptionCard() {
   const handleUpgrade = async () => {
     try {
       console.log('Initiating checkout process')
-      const priceId = subscription?.plan_id?.includes('professional') 
-        ? 'price_1QbuUiKkjJ7tububpw8Vpsrp' // Professional plan
-        : 'price_1QbuUiKkjJ7tububpw8Vpsrp' // Starter plan
-      
-      console.log('Using price ID:', priceId)
       const { data, error } = await supabase.functions.invoke('stripe-checkout', {
-        body: { priceId },
+        body: { 
+          priceId: subscription?.plan_id?.includes('professional') 
+            ? 'price_1QbuUiKkjJ7tububpw8Vpsrp' // Professional plan
+            : 'price_1QbuUiKkjJ7tububpw8Vpsrp' // Starter plan
+        },
       })
 
       if (error) {
@@ -73,7 +72,9 @@ export function SubscriptionCard() {
       return {
         name: 'Gratuito',
         instances: 0,
-        color: 'text-gray-500'
+        color: 'text-gray-500',
+        bgColor: 'bg-gray-50',
+        borderColor: 'border-gray-200'
       }
     }
 
@@ -81,12 +82,16 @@ export function SubscriptionCard() {
       ? {
           name: 'Profissional',
           instances: 3,
-          color: 'text-purple-500'
+          color: 'text-purple-500',
+          bgColor: 'bg-purple-50',
+          borderColor: 'border-purple-200'
         }
       : {
           name: 'Inicial',
           instances: 1,
-          color: 'text-blue-500'
+          color: 'text-blue-500',
+          bgColor: 'bg-blue-50',
+          borderColor: 'border-blue-200'
         }
   }
 
@@ -110,11 +115,16 @@ export function SubscriptionCard() {
           </div>
         ) : (
           <div className="space-y-4">
-            <div className="p-4 border rounded-lg">
-              <h3 className={`text-lg font-semibold ${planDetails.color}`}>
-                Plano {planDetails.name}
-              </h3>
-              <p className="text-sm text-muted-foreground mt-1">
+            <div className={`p-4 border rounded-lg ${planDetails.bgColor} ${planDetails.borderColor}`}>
+              <div className="flex items-center justify-between mb-2">
+                <h3 className={`text-lg font-semibold ${planDetails.color}`}>
+                  Plano {planDetails.name}
+                </h3>
+                {subscription?.status === 'active' && (
+                  <CheckCircle2 className="h-5 w-5 text-green-500" />
+                )}
+              </div>
+              <p className="text-sm text-muted-foreground">
                 {planDetails.instances} instância{planDetails.instances !== 1 ? 's' : ''} disponíve{planDetails.instances !== 1 ? 'is' : 'l'}
               </p>
               {subscription?.status === 'active' && (
