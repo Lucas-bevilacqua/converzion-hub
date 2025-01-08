@@ -5,21 +5,21 @@ const testimonials = [
   {
     name: "João Silva",
     role: "CEO, TechStart",
-    content: "A Converzion revolucionou nosso atendimento. Reduzimos o tempo de resposta em 80% e aumentamos a satisfação dos clientes em 60%. O ROI foi surpreendente já no primeiro mês.",
+    content: "A plataforma revolucionou nosso atendimento. Reduzimos o tempo de resposta em 80% e aumentamos a satisfação dos clientes.",
     rating: 5,
     image: "https://i.pravatar.cc/150?img=1",
   },
   {
     name: "Maria Santos",
     role: "Gerente de Marketing, E-commerce Plus",
-    content: "Impressionante como a IA entende o contexto e responde naturalmente. Nossos clientes nem percebem que é um bot, e nossas vendas aumentaram 40% desde a implementação.",
+    content: "Impressionante como a IA entende o contexto e responde naturalmente. Nossos clientes nem percebem que é um bot.",
     rating: 5,
     image: "https://i.pravatar.cc/150?img=2",
   },
   {
     name: "Pedro Oliveira",
     role: "Diretor Comercial, Vendas.co",
-    content: "A melhor decisão que tomamos foi implementar a Converzion. O atendimento 24/7 multiplicou nossas conversões e a IA é simplesmente fantástica na forma como conduz as conversas.",
+    content: "A melhor decisão que tomamos. O atendimento 24/7 multiplicou nossas conversões e a IA é fantástica na condução das conversas.",
     rating: 5,
     image: "https://i.pravatar.cc/150?img=3",
   },
@@ -31,10 +31,10 @@ export const TestimonialSection = () => {
       <div className="container">
         <div className="text-center max-w-3xl mx-auto mb-16">
           <h2 className="text-4xl font-bold mb-6 bg-gradient-to-r from-primary-600 to-primary-800 bg-clip-text text-transparent">
-            Histórias de Sucesso Real
+            Histórias de Sucesso
           </h2>
           <p className="text-gray-600 text-lg">
-            Veja como empresas estão transformando seu atendimento e multiplicando vendas com a Converzion
+            Veja como empresas estão transformando seu atendimento com nossa plataforma
           </p>
         </div>
 
@@ -69,7 +69,7 @@ export const TestimonialSection = () => {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 max-w-4xl mx-auto">
             <div className="p-8 bg-primary-50 rounded-lg hover:shadow-lg transition-all">
               <h3 className="text-4xl font-bold text-primary-800 mb-2">95%</h3>
-              <p className="text-gray-600">Satisfação dos clientes</p>
+              <p className="text-gray-600">Satisfação</p>
             </div>
             <div className="p-8 bg-primary-50 rounded-lg hover:shadow-lg transition-all">
               <h3 className="text-4xl font-bold text-primary-800 mb-2">24/7</h3>
@@ -77,11 +77,11 @@ export const TestimonialSection = () => {
             </div>
             <div className="p-8 bg-primary-50 rounded-lg hover:shadow-lg transition-all">
               <h3 className="text-4xl font-bold text-primary-800 mb-2">+40%</h3>
-              <p className="text-gray-600">Aumento em vendas</p>
+              <p className="text-gray-600">Vendas</p>
             </div>
             <div className="p-8 bg-primary-50 rounded-lg hover:shadow-lg transition-all">
               <h3 className="text-4xl font-bold text-primary-800 mb-2">-80%</h3>
-              <p className="text-gray-600">Tempo de resposta</p>
+              <p className="text-gray-600">Tempo de Resposta</p>
             </div>
           </div>
         </div>

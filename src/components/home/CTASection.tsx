@@ -3,9 +3,9 @@ import { useNavigate } from "react-router-dom";
 import { ArrowRight, Check } from "lucide-react";
 
 const benefits = [
-  "7 dias grátis sem compromisso",
-  "Configuração em 5 minutos",
-  "Suporte técnico especializado",
+  "7 dias para testar",
+  "Configuração rápida",
+  "Suporte especializado",
   "Cancele quando quiser",
   "Treinamento incluído",
   "Atualizações constantes",
@@ -20,10 +20,10 @@ export const CTASection = () => {
       <div className="container relative">
         <div className="text-center max-w-3xl mx-auto">
           <h2 className="text-4xl font-bold text-white mb-6">
-            Comece a Transformar seu Atendimento Hoje
+            Comece a Transformar seu Atendimento
           </h2>
           <p className="text-primary-100 text-lg mb-8">
-            Junte-se a centenas de empresas que já multiplicaram suas vendas com atendimento automatizado inteligente
+            Junte-se às empresas que já multiplicaram suas vendas com atendimento automatizado inteligente
           </p>
           
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 max-w-2xl mx-auto mb-12">
@@ -43,7 +43,7 @@ export const CTASection = () => {
               onClick={() => navigate("/register")}
               className="bg-white text-primary-900 hover:bg-primary-50 text-lg gap-2 h-14 px-8 shadow-lg hover:shadow-xl transition-all duration-300 group"
             >
-              Começar Gratuitamente <ArrowRight className="h-5 w-5 group-hover:translate-x-1 transition-transform" />
+              Começar Agora <ArrowRight className="h-5 w-5 group-hover:translate-x-1 transition-transform" />
             </Button>
             <p className="text-primary-200 text-sm">
               Não é necessário cartão de crédito
