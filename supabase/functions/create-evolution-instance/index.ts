@@ -27,6 +27,7 @@ serve(async (req) => {
     )
 
     if (userError || !user) {
+      console.error('Error getting user:', userError)
       throw userError || new Error('User not found')
     }
 
@@ -49,6 +50,8 @@ serve(async (req) => {
       throw new Error('User profile not found')
     }
 
+    console.log('Found profile:', profile.id)
+
     // Check subscription status using profile.id
     const { data: subscription, error: subError } = await supabaseClient
       .from('subscriptions')
@@ -66,6 +69,14 @@ serve(async (req) => {
     if (!subscription || subscription.status !== 'active') {
       console.error('No active subscription found for user:', user.id)
       throw new Error('Active subscription required')
+    }
+
+    const body = await req.json()
+    const { instanceName, phoneNumber } = body
+
+    if (!instanceName || !phoneNumber) {
+      console.error('Missing required parameters:', { instanceName, phoneNumber })
+      throw new Error('Missing required parameters: instanceName and phoneNumber are required')
     }
 
     // Get instance count
@@ -88,14 +99,6 @@ serve(async (req) => {
       throw new Error(`Instance limit (${instanceLimit}) reached for your plan`)
     }
 
-    const body = await req.json()
-    const { instanceName, phoneNumber } = body
-
-    if (!instanceName || !phoneNumber) {
-      console.error('Missing required parameters:', { instanceName, phoneNumber })
-      throw new Error('Missing required parameters: instanceName and phoneNumber are required')
-    }
-
     console.log('Creating Evolution API instance:', { instanceName, phoneNumber })
 
     // Create instance in Evolution API
@@ -106,9 +109,9 @@ serve(async (req) => {
         'apikey': Deno.env.get('EVOLUTION_API_KEY') ?? '',
       },
       body: JSON.stringify({
-        instanceName: instanceName.replace(/[^a-zA-Z0-9]/g, ''), // Sanitize instance name
+        instanceName: instanceName.replace(/[^a-zA-Z0-9]/g, ''),
         qrcode: true,
-        number: phoneNumber.replace(/\D/g, ''), // Remove non-digits
+        number: phoneNumber.replace(/\D/g, ''),
         integration: "WHATSAPP-BAILEYS"
       })
     })
