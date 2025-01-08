@@ -4,9 +4,11 @@ import { Crown, Loader2 } from "lucide-react"
 import { useQuery } from "@tanstack/react-query"
 import { supabase } from "@/integrations/supabase/client"
 import { useAuth } from "@/contexts/AuthContext"
+import { useToast } from "@/components/ui/use-toast"
 
 export function SubscriptionCard() {
   const { user } = useAuth()
+  const { toast } = useToast()
 
   const { data: subscription, isLoading } = useQuery({
     queryKey: ['subscription', user?.id],
@@ -25,18 +27,24 @@ export function SubscriptionCard() {
 
   const handleUpgrade = async () => {
     try {
-      const response = await fetch('/api/create-checkout-session', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`
-        }
+      const { data, error } = await supabase.functions.invoke('stripe-checkout', {
+        body: { priceId: subscription?.plan_id },
       })
+
+      if (error) throw error
       
-      const { url } = await response.json()
-      window.location.href = url
+      if (data?.url) {
+        window.location.href = data.url
+      } else {
+        throw new Error('No checkout URL returned')
+      }
     } catch (error) {
       console.error('Error creating checkout session:', error)
+      toast({
+        title: "Error",
+        description: "Could not initiate checkout. Please try again.",
+        variant: "destructive",
+      })
     }
   }
 
