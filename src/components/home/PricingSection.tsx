@@ -15,7 +15,7 @@ const plans = [
   {
     name: "Starter",
     price: "4,97",
-    priceId: "price_1QbuUiKkjJ7tububpw8Vpsrp",
+    priceId: "price_1QbuUiKkjJ7tububpw8Vpsrp_test", // Updated to test mode price ID
     description: "Perfeito para começar",
     features: [
       "1 Instância",
@@ -29,7 +29,7 @@ const plans = [
   {
     name: "Professional",
     price: "9,97",
-    priceId: "price_1QbuUvKkjJ7tububiklS9tAc",
+    priceId: "price_1QbuUvKkjJ7tububiklS9tAc_test", // Updated to test mode price ID
     description: "Para negócios em crescimento",
     features: [
       "3 Instâncias",

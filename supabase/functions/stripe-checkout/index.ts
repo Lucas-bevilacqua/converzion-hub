@@ -40,6 +40,13 @@ serve(async (req) => {
       apiVersion: '2023-10-16',
     })
 
+    // Get request body
+    const { priceId } = await req.json()
+    if (!priceId) {
+      throw new Error('No price ID provided')
+    }
+    console.log('Price ID:', priceId)
+
     console.log('Checking for existing customer...')
     const customers = await stripe.customers.list({
       email: user.email,
@@ -60,7 +67,7 @@ serve(async (req) => {
       customer_email: customer_id ? undefined : user.email,
       line_items: [
         {
-          price: 'price_1QbuUiKkjJ7tububpw8Vpsrp', // Starter plan price ID
+          price: priceId,
           quantity: 1,
         },
       ],
