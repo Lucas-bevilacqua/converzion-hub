@@ -31,12 +31,14 @@ export function SubscriptionCard() {
       return data
     },
     enabled: !!user?.id,
+    retry: 3,
+    retryDelay: 1000,
     meta: {
       onError: (error: Error) => {
         console.error('Error in subscription query:', error)
         toast({
           title: "Erro",
-          description: "Não foi possível carregar os dados da assinatura",
+          description: "Não foi possível carregar os dados da assinatura. Tente novamente mais tarde.",
           variant: "destructive",
         })
       }
@@ -68,7 +70,7 @@ export function SubscriptionCard() {
       console.error('Error creating checkout session:', error)
       toast({
         title: "Erro",
-        description: "Não foi possível iniciar o checkout. Tente novamente.",
+        description: "Não foi possível iniciar o checkout. Tente novamente mais tarde.",
         variant: "destructive",
       })
     }
