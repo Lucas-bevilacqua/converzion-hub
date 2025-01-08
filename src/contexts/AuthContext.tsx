@@ -43,37 +43,39 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signIn = async (email: string, password: string) => {
     console.log("Attempting sign in...");
     try {
-      const response = await supabase.auth.signInWithPassword({
+      const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
 
-      if (response.error) {
-        console.error("Sign in error:", response.error);
+      if (error) {
+        console.error("Sign in error:", error);
         
-        // Handle specific error cases
-        if (response.error.message.includes("Invalid login credentials")) {
+        if (error.message.includes("Invalid login credentials")) {
           throw new Error("Email ou senha inválidos");
         }
         
-        throw new Error(response.error.message);
+        throw error;
       }
 
-      if (!response.data?.user) {
+      if (!data?.user) {
         throw new Error("Erro ao fazer login");
       }
 
       console.log("Sign in successful");
     } catch (error) {
       console.error("Sign in error:", error);
-      throw error;
+      if (error instanceof Error) {
+        throw error;
+      }
+      throw new Error("Erro ao fazer login");
     }
   };
 
   const signUp = async (email: string, password: string, fullName: string) => {
     console.log("Attempting sign up...");
     try {
-      const response = await supabase.auth.signUp({
+      const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
@@ -83,19 +85,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         },
       });
 
-      if (response.error) {
-        console.error("Sign up error:", response.error);
-        throw response.error;
+      if (error) {
+        console.error("Sign up error:", error);
+        throw error;
       }
 
-      if (!response.data?.user) {
+      if (!data?.user) {
         throw new Error("Erro ao criar conta");
       }
 
       console.log("Sign up successful");
     } catch (error) {
       console.error("Sign up error:", error);
-      throw error;
+      if (error instanceof Error) {
+        throw error;
+      }
+      throw new Error("Erro ao criar conta");
     }
   };
 
