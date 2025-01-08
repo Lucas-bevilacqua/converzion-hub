@@ -21,35 +21,8 @@ export default function Register() {
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  const validateForm = () => {
-    if (!email || !password || !fullName) {
-      toast({
-        title: "Erro de validação",
-        description: "Todos os campos são obrigatórios",
-        variant: "destructive",
-      });
-      return false;
-    }
-
-    if (password.length < 6) {
-      toast({
-        title: "Senha inválida",
-        description: "A senha deve ter pelo menos 6 caracteres",
-        variant: "destructive",
-      });
-      return false;
-    }
-
-    return true;
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!validateForm()) {
-      return;
-    }
-
     try {
       setLoading(true);
       console.log("Starting signup process...");
@@ -67,8 +40,6 @@ export default function Register() {
       if (error.message) {
         if (error.message.includes("Invalid API key")) {
           errorMessage = "Erro de configuração do servidor. Por favor, tente novamente mais tarde.";
-        } else if (error.message.includes("weak_password")) {
-          errorMessage = "A senha deve ter pelo menos 6 caracteres.";
         } else {
           errorMessage = error.message;
         }
@@ -102,7 +73,6 @@ export default function Register() {
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
                 required
-                minLength={2}
               />
             </div>
             <div className="space-y-2">
@@ -123,11 +93,7 @@ export default function Register() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
-                minLength={6}
               />
-              <p className="text-sm text-muted-foreground">
-                A senha deve ter pelo menos 6 caracteres
-              </p>
             </div>
             <Button type="submit" className="w-full" disabled={loading}>
               {loading ? "Criando conta..." : "Criar Conta"}

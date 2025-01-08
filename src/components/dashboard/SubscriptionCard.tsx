@@ -10,39 +10,30 @@ export function SubscriptionCard() {
   const { user } = useAuth()
   const { toast } = useToast()
 
-  const { data: subscription, isLoading, error } = useQuery({
+  const { data: subscription, isLoading } = useQuery({
     queryKey: ['subscription', user?.id],
     queryFn: async () => {
       console.log('Fetching subscription for user:', user?.id)
-      if (!user?.id) return null
-      
-      const { data, error } = await supabase
-        .from('subscriptions')
-        .select('*')
-        .eq('user_id', user.id)
-        .maybeSingle()
-      
-      if (error) {
-        console.error('Error fetching subscription:', error)
+      try {
+        const { data, error } = await supabase
+          .from('subscriptions')
+          .select('*')
+          .eq('user_id', user?.id)
+          .maybeSingle()
+        
+        if (error) {
+          console.error('Error fetching subscription:', error)
+          throw error
+        }
+
+        console.log('Subscription data:', data)
+        return data
+      } catch (error) {
+        console.error('Error in subscription query:', error)
         throw error
       }
-
-      console.log('Subscription data:', data)
-      return data
     },
-    enabled: !!user?.id,
-    retry: 3,
-    retryDelay: 1000,
-    meta: {
-      onError: (error: Error) => {
-        console.error('Error in subscription query:', error)
-        toast({
-          title: "Erro",
-          description: "Não foi possível carregar os dados da assinatura. Tente novamente mais tarde.",
-          variant: "destructive",
-        })
-      }
-    }
+    enabled: !!user?.id
   })
 
   const handleUpgrade = async () => {
@@ -70,7 +61,7 @@ export function SubscriptionCard() {
       console.error('Error creating checkout session:', error)
       toast({
         title: "Erro",
-        description: "Não foi possível iniciar o checkout. Tente novamente mais tarde.",
+        description: "Não foi possível iniciar o checkout. Tente novamente.",
         variant: "destructive",
       })
     }
@@ -106,21 +97,6 @@ export function SubscriptionCard() {
 
   const planDetails = getPlanDetails()
 
-  if (error) {
-    return (
-      <Card>
-        <CardContent className="pt-6">
-          <div className="flex items-center gap-2 p-4 bg-red-50 border border-red-200 rounded-lg">
-            <AlertTriangle className="h-5 w-5 text-red-500" />
-            <p className="text-sm text-red-700">
-              Erro ao carregar dados da assinatura. Tente novamente mais tarde.
-            </p>
-          </div>
-        </CardContent>
-      </Card>
-    )
-  }
-
   return (
     <Card>
       <CardHeader>
@@ -151,9 +127,9 @@ export function SubscriptionCard() {
               <p className="text-sm text-muted-foreground">
                 {planDetails.instances} instância{planDetails.instances !== 1 ? 's' : ''} disponíve{planDetails.instances !== 1 ? 'is' : 'l'}
               </p>
-              {subscription?.status === 'active' && subscription.current_period_end && (
+              {subscription?.status === 'active' && (
                 <p className="text-sm text-muted-foreground mt-1">
-                  Válido até: {new Date(subscription.current_period_end).toLocaleDateString()}
+                  Válido até: {new Date(subscription.current_period_end!).toLocaleDateString()}
                 </p>
               )}
             </div>
