@@ -40,7 +40,7 @@ export function SubscriptionCard() {
     try {
       console.log('Initiating checkout process')
       // Default to starter plan if no current plan
-      const priceId = 'price_1QbuUiKkjJ7tububpw8Vpsrp_test'
+      const priceId = 'price_1OgbQkKkjJ7tubuZGJjcvq4M' // Updated to actual test mode price ID
       
       console.log('Using price ID:', priceId)
       const { data, error } = await supabase.functions.invoke('stripe-checkout', {
