@@ -96,13 +96,28 @@ serve(async (req) => {
     }
 
     const evolutionData = await evolutionResponse.json()
-    console.log('Evolution API response:', evolutionData)
+    console.log('Evolution API full response:', JSON.stringify(evolutionData, null, 2))
+
+    // Extract QR code from response
+    const qrCode = evolutionData.qrcode?.base64 || evolutionData.qrcode || evolutionData.data?.qrcode
+    console.log('Extracted QR code:', qrCode ? 'Present' : 'Not found')
+
+    if (!qrCode) {
+      console.error('No QR code found in response')
+      return new Response(
+        JSON.stringify({ error: 'No QR code found in response' }),
+        { 
+          status: 400, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      )
+    }
 
     // Update instance status and QR code
     const { error: updateError } = await supabaseClient
       .from('evolution_instances')
       .update({
-        qr_code: evolutionData.qrcode?.base64 || evolutionData.qrcode,
+        qr_code: qrCode,
         last_qr_update: new Date().toISOString(),
         connection_status: evolutionData.connected ? 'connected' : 'disconnected'
       })
@@ -114,7 +129,7 @@ serve(async (req) => {
       JSON.stringify({
         id: instance.id,
         name: instance.name,
-        qrCode: evolutionData.qrcode?.base64 || evolutionData.qrcode,
+        qrCode: qrCode,
         connected: evolutionData.connected
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
