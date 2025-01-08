@@ -146,30 +146,39 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signOut = async () => {
     console.log("Attempting sign out...");
     try {
-      // First clear the local session
+      // First clear the local session and state
       setSession(null);
       setUser(null);
       
-      // Then attempt to sign out from Supabase
-      const { error } = await supabase.auth.signOut();
-      if (error) {
-        console.error("Sign out error:", error);
-        // Even if there's an error, we've already cleared the local session
-        // so the user is effectively signed out
-        if (error.message.includes("User not found") || error.status === 403) {
-          console.log("User already signed out or session expired");
-          return; // Don't throw error in this case
+      try {
+        // Then attempt to sign out from Supabase
+        const { error } = await supabase.auth.signOut();
+        if (error) {
+          console.error("Sign out error:", error);
+          // Don't throw for these specific cases since we've already cleared the local session
+          if (error.message.includes("User not found") || 
+              error.status === 403 || 
+              error.message.includes("JWT")) {
+            console.log("User already signed out or session expired");
+            return;
+          }
+          throw error;
         }
-        const errorMessage = parseAuthError(error);
-        throw new Error(errorMessage);
+      } catch (supabaseError) {
+        // If Supabase signOut fails but we've cleared the local session, 
+        // the user is effectively signed out
+        console.log("Supabase signOut failed but local session cleared:", supabaseError);
+        return;
       }
+      
       console.log("Sign out successful");
     } catch (error) {
       console.error("Sign out catch block error:", error);
-      // Only throw if it's not a "user not found" error
+      // Only throw if it's a critical error
       if (error instanceof Error && 
           !error.message.includes("User not found") && 
-          !error.message.includes("403")) {
+          !error.message.includes("403") &&
+          !error.message.includes("JWT")) {
         const errorMessage = parseAuthError(error as AuthError);
         throw new Error(errorMessage);
       }
