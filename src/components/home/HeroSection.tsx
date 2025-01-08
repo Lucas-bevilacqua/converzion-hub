@@ -6,24 +6,24 @@ export const HeroSection = () => {
   const navigate = useNavigate();
 
   return (
-    <section className="pt-32 pb-24 px-4 bg-gradient-to-br from-[#1A1F2C] to-[#2A2F3C] relative overflow-hidden">
+    <section className="pt-32 pb-24 px-4 bg-[#F5F7FA] relative overflow-hidden">
       <div className="absolute inset-0 bg-[url('/grid.svg')] bg-center [mask-image:linear-gradient(180deg,white,rgba(255,255,255,0))]" />
       
       <div className="container relative">
         <div className="text-center max-w-4xl mx-auto">
-          <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/10 backdrop-blur-sm text-primary-200 text-sm mb-6 font-medium">
+          <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[#0056D2]/10 text-[#0056D2] text-sm mb-6 font-medium">
             <Zap className="h-4 w-4" />
             Aumente suas vendas com atendimento inteligente
           </span>
 
-          <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold tracking-tight mb-8 text-white">
+          <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold tracking-tight mb-8 text-[#333333]">
             Transforme Atendimentos em{" "}
-            <span className="bg-gradient-to-r from-[#9b87f5] to-[#b8a2ff] bg-clip-text text-transparent">
+            <span className="bg-gradient-to-r from-[#0056D2] to-[#00C896] bg-clip-text text-transparent">
               Vendas Automáticas
             </span>
           </h1>
           
-          <p className="text-xl text-gray-200 mb-12 max-w-3xl mx-auto leading-relaxed font-medium">
+          <p className="text-xl text-[#333333]/80 mb-12 max-w-3xl mx-auto leading-relaxed font-medium">
             Liberte sua equipe e multiplique seus resultados com atendimento automático 24/7. 
             Nossa IA avançada entende seus clientes e fecha vendas enquanto você descansa.
           </p>
@@ -32,7 +32,7 @@ export const HeroSection = () => {
             <Button
               size="lg"
               onClick={() => navigate("/register")}
-              className="bg-[#9b87f5] hover:bg-[#8b77e5] text-white text-lg gap-2 h-14 px-8 shadow-lg hover:shadow-xl transition-all duration-300 group font-semibold"
+              className="bg-[#FF6B35] hover:bg-[#FF6B35]/90 text-white text-lg gap-2 h-14 px-8 shadow-lg hover:shadow-xl transition-all duration-300 group font-semibold"
             >
               Teste Grátis por 7 Dias{" "}
               <ArrowRight className="h-5 w-5 group-hover:translate-x-1 transition-transform" />
@@ -41,7 +41,7 @@ export const HeroSection = () => {
               size="lg"
               variant="outline"
               onClick={() => navigate("/contact")}
-              className="text-white border-white/20 hover:bg-white/10 backdrop-blur-sm text-lg h-14 px-8 font-medium"
+              className="text-[#333333] border-[#333333]/20 hover:bg-[#333333]/5 text-lg h-14 px-8 font-medium"
             >
               Ver Demonstração
             </Button>
@@ -49,22 +49,22 @@ export const HeroSection = () => {
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             <div className="flex items-center gap-3 justify-center">
-              <div className="p-2 rounded-full bg-[#9b87f5]/20 backdrop-blur-sm">
-                <Bot className="h-5 w-5 text-[#9b87f5]" />
+              <div className="p-2 rounded-full bg-[#00C896]/20">
+                <Bot className="h-5 w-5 text-[#00C896]" />
               </div>
-              <span className="text-gray-200 font-medium">Vendas Automáticas 24/7</span>
+              <span className="text-[#333333] font-medium">Vendas Automáticas 24/7</span>
             </div>
             <div className="flex items-center gap-3 justify-center">
-              <div className="p-2 rounded-full bg-[#9b87f5]/20 backdrop-blur-sm">
-                <Shield className="h-5 w-5 text-[#9b87f5]" />
+              <div className="p-2 rounded-full bg-[#00C896]/20">
+                <Shield className="h-5 w-5 text-[#00C896]" />
               </div>
-              <span className="text-gray-200 font-medium">Resultados Garantidos</span>
+              <span className="text-[#333333] font-medium">Resultados Garantidos</span>
             </div>
             <div className="flex items-center gap-3 justify-center">
-              <div className="p-2 rounded-full bg-[#9b87f5]/20 backdrop-blur-sm">
-                <Zap className="h-5 w-5 text-[#9b87f5]" />
+              <div className="p-2 rounded-full bg-[#00C896]/20">
+                <Zap className="h-5 w-5 text-[#00C896]" />
               </div>
-              <span className="text-gray-200 font-medium">Setup em 5 Minutos</span>
+              <span className="text-[#333333] font-medium">Setup em 5 Minutos</span>
             </div>
           </div>
         </div>
