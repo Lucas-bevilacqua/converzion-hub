@@ -22,24 +22,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     console.log("Initializing auth state...");
-    let profileUpdateInProgress = false;
+    let mounted = true;
 
     const handleSession = async (session: Session | null) => {
+      if (!mounted) return;
+
       console.log("Handling session:", session ? "Session exists" : "No session");
       setSession(session);
       setUser(session?.user ?? null);
 
-      if (session?.user && !profileUpdateInProgress) {
+      if (session?.user) {
         try {
-          profileUpdateInProgress = true;
           console.log("Creating/updating profile for user:", session.user.id);
           await createOrUpdateProfile(session.user);
         } catch (error) {
           console.error("Error creating/updating profile:", error);
-        } finally {
-          profileUpdateInProgress = false;
         }
       }
+      
       setLoading(false);
     };
 
@@ -51,13 +51,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Auth state change listener
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      console.log("Auth state changed:", _event);
-      handleSession(session);
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log("Auth state changed:", event);
+      await handleSession(session);
     });
 
     return () => {
       console.log("Cleaning up auth subscription");
+      mounted = false;
       subscription.unsubscribe();
     };
   }, []);
