@@ -42,20 +42,41 @@ export const handleCheckoutCompleted = async (
 
   console.log('Found user:', userData)
 
-  const { error: subscriptionError } = await supabaseClient
+  // Primeiro verificamos se já existe uma assinatura para este usuário
+  const { data: existingSubscription } = await supabaseClient
     .from('subscriptions')
-    .upsert({
-      user_id: userData.id,
-      stripe_customer_id: session.customer,
-      stripe_subscription_id: session.subscription,
-      status: 'active',
-      plan_id: subscription.items.data[0].price.id,
-      current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
-    })
+    .select('*')
+    .eq('user_id', userData.id)
+    .maybeSingle()
 
-  if (subscriptionError) {
-    console.error('Error updating subscription:', subscriptionError)
-    throw subscriptionError
+  const subscriptionData = {
+    user_id: userData.id,
+    stripe_customer_id: session.customer,
+    stripe_subscription_id: session.subscription,
+    status: 'active',
+    plan_id: subscription.items.data[0].price.id,
+    current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
+  }
+
+  let error
+  if (existingSubscription) {
+    // Se existe, atualizamos
+    const { error: updateError } = await supabaseClient
+      .from('subscriptions')
+      .update(subscriptionData)
+      .eq('id', existingSubscription.id)
+    error = updateError
+  } else {
+    // Se não existe, criamos
+    const { error: insertError } = await supabaseClient
+      .from('subscriptions')
+      .insert(subscriptionData)
+    error = insertError
+  }
+
+  if (error) {
+    console.error('Error updating subscription:', error)
+    throw error
   }
 
   console.log('Subscription updated successfully')
