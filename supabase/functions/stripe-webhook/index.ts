@@ -13,11 +13,16 @@ serve(async (req) => {
   }
 
   try {
+    console.log('Processing webhook request...')
+    
     const stripeKey = Deno.env.get('STRIPE_SECRET_KEY')
     const webhookSecret = Deno.env.get('STRIPE_WEBHOOK_SECRET')
     
     if (!stripeKey || !webhookSecret) {
-      console.error('Missing required environment variables')
+      console.error('Missing required environment variables:', {
+        hasStripeKey: !!stripeKey,
+        hasWebhookSecret: !!webhookSecret
+      })
       throw new Error('Missing Stripe configuration')
     }
 
@@ -32,8 +37,11 @@ serve(async (req) => {
       throw new Error('No signature provided')
     }
 
+    console.log('Received webhook with signature:', signature)
+
     // Get the raw body
     const body = await req.text()
+    console.log('Webhook raw body:', body)
     
     // Verify the webhook signature
     let event
@@ -49,6 +57,7 @@ serve(async (req) => {
     }
 
     // Initialize Supabase client
+    console.log('Initializing Supabase client...')
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
@@ -61,6 +70,10 @@ serve(async (req) => {
         console.log('Checkout session completed:', session)
 
         if (!session.customer || !session.subscription) {
+          console.error('Missing customer or subscription information:', {
+            customer: session.customer,
+            subscription: session.subscription
+          })
           throw new Error('Missing customer or subscription information')
         }
 
@@ -72,10 +85,12 @@ serve(async (req) => {
         console.log('Customer retrieved:', customer)
 
         if (!customer.email) {
+          console.error('No customer email found')
           throw new Error('No customer email found')
         }
 
         // Get user from Supabase by email
+        console.log('Looking up user with client reference ID:', session.client_reference_id)
         const { data: userData, error: userError } = await supabaseClient
           .from('profiles')
           .select('id')
@@ -159,7 +174,10 @@ serve(async (req) => {
   } catch (error) {
     console.error('Error processing webhook:', error)
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ 
+        error: error.message,
+        details: error instanceof Error ? error.stack : undefined
+      }),
       { 
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
