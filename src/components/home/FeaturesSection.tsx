@@ -9,50 +9,50 @@ import { Bot, MessageSquare, BarChart3, Settings2, Brain, Zap, Shield, Users } f
 
 const features = [
   {
-    title: "IA Avançada",
-    description: "Respostas contextualizadas e naturais com GPT-4, entendendo perfeitamente as necessidades dos seus clientes",
+    title: "IA Avançada GPT-4",
+    description: "Respostas contextualizadas e naturais que realmente entendem seus clientes. Aumente suas vendas com atendimento personalizado em escala.",
     icon: Brain,
     color: "bg-purple-50 text-purple-600",
   },
   {
     title: "WhatsApp Business API",
-    description: "Integração oficial com a API do WhatsApp Business, garantindo segurança e confiabilidade nas conversas",
+    description: "Integração oficial e segura com o WhatsApp Business. Mantenha sua conta verificada e protegida, garantindo confiabilidade nas conversas.",
     icon: MessageSquare,
     color: "bg-green-50 text-green-600",
   },
   {
-    title: "Analytics Detalhado",
-    description: "Métricas completas de atendimento, conversão e satisfação para otimizar sua estratégia",
+    title: "Analytics Completo",
+    description: "Acompanhe em tempo real suas métricas de atendimento, taxa de conversão e satisfação dos clientes. Tome decisões baseadas em dados.",
     icon: BarChart3,
     color: "bg-blue-50 text-blue-600",
   },
   {
-    title: "Personalização Total",
-    description: "Configure a IA de acordo com seu negócio, tom de voz e regras específicas de atendimento",
+    title: "100% Personalizável",
+    description: "Adapte a IA ao seu negócio com prompts personalizados, tom de voz da sua marca e regras específicas de atendimento.",
     icon: Settings2,
     color: "bg-orange-50 text-orange-600",
   },
   {
-    title: "Respostas Instantâneas",
-    description: "Atendimento 24/7 com respostas imediatas, aumentando a satisfação dos clientes",
+    title: "Atendimento 24/7",
+    description: "Nunca mais perca uma venda. Responda seus clientes instantaneamente, 24 horas por dia, 7 dias por semana, sem atrasos.",
     icon: Zap,
     color: "bg-yellow-50 text-yellow-600",
   },
   {
     title: "Multi-atendentes",
-    description: "Gerencie múltiplos atendentes virtuais para diferentes setores ou necessidades",
+    description: "Gerencie múltiplos atendentes virtuais para diferentes setores ou necessidades do seu negócio com total controle.",
     icon: Users,
     color: "bg-pink-50 text-pink-600",
   },
   {
-    title: "Segurança Avançada",
-    description: "Proteção de dados e conformidade com LGPD para garantir a privacidade das conversas",
+    title: "Segurança Máxima",
+    description: "Seus dados e conversas protegidos com criptografia de ponta a ponta. Total conformidade com LGPD e padrões internacionais.",
     icon: Shield,
     color: "bg-indigo-50 text-indigo-600",
   },
   {
-    title: "IA Treinável",
-    description: "Sistema que aprende com as interações e melhora continuamente o atendimento",
+    title: "IA que Aprende",
+    description: "Sistema que evolui continuamente com as interações, melhorando o atendimento e as taxas de conversão ao longo do tempo.",
     icon: Bot,
     color: "bg-red-50 text-red-600",
   },
@@ -64,11 +64,11 @@ export const FeaturesSection = () => {
       <div className="container">
         <div className="text-center max-w-3xl mx-auto mb-16">
           <h2 className="text-4xl font-bold mb-6 bg-gradient-to-r from-primary-600 to-primary-800 bg-clip-text text-transparent">
-            Tecnologia de Ponta para seu Negócio
+            Tecnologia de Ponta para Maximizar seus Resultados
           </h2>
           <p className="text-gray-600 text-lg leading-relaxed">
-            Nossa plataforma combina inteligência artificial avançada com a praticidade
-            do WhatsApp para revolucionar seu atendimento e impulsionar suas vendas
+            Uma plataforma completa que combina inteligência artificial avançada com o WhatsApp
+            para automatizar seu atendimento e multiplicar suas vendas
           </p>
         </div>
         

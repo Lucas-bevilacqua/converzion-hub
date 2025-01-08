@@ -5,7 +5,7 @@ const testimonials = [
   {
     name: "João Silva",
     role: "CEO, TechStart",
-    content: "A Converzion revolucionou nosso atendimento. Reduzimos o tempo de resposta em 80% e aumentamos a satisfação dos clientes em 60%. O ROI foi surpreendente já no primeiro mês.",
+    content: "A Converzion revolucionou nosso atendimento. Reduzimos o tempo de resposta em 80% e aumentamos a satisfação dos clientes em 60%. O ROI foi surpreendente já no primeiro mês de uso.",
     rating: 5,
     image: "https://i.pravatar.cc/150?img=1",
   },
@@ -31,10 +31,10 @@ export const TestimonialSection = () => {
       <div className="container">
         <div className="text-center max-w-3xl mx-auto mb-16">
           <h2 className="text-4xl font-bold mb-6 bg-gradient-to-r from-primary-600 to-primary-800 bg-clip-text text-transparent">
-            Histórias de Sucesso
+            Histórias de Sucesso Real
           </h2>
           <p className="text-gray-600 text-lg">
-            Descubra como empresas estão transformando seu atendimento e aumentando suas vendas com a Converzion
+            Veja como empresas estão transformando seu atendimento e multiplicando vendas com a Converzion
           </p>
         </div>
 

@@ -15,18 +15,18 @@ export const HeroSection = () => {
               <Zap className="mr-1 h-3 w-3" /> Novo
             </span>
             <span className="text-sm text-gray-600">
-              Inteligência Artificial GPT-4 integrada
+              Potencializado por GPT-4
             </span>
           </div>
           
           <h1 className="text-4xl md:text-6xl font-bold tracking-tight mb-6 bg-gradient-to-r from-primary-600 to-primary-800 bg-clip-text text-transparent animate-fade-in">
-            Automatize seu WhatsApp com IA e <br className="hidden md:block" />
-            Multiplique suas Vendas
+            Transforme seu WhatsApp em uma <br className="hidden md:block" />
+            Máquina de Vendas Automática
           </h1>
           
           <p className="text-xl text-gray-600 mb-8 max-w-3xl mx-auto leading-relaxed">
-            Transforme seu atendimento com respostas automáticas inteligentes 24/7.
-            Aumente suas vendas, reduza custos e encante seus clientes com uma experiência única.
+            Atenda centenas de clientes simultaneamente com respostas personalizadas e inteligentes.
+            Aumente suas vendas em até 300% enquanto reduz custos operacionais.
           </p>
           
           <div className="flex flex-col sm:flex-row gap-4 justify-center mb-12">
@@ -35,7 +35,7 @@ export const HeroSection = () => {
               onClick={() => navigate("/register")}
               className="bg-primary hover:bg-primary-600 text-lg gap-2 h-14 px-8 shadow-lg hover:shadow-xl transition-all duration-300"
             >
-              Começar Gratuitamente <ArrowRight className="h-5 w-5" />
+              Teste Grátis por 7 Dias <ArrowRight className="h-5 w-5" />
             </Button>
             <Button
               size="lg"
@@ -43,7 +43,7 @@ export const HeroSection = () => {
               onClick={() => navigate("/contact")}
               className="text-lg h-14 px-8 hover:bg-gray-50"
             >
-              Falar com Especialista
+              Ver Demonstração
             </Button>
           </div>
 
@@ -52,24 +52,24 @@ export const HeroSection = () => {
               <div className="p-2 rounded-full bg-primary-50">
                 <Zap className="h-5 w-5 text-primary" />
               </div>
-              <span className="text-gray-600">Resposta em segundos</span>
+              <span className="text-gray-600">Respostas em 2 segundos</span>
             </div>
             <div className="flex items-center gap-3 justify-center">
               <div className="p-2 rounded-full bg-primary-50">
                 <Shield className="h-5 w-5 text-primary" />
               </div>
-              <span className="text-gray-600">Dados 100% seguros</span>
+              <span className="text-gray-600">Dados criptografados</span>
             </div>
             <div className="flex items-center gap-3 justify-center">
               <div className="p-2 rounded-full bg-primary-50">
                 <MessageSquare className="h-5 w-5 text-primary" />
               </div>
-              <span className="text-gray-600">Suporte especializado</span>
+              <span className="text-gray-600">Suporte 24/7</span>
             </div>
           </div>
 
           <div className="mt-20 pt-10 border-t">
-            <p className="text-sm text-gray-500 mb-6">Empresas que confiam na Converzion</p>
+            <p className="text-sm text-gray-500 mb-6">Empresas que já multiplicaram suas vendas com a Converzion</p>
             <div className="flex flex-wrap justify-center gap-8 opacity-70">
               {/* Placeholder logos - replace with actual client logos */}
               <div className="h-8 w-24 bg-gray-200 rounded animate-pulse" />

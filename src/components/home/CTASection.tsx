@@ -4,7 +4,7 @@ import { ArrowRight, Check } from "lucide-react";
 
 const benefits = [
   "7 dias grátis sem compromisso",
-  "Configuração em menos de 5 minutos",
+  "Configuração em 5 minutos",
   "Suporte técnico especializado",
   "Cancele quando quiser",
   "Treinamento incluído",
@@ -20,7 +20,7 @@ export const CTASection = () => {
       <div className="container relative">
         <div className="text-center max-w-3xl mx-auto">
           <h2 className="text-4xl font-bold text-white mb-6">
-            Transforme Seu Atendimento Hoje
+            Comece a Transformar seu Atendimento Hoje
           </h2>
           <p className="text-primary-100 text-lg mb-8">
             Junte-se a centenas de empresas que já multiplicaram suas vendas com atendimento automatizado inteligente
