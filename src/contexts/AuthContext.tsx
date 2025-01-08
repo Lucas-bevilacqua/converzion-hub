@@ -43,20 +43,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signIn = async (email: string, password: string) => {
     console.log("Attempting sign in...");
     try {
-      const { error } = await supabase.auth.signInWithPassword({
+      const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
 
       if (error) {
         console.error("Sign in error:", error);
-        // Convert the error to a more readable format
-        const errorMessage = error.message;
+        if (error.message.includes("Invalid login credentials")) {
+          throw new Error(JSON.stringify({
+            code: "invalid_credentials",
+            message: "Email ou senha inválidos"
+          }));
+        }
+        throw error;
+      }
+
+      if (!data?.user) {
         throw new Error(JSON.stringify({
-          code: error.message.includes("Invalid login credentials") ? "invalid_credentials" : "unknown",
-          message: errorMessage
+          code: "unknown",
+          message: "Erro ao fazer login"
         }));
       }
+
       console.log("Sign in successful");
     } catch (error) {
       console.error("Sign in error:", error);
@@ -67,7 +76,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signUp = async (email: string, password: string, fullName: string) => {
     console.log("Attempting sign up...");
     try {
-      const { error } = await supabase.auth.signUp({
+      const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
@@ -81,6 +90,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         console.error("Sign up error:", error);
         throw error;
       }
+
+      if (!data?.user) {
+        throw new Error(JSON.stringify({
+          code: "unknown",
+          message: "Erro ao criar conta"
+        }));
+      }
+
       console.log("Sign up successful");
     } catch (error) {
       console.error("Sign up error:", error);
