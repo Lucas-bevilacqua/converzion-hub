@@ -46,31 +46,37 @@ export type Database = {
       }
       evolution_instances: {
         Row: {
-          api_key: string
-          api_url: string
+          connection_status: string | null
           created_at: string
           id: string
+          last_qr_update: string | null
           name: string
+          phone_number: string | null
+          qr_code: string | null
           status: string | null
           updated_at: string
           user_id: string | null
         }
         Insert: {
-          api_key: string
-          api_url: string
+          connection_status?: string | null
           created_at?: string
           id?: string
+          last_qr_update?: string | null
           name: string
+          phone_number?: string | null
+          qr_code?: string | null
           status?: string | null
           updated_at?: string
           user_id?: string | null
         }
         Update: {
-          api_key?: string
-          api_url?: string
+          connection_status?: string | null
           created_at?: string
           id?: string
+          last_qr_update?: string | null
           name?: string
+          phone_number?: string | null
+          qr_code?: string | null
           status?: string | null
           updated_at?: string
           user_id?: string | null

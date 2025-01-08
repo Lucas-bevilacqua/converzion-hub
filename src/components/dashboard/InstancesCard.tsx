@@ -1,13 +1,13 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { MessageSquare, Loader2, Plus, QrCode } from "lucide-react"
+import { MessageSquare, Loader2 } from "lucide-react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { supabase } from "@/integrations/supabase/client"
 import { useAuth } from "@/contexts/AuthContext"
 import { useState } from "react"
 import { useToast } from "@/components/ui/use-toast"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { InstanceListItem } from "./instance-components/InstanceListItem"
+import { NewInstanceForm } from "./instance-components/NewInstanceForm"
+import { QRCodeDialog } from "./instance-components/QRCodeDialog"
 
 export function InstancesCard() {
   const { user } = useAuth()
@@ -116,7 +116,7 @@ export function InstancesCard() {
   })
 
   const handleAdd = () => {
-    if (!subscription?.status === 'active') {
+    if (!subscription || subscription.status !== 'active') {
       toast({
         title: "Erro",
         description: "Você precisa ter uma assinatura ativa para criar instâncias.",
@@ -137,7 +137,7 @@ export function InstancesCard() {
   }
 
   const handleConnect = (instanceId: string) => {
-    if (!subscription?.status === 'active') {
+    if (!subscription || subscription.status !== 'active') {
       toast({
         title: "Erro",
         description: "Você precisa ter uma assinatura ativa para conectar instâncias.",
@@ -184,89 +184,29 @@ export function InstancesCard() {
           <div className="space-y-6">
             <div className="space-y-4">
               {instances?.map((instance) => (
-                <div 
+                <InstanceListItem
                   key={instance.id}
-                  className="flex items-center justify-between p-4 border rounded-lg"
-                >
-                  <div>
-                    <p className="font-medium">{instance.name}</p>
-                    <p className="text-sm text-muted-foreground">{instance.phone_number}</p>
-                    <p className="text-sm text-muted-foreground">Status: {instance.connection_status}</p>
-                  </div>
-                  <Button
-                    variant="outline"
-                    onClick={() => handleConnect(instance.id)}
-                    disabled={instance.connection_status === 'connected'}
-                  >
-                    {instance.connection_status === 'connected' ? (
-                      'Conectado'
-                    ) : (
-                      <>
-                        <QrCode className="mr-2 h-4 w-4" />
-                        Conectar
-                      </>
-                    )}
-                  </Button>
-                </div>
+                  instance={instance}
+                  onConnect={handleConnect}
+                />
               ))}
             </div>
             
-            <div className="space-y-4 border-t pt-4">
-              <h4 className="font-medium">Adicionar Nova Instância</h4>
-              <div className="space-y-2">
-                <Input
-                  placeholder="Nome da Instância"
-                  value={newInstance.name}
-                  onChange={(e) => setNewInstance(prev => ({ ...prev, name: e.target.value }))}
-                />
-                <Input
-                  placeholder="Número do WhatsApp (com DDD do país)"
-                  value={newInstance.phone_number}
-                  onChange={(e) => setNewInstance(prev => ({ ...prev, phone_number: e.target.value }))}
-                />
-                <Button 
-                  onClick={handleAdd}
-                  disabled={createMutation.isPending}
-                  className="w-full"
-                >
-                  {createMutation.isPending && (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  )}
-                  <Plus className="mr-2 h-4 w-4" />
-                  Adicionar Instância
-                </Button>
-              </div>
-            </div>
+            <NewInstanceForm
+              newInstance={newInstance}
+              onChange={(field, value) => setNewInstance(prev => ({ ...prev, [field]: value }))}
+              onAdd={handleAdd}
+              isLoading={createMutation.isPending}
+            />
           </div>
         )}
       </CardContent>
 
-      <Dialog open={showQRCode} onOpenChange={setShowQRCode}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Conecte seu WhatsApp</DialogTitle>
-          </DialogHeader>
-          <div className="flex flex-col items-center justify-center space-y-4">
-            {selectedInstance?.qrCode ? (
-              <>
-                <img 
-                  src={`data:image/png;base64,${selectedInstance.qrCode}`} 
-                  alt="QR Code" 
-                  className="w-64 h-64"
-                />
-                <p className="text-sm text-muted-foreground text-center">
-                  Escaneie o QR Code com seu WhatsApp para conectar.<br/>
-                  O código será atualizado automaticamente a cada 30 segundos.
-                </p>
-              </>
-            ) : (
-              <div className="flex items-center justify-center w-64 h-64">
-                <Loader2 className="h-8 w-8 animate-spin" />
-              </div>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
+      <QRCodeDialog
+        open={showQRCode}
+        onOpenChange={setShowQRCode}
+        qrCode={selectedInstance?.qrCode}
+      />
     </Card>
   )
 }
