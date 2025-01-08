@@ -21,69 +21,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    let mounted = true;
+    // Get initial session
+    supabase.auth.getSession().then(({ data: { session: initialSession } }) => {
+      console.log("Initial session check:", initialSession?.user?.id || "No session");
+      setSession(initialSession);
+      setUser(initialSession?.user || null);
+      setLoading(false);
 
-    async function initializeAuth() {
-      try {
-        console.log("Initializing auth state...");
-        const { data: { session: initialSession } } = await supabase.auth.getSession();
-        
-        if (!mounted) return;
-        
-        if (initialSession?.user) {
-          console.log("Initial session found for user:", initialSession.user.id);
-          setSession(initialSession);
-          setUser(initialSession.user);
-          try {
-            await createOrUpdateProfile(initialSession.user);
-          } catch (error) {
-            console.error("Error in profile creation:", error);
-          }
-        } else {
-          console.log("No initial session found");
-          setSession(null);
-          setUser(null);
-        }
-      } catch (error) {
-        console.error("Error in initial auth check:", error);
-      } finally {
-        if (mounted) {
-          setLoading(false);
-        }
+      if (initialSession?.user) {
+        createOrUpdateProfile(initialSession.user).catch(console.error);
       }
-    }
+    });
 
-    initializeAuth();
-
+    // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, currentSession) => {
-        console.log("Auth state changed:", event);
+        console.log("Auth state changed:", event, currentSession?.user?.id);
         
-        if (!mounted) return;
-
-        try {
-          if (currentSession?.user) {
-            console.log("Session update for user:", currentSession.user.id);
-            setSession(currentSession);
-            setUser(currentSession.user);
-            await createOrUpdateProfile(currentSession.user);
-          } else {
-            console.log("No session in auth state change");
-            setSession(null);
-            setUser(null);
-          }
-        } catch (error) {
-          console.error("Error in auth state change:", error);
-        } finally {
-          setLoading(false);
+        setSession(currentSession);
+        setUser(currentSession?.user || null);
+        
+        if (currentSession?.user) {
+          await createOrUpdateProfile(currentSession.user);
         }
       }
     );
 
-    return () => {
-      mounted = false;
-      subscription.unsubscribe();
-    };
+    return () => subscription.unsubscribe();
   }, []);
 
   const signIn = async (email: string, password: string) => {

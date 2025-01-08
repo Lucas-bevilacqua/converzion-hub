@@ -41,8 +41,7 @@ const PublicRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, loading } = useAuth();
   console.log("Public route - User:", user?.id, "Loading:", loading);
 
-  // Only show loading if we're still checking the initial session
-  if (loading && !user) {
+  if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
@@ -53,13 +52,11 @@ const PublicRoute = ({ children }: { children: React.ReactNode }) => {
     );
   }
 
-  // If user is loaded and exists, redirect to dashboard
   if (user) {
     console.log("User found, redirecting to dashboard");
     return <Navigate to="/dashboard" replace />;
   }
 
-  // If no user and not loading, show the children (login/register page)
   return <>{children}</>;
 };
 
