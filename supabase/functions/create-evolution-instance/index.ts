@@ -27,36 +27,79 @@ serve(async (req) => {
     )
 
     if (userError || !user) {
+      console.error('Error getting user:', userError)
       throw userError || new Error('User not found')
     }
 
-    // Check subscription status
+    console.log('Checking subscription for user:', user.id)
+
+    // Get user profile first
+    const { data: profile, error: profileError } = await supabaseClient
+      .from('profiles')
+      .select('id')
+      .eq('id', user.id)
+      .maybeSingle()
+
+    if (profileError) {
+      console.error('Error fetching profile:', profileError)
+      throw profileError
+    }
+
+    if (!profile) {
+      console.error('Profile not found for user:', user.id)
+      throw new Error('User profile not found')
+    }
+
+    console.log('Found profile:', profile.id)
+
+    // Check subscription status using profile.id
     const { data: subscription, error: subError } = await supabaseClient
       .from('subscriptions')
       .select('*')
-      .eq('user_id', user.id)
+      .eq('user_id', profile.id)
       .maybeSingle()
 
-    if (subError) throw subError
+    if (subError) {
+      console.error('Error fetching subscription:', subError)
+      throw subError
+    }
+
+    console.log('Subscription data:', subscription)
+
     if (!subscription || subscription.status !== 'active') {
+      console.error('No active subscription found for user:', user.id)
       throw new Error('Active subscription required')
+    }
+
+    const body = await req.json()
+    const { instanceName, phoneNumber } = body
+
+    if (!instanceName || !phoneNumber) {
+      console.error('Missing required parameters:', { instanceName, phoneNumber })
+      throw new Error('Missing required parameters: instanceName and phoneNumber are required')
     }
 
     // Get instance count
     const { count, error: countError } = await supabaseClient
       .from('evolution_instances')
       .select('*', { count: 'exact' })
-      .eq('user_id', user.id)
+      .eq('user_id', profile.id)
 
-    if (countError) throw countError
+    if (countError) {
+      console.error('Error counting instances:', countError)
+      throw countError
+    }
+
+    console.log('Current instance count:', count)
 
     // Check instance limit based on plan
     const instanceLimit = subscription.plan_id?.includes('professional') ? 3 : 1
     if (count && count >= instanceLimit) {
+      console.error('Instance limit reached:', { count, instanceLimit })
       throw new Error(`Instance limit (${instanceLimit}) reached for your plan`)
     }
 
-    const { instanceName, phoneNumber } = await req.json()
+    console.log('Creating Evolution API instance:', { instanceName, phoneNumber })
 
     // Create instance in Evolution API
     const evolutionResponse = await fetch(`${Deno.env.get('EVOLUTION_API_URL')}/instance/create`, {
@@ -66,21 +109,27 @@ serve(async (req) => {
         'apikey': Deno.env.get('EVOLUTION_API_KEY') ?? '',
       },
       body: JSON.stringify({
-        instanceName,
+        instanceName: instanceName.replace(/[^a-zA-Z0-9]/g, ''),
         qrcode: true,
+        number: phoneNumber.replace(/\D/g, ''),
         integration: "WHATSAPP-BAILEYS"
       })
     })
 
     if (!evolutionResponse.ok) {
-      throw new Error('Failed to create Evolution API instance')
+      const errorData = await evolutionResponse.text()
+      console.error('Evolution API error:', errorData)
+      throw new Error(`Failed to create Evolution API instance: ${errorData}`)
     }
+
+    const evolutionData = await evolutionResponse.json()
+    console.log('Evolution API response:', evolutionData)
 
     // Save instance to database
     const { data: instance, error: insertError } = await supabaseClient
       .from('evolution_instances')
       .insert({
-        user_id: user.id,
+        user_id: profile.id,
         name: instanceName,
         phone_number: phoneNumber,
         connection_status: 'disconnected'
@@ -88,16 +137,36 @@ serve(async (req) => {
       .select()
       .single()
 
-    if (insertError) throw insertError
+    if (insertError) {
+      console.error('Database insert error:', insertError)
+      throw insertError
+    }
+
+    console.log('Instance created successfully:', instance)
 
     return new Response(
       JSON.stringify(instance),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { 
+        headers: { 
+          ...corsHeaders, 
+          'Content-Type': 'application/json' 
+        } 
+      }
     )
   } catch (error) {
+    console.error('Error in create-evolution-instance:', error)
     return new Response(
-      JSON.stringify({ error: error.message }),
-      { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      JSON.stringify({ 
+        error: error.message,
+        details: error.toString()
+      }),
+      { 
+        status: 400, 
+        headers: { 
+          ...corsHeaders, 
+          'Content-Type': 'application/json' 
+        } 
+      }
     )
   }
 })

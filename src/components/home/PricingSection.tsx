@@ -9,7 +9,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Check } from "lucide-react";
+import { Check, Sparkles } from "lucide-react";
 
 const plans = [
   {
@@ -29,6 +29,7 @@ const plans = [
     name: "Professional Plan",
     price: "997,00",
     description: "Para negócios em crescimento",
+    popular: true,
     features: [
       "3 Instâncias",
       "15.000 Interações de IA",
@@ -114,28 +115,41 @@ export const PricingSection = () => {
   };
 
   return (
-    <section className="py-16">
+    <section className="py-24 bg-gradient-to-b from-primary-50 to-white">
       <div className="container">
-        <h2 className="text-3xl font-bold text-center mb-12">
+        <h2 className="text-3xl md:text-4xl font-bold text-center mb-6 text-primary-950">
           Planos que cabem no seu bolso
         </h2>
+        <p className="text-center text-gray-600 mb-16 max-w-2xl mx-auto">
+          Escolha o plano ideal para o seu negócio e comece a transformar seu atendimento hoje mesmo
+        </p>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           {plans.map((plan) => (
             <Card
               key={plan.name}
-              className="relative hover:shadow-xl transition-shadow duration-300"
+              className={`relative hover:shadow-xl transition-shadow duration-300 ${
+                plan.popular ? 'border-primary shadow-lg scale-105' : ''
+              }`}
             >
+              {plan.popular && (
+                <div className="absolute -top-4 left-1/2 -translate-x-1/2">
+                  <span className="bg-primary text-white text-sm px-3 py-1 rounded-full flex items-center gap-1">
+                    <Sparkles className="h-4 w-4" />
+                    Mais Popular
+                  </span>
+                </div>
+              )}
               <CardHeader>
-                <CardTitle>{plan.name}</CardTitle>
+                <CardTitle className="text-2xl">{plan.name}</CardTitle>
                 <CardDescription>{plan.description}</CardDescription>
                 <div className="mt-4">
-                  <span className="text-3xl font-bold">
+                  <span className="text-3xl font-bold text-primary-950">
                     {plan.price === "Personalizado" ? (
                       "Personalizado"
                     ) : (
                       <>
                         R$ {plan.price}
-                        <span className="text-sm font-normal">/mês</span>
+                        <span className="text-sm font-normal text-gray-600">/mês</span>
                       </>
                     )}
                   </span>
@@ -145,13 +159,17 @@ export const PricingSection = () => {
                 <ul className="space-y-3">
                   {plan.features.map((feature) => (
                     <li key={feature} className="flex items-center gap-2">
-                      <Check className="h-5 w-5 text-primary" />
-                      <span>{feature}</span>
+                      <Check className="h-5 w-5 text-primary flex-shrink-0" />
+                      <span className="text-gray-600">{feature}</span>
                     </li>
                   ))}
                 </ul>
                 <Button
-                  className="w-full mt-6"
+                  className={`w-full mt-8 h-12 rounded-full ${
+                    plan.popular
+                      ? 'bg-primary hover:bg-primary-600'
+                      : 'bg-primary/90 hover:bg-primary'
+                  }`}
                   onClick={() => handleSubscribe(plan)}
                 >
                   {plan.price === "Personalizado"
