@@ -7,6 +7,7 @@ const corsHeaders = {
 }
 
 serve(async (req) => {
+  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
   }
@@ -17,6 +18,7 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
+    // Verify authentication
     const authHeader = req.headers.get('Authorization')
     if (!authHeader) {
       throw new Error('No authorization header')
@@ -30,7 +32,9 @@ serve(async (req) => {
       throw userError || new Error('User not found')
     }
 
+    // Get instance ID from request body
     const { instanceId } = await req.json()
+    console.log('Checking state for instance:', instanceId)
     
     // Get instance details from database
     const { data: instance, error: instanceError } = await supabaseClient

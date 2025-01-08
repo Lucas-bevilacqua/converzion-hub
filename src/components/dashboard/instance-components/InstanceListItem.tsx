@@ -1,9 +1,9 @@
 import { Button } from "@/components/ui/button"
 import { QrCode, MessageSquare } from "lucide-react"
 import { Database } from "@/integrations/supabase/types"
-import { useEffect } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { supabase } from "@/integrations/supabase/client"
+import { useToast } from "@/components/ui/use-toast"
 
 type Instance = Database['public']['Tables']['evolution_instances']['Row']
 
@@ -13,20 +13,36 @@ interface InstanceListItemProps {
 }
 
 export function InstanceListItem({ instance, onConnect }: InstanceListItemProps) {
+  const { toast } = useToast()
+
   // Poll for instance state every 5 seconds
   const { data: stateData } = useQuery({
     queryKey: ['instanceState', instance.id],
     queryFn: async () => {
       console.log('Checking state for instance:', instance.id)
-      const { data, error } = await supabase.functions.invoke('check-instance-state', {
-        body: { instanceId: instance.id }
-      })
-      
-      if (error) throw error
-      return data
+      try {
+        const { data, error } = await supabase.functions.invoke('check-instance-state', {
+          body: { instanceId: instance.id }
+        })
+        
+        if (error) {
+          console.error('Error checking instance state:', error)
+          toast({
+            title: "Error",
+            description: "Failed to check instance state. Please try again.",
+            variant: "destructive",
+          })
+          throw error
+        }
+        return data
+      } catch (error) {
+        console.error('Error in state check:', error)
+        return null
+      }
     },
     refetchInterval: 5000,
-    enabled: !!instance.id
+    enabled: !!instance.id,
+    retry: false
   })
 
   const connectionStatus = stateData?.state || instance.connection_status
