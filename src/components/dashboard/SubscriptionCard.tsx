@@ -40,13 +40,15 @@ export function SubscriptionCard() {
     },
     enabled: !!user?.id,
     retry: 1,
-    onError: (error) => {
-      console.error('Erro na query de assinatura:', error)
-      toast({
-        title: "Erro",
-        description: "Não foi possível carregar os dados da assinatura",
-        variant: "destructive",
-      })
+    meta: {
+      onError: () => {
+        console.error('Erro na query de assinatura')
+        toast({
+          title: "Erro",
+          description: "Não foi possível carregar os dados da assinatura",
+          variant: "destructive",
+        })
+      }
     }
   })
 
