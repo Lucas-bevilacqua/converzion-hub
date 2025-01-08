@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState } from "react";
-import { Session, User } from "@supabase/supabase-js";
+import { Session, User, AuthError } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 
 interface AuthContextType {
@@ -19,7 +19,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Add console log to track initialization
     console.log("Initializing auth state...");
     
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -43,43 +42,65 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signIn = async (email: string, password: string) => {
     console.log("Attempting sign in...");
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-    if (error) {
+    try {
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (error) {
+        console.error("Sign in error:", error);
+        // Convert the error to a more readable format
+        const errorMessage = error.message;
+        throw new Error(JSON.stringify({
+          code: error.message.includes("Invalid login credentials") ? "invalid_credentials" : "unknown",
+          message: errorMessage
+        }));
+      }
+      console.log("Sign in successful");
+    } catch (error) {
       console.error("Sign in error:", error);
       throw error;
     }
-    console.log("Sign in successful");
   };
 
   const signUp = async (email: string, password: string, fullName: string) => {
     console.log("Attempting sign up...");
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: {
-          full_name: fullName,
+    try {
+      const { error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            full_name: fullName,
+          },
         },
-      },
-    });
-    if (error) {
+      });
+
+      if (error) {
+        console.error("Sign up error:", error);
+        throw error;
+      }
+      console.log("Sign up successful");
+    } catch (error) {
       console.error("Sign up error:", error);
       throw error;
     }
-    console.log("Sign up successful");
   };
 
   const signOut = async () => {
     console.log("Attempting sign out...");
-    const { error } = await supabase.auth.signOut();
-    if (error) {
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) {
+        console.error("Sign out error:", error);
+        throw error;
+      }
+      console.log("Sign out successful");
+    } catch (error) {
       console.error("Sign out error:", error);
       throw error;
     }
-    console.log("Sign out successful");
   };
 
   return (
