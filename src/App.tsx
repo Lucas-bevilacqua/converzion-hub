@@ -13,7 +13,6 @@ import Admin from "./pages/Admin";
 
 const queryClient = new QueryClient();
 
-// Protected Route component
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, loading } = useAuth();
   
@@ -31,7 +30,6 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   return <>{children}</>;
 };
 
-// Public Route component (redirects to dashboard if logged in)
 const PublicRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, loading } = useAuth();
   
@@ -41,7 +39,7 @@ const PublicRoute = ({ children }: { children: React.ReactNode }) => {
     return <div>Loading...</div>;
   }
   
-  // Only redirect to dashboard if it's login or register page
+  // Não redireciona na home page
   if (user && window.location.pathname !== "/") {
     console.log("PublicRoute - User logged in, redirecting to dashboard");
     return <Navigate to="/dashboard" />;
