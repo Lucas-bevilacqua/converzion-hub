@@ -33,7 +33,8 @@ export function SubscriptionCard() {
         throw error
       }
     },
-    enabled: !!user?.id
+    enabled: !!user?.id,
+    retry: 1
   })
 
   const handleUpgrade = async () => {
