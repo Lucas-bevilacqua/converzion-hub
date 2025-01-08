@@ -70,9 +70,10 @@ serve(async (req) => {
       throw new Error('Evolution API configuration not found')
     }
 
-    // Clean up the base URL by removing trailing slashes
+    // Clean up the base URL and construct the endpoint
     const baseUrl = evolutionApiUrl.replace(/\/+$/, '')
-    const connectUrl = `${baseUrl}/instance/connect/${instance.name}`
+    const instanceName = encodeURIComponent(instance.name)
+    const connectUrl = `${baseUrl}/instance/connect/${instanceName}`
     
     console.log('Making request to Evolution API:', connectUrl)
 
@@ -80,37 +81,30 @@ serve(async (req) => {
       method: 'GET',
       headers: {
         'apikey': evolutionApiKey,
+        'Content-Type': 'application/json'
       }
     })
 
     if (!evolutionResponse.ok) {
       const errorText = await evolutionResponse.text()
       console.error('Evolution API error:', errorText)
-      return new Response(
-        JSON.stringify({ error: 'Failed to connect to Evolution API', details: errorText }),
-        { 
-          status: evolutionResponse.status, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        }
-      )
+      throw new Error(`Evolution API returned status ${evolutionResponse.status}: ${errorText}`)
     }
 
     const evolutionData = await evolutionResponse.json()
     console.log('Evolution API full response:', JSON.stringify(evolutionData, null, 2))
 
-    // Extract QR code from response
-    const qrCode = evolutionData.qrcode?.base64 || evolutionData.qrcode || evolutionData.data?.qrcode
+    // Extract QR code from response, checking all possible paths
+    const qrCode = evolutionData.qrcode?.base64 || 
+                  evolutionData.qrcode || 
+                  evolutionData.data?.qrcode?.base64 || 
+                  evolutionData.data?.qrcode
+
     console.log('Extracted QR code:', qrCode ? 'Present' : 'Not found')
 
     if (!qrCode) {
       console.error('No QR code found in response')
-      return new Response(
-        JSON.stringify({ error: 'No QR code found in response' }),
-        { 
-          status: 400, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        }
-      )
+      throw new Error('No QR code found in Evolution API response')
     }
 
     // Update instance status and QR code
@@ -119,7 +113,7 @@ serve(async (req) => {
       .update({
         qr_code: qrCode,
         last_qr_update: new Date().toISOString(),
-        connection_status: evolutionData.connected ? 'connected' : 'disconnected'
+        connection_status: evolutionData.connected ? 'connected' : 'pending'
       })
       .eq('id', instanceId)
 
@@ -130,14 +124,17 @@ serve(async (req) => {
         id: instance.id,
         name: instance.name,
         qrCode: qrCode,
-        connected: evolutionData.connected
+        connected: evolutionData.connected || false
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   } catch (error) {
     console.error('Error in connect-evolution-instance:', error)
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ 
+        error: error.message,
+        details: error.cause || error.stack
+      }),
       { 
         status: 400, 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
