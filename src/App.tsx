@@ -39,7 +39,6 @@ const PublicRoute = ({ children }: { children: React.ReactNode }) => {
     return <div>Loading...</div>;
   }
   
-  // Não redireciona na home page
   if (user && window.location.pathname !== "/") {
     console.log("PublicRoute - User logged in, redirecting to dashboard");
     return <Navigate to="/dashboard" />;
@@ -59,6 +58,7 @@ const AppRoutes = () => {
       <Route path="/register" element={<PublicRoute><Register /></PublicRoute>} />
       <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
       <Route path="/admin" element={<ProtectedRoute><Admin /></ProtectedRoute>} />
+      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
 };
