@@ -12,7 +12,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { LockKeyhole, Mail, Shield, CheckCircle, Building2 } from "lucide-react";
+import { LockKeyhole, Mail } from "lucide-react";
 
 export default function Login() {
   const [email, setEmail] = useState("");
@@ -23,6 +23,7 @@ export default function Login() {
   const navigate = useNavigate();
   const { toast } = useToast();
 
+  // Redireciona se já estiver logado
   useEffect(() => {
     if (session) {
       console.log("User already logged in, redirecting to dashboard");
@@ -63,30 +64,11 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center px-4 bg-gradient-to-b from-primary-50/50 to-white">
-      <div className="w-full max-w-md space-y-8">
-        <div className="text-center">
-          <h1 className="text-3xl font-bold tracking-tight text-gray-900">
-            Bem-vindo de volta
-          </h1>
-          <p className="mt-2 text-gray-600">
-            Entre para acessar sua conta e transformar seu atendimento
-          </p>
-        </div>
-
-        <div className="flex justify-center space-x-6 py-8">
-          <div className="text-center">
-            <Building2 className="mx-auto h-6 w-6 text-primary mb-2" />
-            <p className="text-sm text-gray-600">+500 empresas</p>
-          </div>
-          <div className="text-center">
-            <CheckCircle className="mx-auto h-6 w-6 text-primary mb-2" />
-            <p className="text-sm text-gray-600">97% satisfação</p>
-          </div>
-          <div className="text-center">
-            <Shield className="mx-auto h-6 w-6 text-primary mb-2" />
-            <p className="text-sm text-gray-600">Dados seguros</p>
-          </div>
+    <div className="min-h-screen flex flex-col items-center justify-center px-4 bg-gray-50">
+      <div className="w-full max-w-md space-y-4">
+        <div className="text-center mb-8">
+          <h1 className="text-2xl font-bold tracking-tight">Bem-vindo de volta</h1>
+          <p className="text-gray-500 mt-2">Entre com sua conta para acessar o painel</p>
         </div>
         
         <Card className="border-0 shadow-lg">
@@ -135,50 +117,25 @@ export default function Login() {
 
               <Button 
                 type="submit" 
-                className="w-full bg-primary hover:bg-primary-600 text-white py-6" 
+                className="w-full bg-primary hover:bg-primary/90" 
                 disabled={loading}
               >
                 {loading ? "Entrando..." : "Entrar"}
               </Button>
 
-              <div className="mt-6 text-center space-y-4">
+              <div className="text-center mt-6">
                 <Button
                   variant="link"
                   onClick={() => navigate("/register")}
                   type="button"
-                  className="text-sm text-gray-600 hover:text-primary"
+                  className="text-sm text-gray-600 hover:text-gray-900"
                 >
-                  Ainda não tem uma conta? Registre-se gratuitamente
+                  Não tem uma conta? Registre-se
                 </Button>
-                
-                <p className="text-xs text-gray-500">
-                  Ao fazer login você concorda com nossos{" "}
-                  <Button variant="link" className="text-xs p-0 h-auto" onClick={() => navigate("/terms")}>
-                    Termos de Uso
-                  </Button>{" "}
-                  e{" "}
-                  <Button variant="link" className="text-xs p-0 h-auto" onClick={() => navigate("/privacy")}>
-                    Política de Privacidade
-                  </Button>
-                </p>
               </div>
             </form>
           </CardContent>
         </Card>
-
-        <div className="mt-8 text-center space-y-4">
-          <div className="flex items-center justify-center space-x-4">
-            <img src="/placeholder.svg" alt="Cliente 1" className="w-8 h-8 rounded-full" />
-            <img src="/placeholder.svg" alt="Cliente 2" className="w-8 h-8 rounded-full" />
-            <img src="/placeholder.svg" alt="Cliente 3" className="w-8 h-8 rounded-full" />
-          </div>
-          <p className="text-sm text-gray-600">
-            "A Converzion transformou completamente nosso atendimento"
-          </p>
-          <p className="text-xs text-gray-500">
-            João Silva, CEO da TechCorp
-          </p>
-        </div>
       </div>
     </div>
   );
