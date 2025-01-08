@@ -146,17 +146,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signOut = async () => {
     console.log("Attempting sign out...");
     try {
+      // First clear the local session
+      setSession(null);
+      setUser(null);
+      
+      // Then attempt to sign out from Supabase
       const { error } = await supabase.auth.signOut();
       if (error) {
         console.error("Sign out error:", error);
+        // Even if there's an error, we've already cleared the local session
+        // so the user is effectively signed out
+        if (error.message.includes("User not found") || error.status === 403) {
+          console.log("User already signed out or session expired");
+          return; // Don't throw error in this case
+        }
         const errorMessage = parseAuthError(error);
         throw new Error(errorMessage);
       }
       console.log("Sign out successful");
     } catch (error) {
       console.error("Sign out catch block error:", error);
-      const errorMessage = parseAuthError(error as AuthError);
-      throw new Error(errorMessage);
+      // Only throw if it's not a "user not found" error
+      if (error instanceof Error && 
+          !error.message.includes("User not found") && 
+          !error.message.includes("403")) {
+        const errorMessage = parseAuthError(error as AuthError);
+        throw new Error(errorMessage);
+      }
     }
   };
 
