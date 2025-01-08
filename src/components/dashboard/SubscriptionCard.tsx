@@ -10,15 +10,20 @@ export function SubscriptionCard() {
   const { user } = useAuth()
   const { toast } = useToast()
 
-  const { data: subscription, isLoading } = useQuery({
+  const { data: subscription, isLoading, error } = useQuery({
     queryKey: ['subscription', user?.id],
     queryFn: async () => {
       console.log('Buscando assinatura para o usuário:', user?.id)
       try {
+        if (!user?.id) {
+          console.log('Usuário não encontrado')
+          return null
+        }
+
         const { data, error } = await supabase
           .from('subscriptions')
           .select('*')
-          .eq('user_id', user?.id)
+          .eq('user_id', user.id)
           .maybeSingle()
         
         if (error) {
@@ -34,7 +39,15 @@ export function SubscriptionCard() {
       }
     },
     enabled: !!user?.id,
-    retry: 1
+    retry: 1,
+    onError: (error) => {
+      console.error('Erro na query de assinatura:', error)
+      toast({
+        title: "Erro",
+        description: "Não foi possível carregar os dados da assinatura",
+        variant: "destructive",
+      })
+    }
   })
 
   const handleUpgrade = async () => {
@@ -42,10 +55,9 @@ export function SubscriptionCard() {
       console.log('Iniciando processo de checkout')
       console.log('Assinatura atual:', subscription)
       
-      // Define diferentes IDs de preço para planos inicial e profissional
       const priceId = !subscription || subscription.status !== 'active'
-        ? 'price_1OqbuUiKkjJ7tububpw8Vpsrp' // Plano inicial para novos assinantes
-        : 'price_1OqbuViKkjJ7tububpw8Vpsrq' // Plano profissional para upgrades
+        ? 'price_1OqbuUiKkjJ7tububpw8Vpsrp' // Plano inicial
+        : 'price_1OqbuViKkjJ7tububpw8Vpsrq' // Plano profissional
       
       console.log('ID do preço selecionado:', priceId)
       
@@ -107,6 +119,21 @@ export function SubscriptionCard() {
 
   const planDetails = getPlanDetails()
 
+  if (error) {
+    return (
+      <Card>
+        <CardContent className="flex items-center justify-center p-6">
+          <div className="text-center">
+            <AlertTriangle className="h-8 w-8 text-red-500 mx-auto mb-2" />
+            <p className="text-sm text-muted-foreground">
+              Erro ao carregar dados da assinatura
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+    )
+  }
+
   return (
     <Card>
       <CardHeader>
@@ -137,9 +164,9 @@ export function SubscriptionCard() {
               <p className="text-sm text-muted-foreground">
                 {planDetails.instances} instância{planDetails.instances !== 1 ? 's' : ''} disponíve{planDetails.instances !== 1 ? 'is' : 'l'}
               </p>
-              {subscription?.status === 'active' && (
+              {subscription?.status === 'active' && subscription.current_period_end && (
                 <p className="text-sm text-muted-foreground mt-1">
-                  Válido até: {new Date(subscription.current_period_end!).toLocaleDateString()}
+                  Válido até: {new Date(subscription.current_period_end).toLocaleDateString()}
                 </p>
               )}
             </div>
