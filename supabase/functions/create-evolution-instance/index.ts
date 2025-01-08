@@ -56,7 +56,15 @@ serve(async (req) => {
       throw new Error(`Instance limit (${instanceLimit}) reached for your plan`)
     }
 
-    const { instanceName, phoneNumber } = await req.json()
+    const body = await req.json()
+    const { instanceName, phoneNumber } = body
+
+    if (!instanceName || !phoneNumber) {
+      console.error('Missing required parameters:', { instanceName, phoneNumber })
+      throw new Error('Missing required parameters: instanceName and phoneNumber are required')
+    }
+
+    console.log('Creating Evolution API instance:', { instanceName, phoneNumber })
 
     // Create instance in Evolution API
     const evolutionResponse = await fetch(`${Deno.env.get('EVOLUTION_API_URL')}/instance/create`, {
@@ -66,15 +74,21 @@ serve(async (req) => {
         'apikey': Deno.env.get('EVOLUTION_API_KEY') ?? '',
       },
       body: JSON.stringify({
-        instanceName,
+        instanceName: instanceName.replace(/[^a-zA-Z0-9]/g, ''), // Sanitize instance name
         qrcode: true,
+        number: phoneNumber.replace(/\D/g, ''), // Remove non-digits
         integration: "WHATSAPP-BAILEYS"
       })
     })
 
     if (!evolutionResponse.ok) {
-      throw new Error('Failed to create Evolution API instance')
+      const errorData = await evolutionResponse.text()
+      console.error('Evolution API error:', errorData)
+      throw new Error(`Failed to create Evolution API instance: ${errorData}`)
     }
+
+    const evolutionData = await evolutionResponse.json()
+    console.log('Evolution API response:', evolutionData)
 
     // Save instance to database
     const { data: instance, error: insertError } = await supabaseClient
@@ -88,16 +102,36 @@ serve(async (req) => {
       .select()
       .single()
 
-    if (insertError) throw insertError
+    if (insertError) {
+      console.error('Database insert error:', insertError)
+      throw insertError
+    }
+
+    console.log('Instance created successfully:', instance)
 
     return new Response(
       JSON.stringify(instance),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { 
+        headers: { 
+          ...corsHeaders, 
+          'Content-Type': 'application/json' 
+        } 
+      }
     )
   } catch (error) {
+    console.error('Error in create-evolution-instance:', error)
     return new Response(
-      JSON.stringify({ error: error.message }),
-      { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      JSON.stringify({ 
+        error: error.message,
+        details: error.toString()
+      }),
+      { 
+        status: 400, 
+        headers: { 
+          ...corsHeaders, 
+          'Content-Type': 'application/json' 
+        } 
+      }
     )
   }
 })
