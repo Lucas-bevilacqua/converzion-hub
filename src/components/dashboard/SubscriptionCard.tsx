@@ -40,12 +40,17 @@ export function SubscriptionCard() {
   const handleUpgrade = async () => {
     try {
       console.log('Initiating checkout process')
+      console.log('Current subscription:', subscription)
+      
+      // Define different price IDs for starter and professional plans
+      const priceId = !subscription || subscription.status !== 'active'
+        ? 'price_1OqbuUiKkjJ7tububpw8Vpsrp' // Starter plan for new subscribers
+        : 'price_1OqbuViKkjJ7tububpw8Vpsrq' // Professional plan for upgrades
+      
+      console.log('Selected price ID:', priceId)
+      
       const { data, error } = await supabase.functions.invoke('stripe-checkout', {
-        body: { 
-          priceId: subscription?.plan_id === 'professional' 
-            ? 'price_1QbuUiKkjJ7tububpw8Vpsrp' // Professional plan
-            : 'price_1QbuUiKkjJ7tububpw8Vpsrp' // Starter plan
-        },
+        body: { priceId }
       })
 
       if (error) {
@@ -69,6 +74,8 @@ export function SubscriptionCard() {
   }
 
   const getPlanDetails = () => {
+    console.log('Getting plan details for subscription:', subscription)
+    
     if (!subscription || subscription.status !== 'active') {
       return {
         name: 'Gratuito',
@@ -79,7 +86,7 @@ export function SubscriptionCard() {
       }
     }
 
-    return subscription.plan_id?.includes('professional')
+    return subscription.plan_id === 'price_1OqbuViKkjJ7tububpw8Vpsrq'
       ? {
           name: 'Profissional',
           instances: 3,
