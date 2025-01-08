@@ -4,7 +4,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, stripe-signature',
 }
 
 serve(async (req) => {
@@ -33,26 +33,31 @@ serve(async (req) => {
     // Get the signature from the headers
     const signature = req.headers.get('stripe-signature')
     if (!signature) {
-      console.error('No Stripe signature found in request')
+      console.error('No Stripe signature found in request headers:', 
+        Object.fromEntries(req.headers.entries())
+      )
       throw new Error('No signature provided')
     }
 
     console.log('Received webhook with signature:', signature)
 
-    // Get the raw body
-    const body = await req.text()
-    console.log('Webhook raw body:', body)
+    // Get the raw body as text
+    const rawBody = await req.text()
+    console.log('Webhook raw body:', rawBody)
     
     // Verify the webhook signature
     let event
     try {
-      event = stripe.webhooks.constructEvent(body, signature, webhookSecret)
+      event = stripe.webhooks.constructEvent(rawBody, signature, webhookSecret)
       console.log('Webhook event verified:', event.type)
     } catch (err) {
       console.error('Webhook signature verification failed:', err)
       return new Response(
-        JSON.stringify({ error: 'Webhook signature verification failed' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify({ error: 'Webhook signature verification failed', details: err.message }),
+        { 
+          status: 400, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
       )
     }
 
@@ -89,7 +94,7 @@ serve(async (req) => {
           throw new Error('No customer email found')
         }
 
-        // Get user from Supabase by email
+        // Get user from Supabase by client_reference_id (user ID)
         console.log('Looking up user with client reference ID:', session.client_reference_id)
         const { data: userData, error: userError } = await supabaseClient
           .from('profiles')
