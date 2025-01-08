@@ -73,12 +73,14 @@ serve(async (req) => {
     // Clean up the base URL and construct the endpoint
     const baseUrl = evolutionApiUrl.replace(/\/+$/, '')
     const instanceName = encodeURIComponent(instance.name)
-    const connectUrl = `${baseUrl}/instance/connect/${instanceName}`
     
-    console.log('Making request to Evolution API:', connectUrl)
+    console.log('Evolution API Base URL:', baseUrl)
+    console.log('Instance Name:', instanceName)
 
     // First, check if instance exists
     const checkInstanceUrl = `${baseUrl}/instance/fetchInstances`
+    console.log('Checking instances at:', checkInstanceUrl)
+    
     const checkResponse = await fetch(checkInstanceUrl, {
       method: 'GET',
       headers: {
@@ -94,10 +96,12 @@ serve(async (req) => {
     }
 
     const instances = await checkResponse.json()
-    console.log('Available instances:', instances)
+    console.log('Available instances:', JSON.stringify(instances, null, 2))
 
     // Create instance if it doesn't exist
     if (!instances.find((inst: any) => inst.instanceName === instance.name)) {
+      console.log('Instance not found, creating new instance:', instance.name)
+      
       const createUrl = `${baseUrl}/instance/create`
       const createResponse = await fetch(createUrl, {
         method: 'POST',
@@ -108,7 +112,8 @@ serve(async (req) => {
         body: JSON.stringify({
           instanceName: instance.name,
           token: "any",
-          qrcode: true
+          qrcode: true,
+          integration: "WHATSAPP-BAILEYS"
         })
       })
 
@@ -118,10 +123,14 @@ serve(async (req) => {
         throw new Error(`Failed to create instance: ${errorText}`)
       }
 
-      console.log('Instance created successfully')
+      const createData = await createResponse.json()
+      console.log('Instance creation response:', JSON.stringify(createData, null, 2))
     }
 
     // Now connect to get QR code
+    const connectUrl = `${baseUrl}/instance/connect/${instanceName}`
+    console.log('Connecting to instance at:', connectUrl)
+    
     const evolutionResponse = await fetch(connectUrl, {
       method: 'GET',
       headers: {
@@ -145,10 +154,10 @@ serve(async (req) => {
                   evolutionData.data?.qrcode?.base64 || 
                   evolutionData.data?.qrcode
 
-    console.log('Extracted QR code:', qrCode ? 'Present' : 'Not found')
+    console.log('QR code found:', qrCode ? 'Yes' : 'No')
 
     if (!qrCode) {
-      console.error('No QR code found in response')
+      console.error('No QR code found in response. Full response:', JSON.stringify(evolutionData, null, 2))
       throw new Error('No QR code found in Evolution API response')
     }
 
