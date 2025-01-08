@@ -17,11 +17,14 @@ const queryClient = new QueryClient();
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, loading } = useAuth();
   
+  console.log("ProtectedRoute - User:", user, "Loading:", loading);
+  
   if (loading) {
     return <div>Loading...</div>;
   }
   
   if (!user) {
+    console.log("ProtectedRoute - No user, redirecting to login");
     return <Navigate to="/login" />;
   }
   
@@ -32,11 +35,15 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 const PublicRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, loading } = useAuth();
   
+  console.log("PublicRoute - User:", user, "Loading:", loading);
+  
   if (loading) {
     return <div>Loading...</div>;
   }
   
-  if (user) {
+  // Only redirect to dashboard if it's login or register page
+  if (user && window.location.pathname !== "/") {
+    console.log("PublicRoute - User logged in, redirecting to dashboard");
     return <Navigate to="/dashboard" />;
   }
   
@@ -44,6 +51,9 @@ const PublicRoute = ({ children }: { children: React.ReactNode }) => {
 };
 
 const AppRoutes = () => {
+  const { user } = useAuth();
+  console.log("AppRoutes - Current user:", user);
+  
   return (
     <Routes>
       <Route path="/" element={<PublicRoute><Index /></PublicRoute>} />
