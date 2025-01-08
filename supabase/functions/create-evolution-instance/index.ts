@@ -14,7 +14,7 @@ serve(async (req) => {
   try {
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? ''
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
     const authHeader = req.headers.get('Authorization')
@@ -27,16 +27,18 @@ serve(async (req) => {
     )
 
     if (userError || !user) {
+      console.error('User error:', userError)
       throw userError || new Error('User not found')
     }
 
     console.log('Checking subscription status for user:', user.id)
 
-    // Check subscription status
+    // Check subscription status using service role client
     const { data: subscription, error: subError } = await supabaseClient
       .from('subscriptions')
       .select('*')
       .eq('user_id', user.id)
+      .eq('status', 'active')
       .maybeSingle()
 
     if (subError) {
@@ -44,7 +46,7 @@ serve(async (req) => {
       throw subError
     }
 
-    if (!subscription || subscription.status !== 'active') {
+    if (!subscription) {
       console.error('No active subscription found for user:', user.id)
       return new Response(
         JSON.stringify({ error: 'Active subscription required' }),
@@ -97,11 +99,12 @@ serve(async (req) => {
     })
 
     if (!evolutionResponse.ok) {
-      console.error('Evolution API error:', await evolutionResponse.text())
+      const errorText = await evolutionResponse.text()
+      console.error('Evolution API error:', errorText)
       throw new Error('Failed to create Evolution API instance')
     }
 
-    // Save instance to database
+    // Save instance to database using service role client
     const { data: instance, error: insertError } = await supabaseClient
       .from('evolution_instances')
       .insert({
