@@ -13,7 +13,7 @@ export function SubscriptionCard() {
   const { data: subscription, isLoading } = useQuery({
     queryKey: ['subscription', user?.id],
     queryFn: async () => {
-      console.log('Fetching subscription for user:', user?.id)
+      console.log('Buscando assinatura para o usuário:', user?.id)
       try {
         const { data, error } = await supabase
           .from('subscriptions')
@@ -22,14 +22,14 @@ export function SubscriptionCard() {
           .maybeSingle()
         
         if (error) {
-          console.error('Error fetching subscription:', error)
+          console.error('Erro ao buscar assinatura:', error)
           throw error
         }
 
-        console.log('Subscription data:', data)
+        console.log('Dados da assinatura:', data)
         return data
       } catch (error) {
-        console.error('Error in subscription query:', error)
+        console.error('Erro na consulta de assinatura:', error)
         throw error
       }
     },
@@ -39,32 +39,32 @@ export function SubscriptionCard() {
 
   const handleUpgrade = async () => {
     try {
-      console.log('Initiating checkout process')
-      console.log('Current subscription:', subscription)
+      console.log('Iniciando processo de checkout')
+      console.log('Assinatura atual:', subscription)
       
-      // Define different price IDs for starter and professional plans
+      // Define diferentes IDs de preço para planos inicial e profissional
       const priceId = !subscription || subscription.status !== 'active'
-        ? 'price_1OqbuUiKkjJ7tububpw8Vpsrp' // Starter plan for new subscribers
-        : 'price_1OqbuViKkjJ7tububpw8Vpsrq' // Professional plan for upgrades
+        ? 'price_1OqbuUiKkjJ7tububpw8Vpsrp' // Plano inicial para novos assinantes
+        : 'price_1OqbuViKkjJ7tububpw8Vpsrq' // Plano profissional para upgrades
       
-      console.log('Selected price ID:', priceId)
+      console.log('ID do preço selecionado:', priceId)
       
       const { data, error } = await supabase.functions.invoke('stripe-checkout', {
         body: { priceId }
       })
 
       if (error) {
-        console.error('Error from stripe-checkout:', error)
+        console.error('Erro do stripe-checkout:', error)
         throw error
       }
       
       if (data?.url) {
         window.location.href = data.url
       } else {
-        throw new Error('No checkout URL returned')
+        throw new Error('URL de checkout não retornada')
       }
     } catch (error) {
-      console.error('Error creating checkout session:', error)
+      console.error('Erro ao criar sessão de checkout:', error)
       toast({
         title: "Erro",
         description: "Não foi possível iniciar o checkout. Tente novamente.",
@@ -74,7 +74,9 @@ export function SubscriptionCard() {
   }
 
   const getPlanDetails = () => {
-    console.log('Getting plan details for subscription:', subscription)
+    console.log('Obtendo detalhes do plano para assinatura:', subscription)
+    console.log('Status da assinatura:', subscription?.status)
+    console.log('ID do plano:', subscription?.plan_id)
     
     if (!subscription || subscription.status !== 'active') {
       return {
@@ -162,5 +164,4 @@ export function SubscriptionCard() {
         )}
       </CardContent>
     </Card>
-  )
-}
+  </div>
