@@ -5,22 +5,23 @@ export const Footer = () => {
   const navigate = useNavigate();
   
   return (
-    <footer className="border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+    <footer className="bg-gradient-to-br from-[#9b87f5]/5 to-white border-t border-[#E5DEFF]">
       <div className="container py-16">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           <div>
-            <h3 className="text-lg font-semibold mb-4">Converzion</h3>
-            <p className="text-sm text-gray-500">
+            <h3 className="text-lg font-semibold text-[#7E69AB] mb-4">Converzion</h3>
+            <p className="text-sm text-[#7E69AB]/70">
               Transforme seu atendimento com IA
             </p>
           </div>
           <div>
-            <h4 className="font-medium mb-4">Produto</h4>
+            <h4 className="font-medium text-[#7E69AB] mb-4">Produto</h4>
             <ul className="space-y-2">
               <li>
                 <Button
                   variant="link"
                   onClick={() => navigate("/pricing")}
+                  className="text-[#7E69AB]/70 hover:text-[#9b87f5]"
                 >
                   Preços
                 </Button>
@@ -29,6 +30,7 @@ export const Footer = () => {
                 <Button
                   variant="link"
                   onClick={() => navigate("/features")}
+                  className="text-[#7E69AB]/70 hover:text-[#9b87f5]"
                 >
                   Funcionalidades
                 </Button>
@@ -36,12 +38,13 @@ export const Footer = () => {
             </ul>
           </div>
           <div>
-            <h4 className="font-medium mb-4">Suporte</h4>
+            <h4 className="font-medium text-[#7E69AB] mb-4">Suporte</h4>
             <ul className="space-y-2">
               <li>
                 <Button
                   variant="link"
                   onClick={() => navigate("/contact")}
+                  className="text-[#7E69AB]/70 hover:text-[#9b87f5]"
                 >
                   Contato
                 </Button>
@@ -50,6 +53,7 @@ export const Footer = () => {
                 <Button
                   variant="link"
                   onClick={() => navigate("/docs")}
+                  className="text-[#7E69AB]/70 hover:text-[#9b87f5]"
                 >
                   Documentação
                 </Button>
@@ -57,12 +61,13 @@ export const Footer = () => {
             </ul>
           </div>
           <div>
-            <h4 className="font-medium mb-4">Legal</h4>
+            <h4 className="font-medium text-[#7E69AB] mb-4">Legal</h4>
             <ul className="space-y-2">
               <li>
                 <Button
                   variant="link"
                   onClick={() => navigate("/privacy")}
+                  className="text-[#7E69AB]/70 hover:text-[#9b87f5]"
                 >
                   Privacidade
                 </Button>
@@ -71,6 +76,7 @@ export const Footer = () => {
                 <Button
                   variant="link"
                   onClick={() => navigate("/terms")}
+                  className="text-[#7E69AB]/70 hover:text-[#9b87f5]"
                 >
                   Termos
                 </Button>
@@ -78,7 +84,7 @@ export const Footer = () => {
             </ul>
           </div>
         </div>
-        <div className="mt-16 pt-8 border-t text-center text-sm text-gray-500">
+        <div className="mt-16 pt-8 border-t border-[#E5DEFF] text-center text-sm text-[#7E69AB]/70">
           © {new Date().getFullYear()} Converzion. Todos os direitos reservados.
         </div>
       </div>
