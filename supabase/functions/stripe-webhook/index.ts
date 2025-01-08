@@ -8,12 +8,15 @@ const corsHeaders = {
 }
 
 serve(async (req) => {
+  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
   }
 
   try {
-    console.log('Processing webhook request...')
+    console.log('Webhook request received')
+    console.log('Request method:', req.method)
+    console.log('Request headers:', Object.fromEntries(req.headers.entries()))
     
     const stripeKey = Deno.env.get('STRIPE_SECRET_KEY')
     const webhookSecret = Deno.env.get('STRIPE_WEBHOOK_SECRET')
@@ -30,39 +33,44 @@ serve(async (req) => {
       apiVersion: '2023-10-16',
     })
 
-    // Get the signature from the headers
+    // Get the raw request body
+    const rawBody = await req.text()
+    console.log('Raw request body length:', rawBody.length)
+    console.log('Raw request body preview:', rawBody.substring(0, 100))
+
+    // Get the Stripe signature
     const signature = req.headers.get('stripe-signature')
     if (!signature) {
-      console.error('No Stripe signature found in request headers:', 
-        Object.fromEntries(req.headers.entries())
+      console.error('No Stripe signature in headers:', Object.fromEntries(req.headers.entries()))
+      return new Response(
+        JSON.stringify({ error: 'No Stripe signature provided' }),
+        { 
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
       )
-      throw new Error('No signature provided')
     }
 
-    console.log('Received webhook with signature:', signature)
+    console.log('Stripe signature received:', signature)
 
-    // Get the raw body as text
-    const rawBody = await req.text()
-    console.log('Webhook raw body:', rawBody)
-    
-    // Verify the webhook signature
+    // Verify Stripe signature
     let event
     try {
       event = stripe.webhooks.constructEvent(rawBody, signature, webhookSecret)
-      console.log('Webhook event verified:', event.type)
+      console.log('Event constructed successfully:', event.type)
     } catch (err) {
-      console.error('Webhook signature verification failed:', err)
+      console.error('Error constructing webhook event:', err)
       return new Response(
         JSON.stringify({ error: 'Webhook signature verification failed', details: err.message }),
         { 
-          status: 400, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         }
       )
     }
 
     // Initialize Supabase client
-    console.log('Initializing Supabase client...')
+    console.log('Initializing Supabase client')
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
@@ -71,31 +79,34 @@ serve(async (req) => {
     // Handle different event types
     switch (event.type) {
       case 'checkout.session.completed': {
-        const session = event.data.object as Stripe.Checkout.Session
-        console.log('Checkout session completed:', session)
+        const session = event.data.object
+        console.log('Processing checkout session:', session.id)
 
         if (!session.customer || !session.subscription) {
-          console.error('Missing customer or subscription information:', {
+          console.error('Missing customer or subscription:', {
             customer: session.customer,
             subscription: session.subscription
           })
-          throw new Error('Missing customer or subscription information')
+          throw new Error('Invalid checkout session data')
         }
 
+        // Retrieve subscription details
+        console.log('Fetching subscription details:', session.subscription)
         const subscription = await stripe.subscriptions.retrieve(session.subscription as string)
-        console.log('Subscription retrieved:', subscription)
+        console.log('Subscription details:', subscription)
 
-        // Get user from customer metadata
+        // Retrieve customer details
+        console.log('Fetching customer details:', session.customer)
         const customer = await stripe.customers.retrieve(session.customer as string)
-        console.log('Customer retrieved:', customer)
+        console.log('Customer details:', customer)
 
         if (!customer.email) {
           console.error('No customer email found')
-          throw new Error('No customer email found')
+          throw new Error('Customer email missing')
         }
 
-        // Get user from Supabase by client_reference_id (user ID)
-        console.log('Looking up user with client reference ID:', session.client_reference_id)
+        // Get user from Supabase using client_reference_id
+        console.log('Looking up user:', session.client_reference_id)
         const { data: userData, error: userError } = await supabaseClient
           .from('profiles')
           .select('id')
@@ -103,13 +114,13 @@ serve(async (req) => {
           .single()
 
         if (userError || !userData) {
-          console.error('Error getting user:', userError)
+          console.error('Error finding user:', userError)
           throw new Error('User not found')
         }
 
-        console.log('Updating subscription for user:', userData.id)
+        console.log('Found user:', userData)
 
-        // Update or create subscription record
+        // Update subscription in database
         const { error: subscriptionError } = await supabaseClient
           .from('subscriptions')
           .upsert({
@@ -131,8 +142,8 @@ serve(async (req) => {
       }
 
       case 'customer.subscription.updated': {
-        const subscription = event.data.object as Stripe.Subscription
-        console.log('Subscription updated:', subscription.id)
+        const subscription = event.data.object
+        console.log('Processing subscription update:', subscription.id)
 
         const { error } = await supabaseClient
           .from('subscriptions')
@@ -146,12 +157,14 @@ serve(async (req) => {
           console.error('Error updating subscription:', error)
           throw error
         }
+
+        console.log('Subscription status updated successfully')
         break
       }
 
       case 'customer.subscription.deleted': {
-        const subscription = event.data.object as Stripe.Subscription
-        console.log('Subscription deleted:', subscription.id)
+        const subscription = event.data.object
+        console.log('Processing subscription deletion:', subscription.id)
 
         const { error } = await supabaseClient
           .from('subscriptions')
@@ -165,6 +178,8 @@ serve(async (req) => {
           console.error('Error updating subscription:', error)
           throw error
         }
+
+        console.log('Subscription marked as canceled')
         break
       }
 
@@ -177,7 +192,7 @@ serve(async (req) => {
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   } catch (error) {
-    console.error('Error processing webhook:', error)
+    console.error('Webhook processing error:', error)
     return new Response(
       JSON.stringify({ 
         error: error.message,
