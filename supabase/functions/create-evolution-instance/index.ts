@@ -30,6 +30,8 @@ serve(async (req) => {
       throw userError || new Error('User not found')
     }
 
+    console.log('Checking subscription for user:', user.id)
+
     // Check subscription status
     const { data: subscription, error: subError } = await supabaseClient
       .from('subscriptions')
@@ -37,8 +39,15 @@ serve(async (req) => {
       .eq('user_id', user.id)
       .maybeSingle()
 
-    if (subError) throw subError
+    if (subError) {
+      console.error('Error fetching subscription:', subError)
+      throw subError
+    }
+
+    console.log('Subscription data:', subscription)
+
     if (!subscription || subscription.status !== 'active') {
+      console.error('No active subscription found for user:', user.id)
       throw new Error('Active subscription required')
     }
 
@@ -48,11 +57,17 @@ serve(async (req) => {
       .select('*', { count: 'exact' })
       .eq('user_id', user.id)
 
-    if (countError) throw countError
+    if (countError) {
+      console.error('Error counting instances:', countError)
+      throw countError
+    }
+
+    console.log('Current instance count:', count)
 
     // Check instance limit based on plan
     const instanceLimit = subscription.plan_id?.includes('professional') ? 3 : 1
     if (count && count >= instanceLimit) {
+      console.error('Instance limit reached:', { count, instanceLimit })
       throw new Error(`Instance limit (${instanceLimit}) reached for your plan`)
     }
 
