@@ -77,6 +77,51 @@ serve(async (req) => {
     
     console.log('Making request to Evolution API:', connectUrl)
 
+    // First, check if instance exists
+    const checkInstanceUrl = `${baseUrl}/instance/fetchInstances`
+    const checkResponse = await fetch(checkInstanceUrl, {
+      method: 'GET',
+      headers: {
+        'apikey': evolutionApiKey,
+        'Content-Type': 'application/json'
+      }
+    })
+
+    if (!checkResponse.ok) {
+      const errorText = await checkResponse.text()
+      console.error('Evolution API check instance error:', errorText)
+      throw new Error(`Evolution API check failed: ${errorText}`)
+    }
+
+    const instances = await checkResponse.json()
+    console.log('Available instances:', instances)
+
+    // Create instance if it doesn't exist
+    if (!instances.find((inst: any) => inst.instanceName === instance.name)) {
+      const createUrl = `${baseUrl}/instance/create`
+      const createResponse = await fetch(createUrl, {
+        method: 'POST',
+        headers: {
+          'apikey': evolutionApiKey,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          instanceName: instance.name,
+          token: "any",
+          qrcode: true
+        })
+      })
+
+      if (!createResponse.ok) {
+        const errorText = await createResponse.text()
+        console.error('Evolution API create instance error:', errorText)
+        throw new Error(`Failed to create instance: ${errorText}`)
+      }
+
+      console.log('Instance created successfully')
+    }
+
+    // Now connect to get QR code
     const evolutionResponse = await fetch(connectUrl, {
       method: 'GET',
       headers: {
@@ -87,7 +132,7 @@ serve(async (req) => {
 
     if (!evolutionResponse.ok) {
       const errorText = await evolutionResponse.text()
-      console.error('Evolution API error:', errorText)
+      console.error('Evolution API connect error:', errorText)
       throw new Error(`Evolution API returned status ${evolutionResponse.status}: ${errorText}`)
     }
 
