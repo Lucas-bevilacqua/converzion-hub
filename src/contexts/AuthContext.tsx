@@ -40,22 +40,44 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => subscription.unsubscribe();
   }, []);
 
-  const handleAuthError = (error: AuthError | Error) => {
-    console.error("Auth error:", error);
+  const parseAuthError = (error: AuthError | Error) => {
+    console.log("Parsing auth error:", error);
     
-    if ('message' in error) {
-      if (error.message.includes("Invalid login credentials")) {
-        throw new Error("Email ou senha inválidos");
+    try {
+      if ('error' in error && typeof error.error === 'string') {
+        const errorBody = JSON.parse(error.error);
+        if (errorBody.code === "invalid_credentials") {
+          return "Email ou senha inválidos";
+        }
       }
-      if (error.message.includes("Email not confirmed")) {
-        throw new Error("Por favor, confirme seu email antes de fazer login");
+      
+      if ('message' in error) {
+        const message = error.message;
+        if (typeof message === 'string') {
+          if (message.includes("Invalid login credentials")) {
+            return "Email ou senha inválidos";
+          }
+          if (message.includes("Email not confirmed")) {
+            return "Por favor, confirme seu email antes de fazer login";
+          }
+          if (message.includes("User not found")) {
+            return "Usuário não encontrado";
+          }
+          try {
+            const parsedMessage = JSON.parse(message);
+            if (parsedMessage.code === "invalid_credentials") {
+              return "Email ou senha inválidos";
+            }
+          } catch (e) {
+            // If message is not JSON, use it as is
+          }
+        }
       }
-      if (error.message.includes("User not found")) {
-        throw new Error("Usuário não encontrado");
-      }
+    } catch (e) {
+      console.error("Error parsing auth error:", e);
     }
     
-    throw new Error("Erro ao autenticar. Por favor, tente novamente.");
+    return "Erro ao autenticar. Por favor, tente novamente.";
   };
 
   const signIn = async (email: string, password: string) => {
@@ -67,7 +89,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
 
       if (error) {
-        handleAuthError(error);
+        console.error("Sign in error:", error);
+        const errorMessage = parseAuthError(error);
+        throw new Error(errorMessage);
       }
 
       if (!data?.user) {
@@ -76,10 +100,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       console.log("Sign in successful");
     } catch (error) {
+      console.error("Sign in catch block error:", error);
       if (error instanceof Error) {
         throw error;
       }
-      handleAuthError(error as AuthError);
+      const errorMessage = parseAuthError(error as AuthError);
+      throw new Error(errorMessage);
     }
   };
 
@@ -97,7 +123,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
 
       if (error) {
-        handleAuthError(error);
+        console.error("Sign up error:", error);
+        const errorMessage = parseAuthError(error);
+        throw new Error(errorMessage);
       }
 
       if (!data?.user) {
@@ -106,10 +134,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       console.log("Sign up successful");
     } catch (error) {
+      console.error("Sign up catch block error:", error);
       if (error instanceof Error) {
         throw error;
       }
-      handleAuthError(error as AuthError);
+      const errorMessage = parseAuthError(error as AuthError);
+      throw new Error(errorMessage);
     }
   };
 
@@ -118,11 +148,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const { error } = await supabase.auth.signOut();
       if (error) {
-        handleAuthError(error);
+        console.error("Sign out error:", error);
+        const errorMessage = parseAuthError(error);
+        throw new Error(errorMessage);
       }
       console.log("Sign out successful");
     } catch (error) {
-      handleAuthError(error as AuthError);
+      console.error("Sign out catch block error:", error);
+      const errorMessage = parseAuthError(error as AuthError);
+      throw new Error(errorMessage);
     }
   };
 
