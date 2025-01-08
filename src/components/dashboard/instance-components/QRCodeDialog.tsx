@@ -18,7 +18,7 @@ export function QRCodeDialog({ open, onOpenChange, qrCode }: QRCodeDialogProps) 
           {qrCode ? (
             <>
               <img 
-                src={`data:image/png;base64,${qrCode}`} 
+                src={qrCode} 
                 alt="QR Code" 
                 className="w-64 h-64"
               />
