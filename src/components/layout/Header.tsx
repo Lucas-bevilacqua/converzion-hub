@@ -1,9 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { Menu, LogOut } from "lucide-react";
-import { useAuth } from "@/contexts/AuthContext";
-import { useToast } from "@/components/ui/use-toast";
+import { Menu } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -14,40 +12,12 @@ import {
 export const Header = () => {
   const navigate = useNavigate();
   const isMobile = useIsMobile();
-  const { user, signOut } = useAuth();
-  const { toast } = useToast();
 
-  const handleLogout = async () => {
-    try {
-      console.log("Attempting to sign out...");
-      await signOut();
-      console.log("Sign out successful");
-      navigate("/");
-      toast({
-        title: "Logout realizado com sucesso",
-        description: "Você foi desconectado da sua conta",
-      });
-    } catch (error) {
-      console.error("Error signing out:", error);
-      toast({
-        title: "Erro ao fazer logout",
-        description: "Ocorreu um erro ao tentar desconectar sua conta",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const publicMenuItems = [
+  const menuItems = [
     { label: "Home", path: "/" },
     { label: "Preços", path: "/pricing" },
-  ];
-
-  const authenticatedMenuItems = [
-    { label: "Home", path: "/" },
     { label: "Dashboard", path: "/dashboard" },
   ];
-
-  const menuItems = user ? authenticatedMenuItems : publicMenuItems;
 
   const renderDesktopMenu = () => (
     <nav className="hidden md:flex items-center gap-6">
@@ -61,32 +31,19 @@ export const Header = () => {
           {item.label}
         </Button>
       ))}
-      {user ? (
-        <Button
-          onClick={handleLogout}
-          variant="outline"
-          className="ml-4 gap-2"
-        >
-          <LogOut className="h-4 w-4" />
-          Sair
-        </Button>
-      ) : (
-        <>
-          <Button
-            onClick={() => navigate("/login")}
-            variant="outline"
-            className="ml-4"
-          >
-            Login
-          </Button>
-          <Button
-            onClick={() => navigate("/register")}
-            className="bg-primary hover:bg-primary-600"
-          >
-            Começar Agora
-          </Button>
-        </>
-      )}
+      <Button
+        onClick={() => navigate("/login")}
+        variant="outline"
+        className="ml-4"
+      >
+        Login
+      </Button>
+      <Button
+        onClick={() => navigate("/register")}
+        className="bg-primary hover:bg-primary-600"
+      >
+        Começar Agora
+      </Button>
     </nav>
   );
 
@@ -106,21 +63,12 @@ export const Header = () => {
             {item.label}
           </DropdownMenuItem>
         ))}
-        {user ? (
-          <DropdownMenuItem onClick={handleLogout} className="gap-2">
-            <LogOut className="h-4 w-4" />
-            Sair
-          </DropdownMenuItem>
-        ) : (
-          <>
-            <DropdownMenuItem onClick={() => navigate("/login")}>
-              Login
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => navigate("/register")}>
-              Começar Agora
-            </DropdownMenuItem>
-          </>
-        )}
+        <DropdownMenuItem onClick={() => navigate("/login")}>
+          Login
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => navigate("/register")}>
+          Começar Agora
+        </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   );

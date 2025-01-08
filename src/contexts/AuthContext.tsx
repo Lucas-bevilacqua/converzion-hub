@@ -1,8 +1,6 @@
 import { createContext, useContext, useEffect, useState } from "react";
-import { Session, User } from "@supabase/supabase-js";
+import { Session, User, AuthError } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
-import { parseAuthError } from "@/utils/auth/errorHandling";
-import { createOrUpdateProfile } from "@/utils/auth/profileManagement";
 
 interface AuthContextType {
   session: Session | null;
@@ -22,48 +20,68 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     console.log("Initializing auth state...");
-    let profileUpdateInProgress = false;
-
-    const handleSession = async (session: Session | null) => {
-      console.log("Handling session:", session ? "Session exists" : "No session");
+    
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      console.log("Session retrieved:", session ? "Session found" : "No session");
       setSession(session);
       setUser(session?.user ?? null);
-
-      if (session?.user && !profileUpdateInProgress) {
-        try {
-          profileUpdateInProgress = true;
-          console.log("Creating/updating profile for user:", session.user.id);
-          await createOrUpdateProfile(session.user);
-        } catch (error) {
-          console.error("Error creating/updating profile:", error);
-        } finally {
-          profileUpdateInProgress = false;
-        }
-      }
       setLoading(false);
-    };
-
-    // Initial session check
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      handleSession(session);
     });
 
-    // Auth state change listener
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
       console.log("Auth state changed:", _event);
-      handleSession(session);
+      setSession(session);
+      setUser(session?.user ?? null);
+      setLoading(false);
     });
 
-    return () => {
-      console.log("Cleaning up auth subscription");
-      subscription.unsubscribe();
-    };
+    return () => subscription.unsubscribe();
   }, []);
 
+  const parseAuthError = (error: AuthError | Error) => {
+    console.log("Parsing auth error:", error);
+    
+    try {
+      if ('error' in error && typeof error.error === 'string') {
+        const errorBody = JSON.parse(error.error);
+        if (errorBody.code === "invalid_credentials") {
+          return "Email ou senha inválidos";
+        }
+      }
+      
+      if ('message' in error) {
+        const message = error.message;
+        if (typeof message === 'string') {
+          if (message.includes("Invalid login credentials")) {
+            return "Email ou senha inválidos";
+          }
+          if (message.includes("Email not confirmed")) {
+            return "Por favor, confirme seu email antes de fazer login";
+          }
+          if (message.includes("User not found")) {
+            return "Usuário não encontrado";
+          }
+          try {
+            const parsedMessage = JSON.parse(message);
+            if (parsedMessage.code === "invalid_credentials") {
+              return "Email ou senha inválidos";
+            }
+          } catch (e) {
+            // If message is not JSON, use it as is
+          }
+        }
+      }
+    } catch (e) {
+      console.error("Error parsing auth error:", e);
+    }
+    
+    return "Erro ao autenticar. Por favor, tente novamente.";
+  };
+
   const signIn = async (email: string, password: string) => {
-    console.log("Attempting sign in for email:", email);
+    console.log("Attempting sign in...");
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
@@ -77,23 +95,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       if (!data?.user) {
-        console.error("No user data returned after successful sign in");
         throw new Error("Erro ao fazer login");
       }
 
-      console.log("Sign in successful for user:", data.user.id);
+      console.log("Sign in successful");
     } catch (error) {
       console.error("Sign in catch block error:", error);
       if (error instanceof Error) {
         throw error;
       }
-      const errorMessage = parseAuthError(error as any);
+      const errorMessage = parseAuthError(error as AuthError);
       throw new Error(errorMessage);
     }
   };
 
   const signUp = async (email: string, password: string, fullName: string) => {
-    console.log("Attempting sign up for email:", email);
+    console.log("Attempting sign up...");
     try {
       const { data, error } = await supabase.auth.signUp({
         email,
@@ -112,17 +129,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       if (!data?.user) {
-        console.error("No user data returned after successful sign up");
         throw new Error("Erro ao criar conta");
       }
 
-      console.log("Sign up successful for user:", data.user.id);
+      console.log("Sign up successful");
     } catch (error) {
       console.error("Sign up catch block error:", error);
       if (error instanceof Error) {
         throw error;
       }
-      const errorMessage = parseAuthError(error as any);
+      const errorMessage = parseAuthError(error as AuthError);
       throw new Error(errorMessage);
     }
   };
@@ -139,7 +155,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.log("Sign out successful");
     } catch (error) {
       console.error("Sign out catch block error:", error);
-      const errorMessage = parseAuthError(error as any);
+      const errorMessage = parseAuthError(error as AuthError);
       throw new Error(errorMessage);
     }
   };
