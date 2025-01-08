@@ -70,9 +70,13 @@ serve(async (req) => {
       throw new Error('Evolution API configuration not found')
     }
 
-    console.log('Making request to Evolution API:', `${evolutionApiUrl}/instance/connect/${instance.name}`)
+    // Clean up the base URL by removing trailing slashes
+    const baseUrl = evolutionApiUrl.replace(/\/+$/, '')
+    const connectUrl = `${baseUrl}/instance/connect/${instance.name}`
+    
+    console.log('Making request to Evolution API:', connectUrl)
 
-    const evolutionResponse = await fetch(`${evolutionApiUrl}/instance/connect/${instance.name}`, {
+    const evolutionResponse = await fetch(connectUrl, {
       method: 'GET',
       headers: {
         'apikey': evolutionApiKey,
