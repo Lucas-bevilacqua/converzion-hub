@@ -16,7 +16,7 @@ export const CTASection = () => {
 
   return (
     <section className="py-24 bg-gradient-to-br from-primary-900 to-primary-800 relative overflow-hidden">
-      <div className="absolute inset-0 bg-grid-white/[0.05] -z-10" />
+      <div className="absolute inset-0 bg-[url('/grid.svg')] bg-center [mask-image:linear-gradient(180deg,white,rgba(255,255,255,0))]" />
       <div className="container relative">
         <div className="text-center max-w-3xl mx-auto">
           <h2 className="text-4xl font-bold text-white mb-6">
@@ -41,9 +41,9 @@ export const CTASection = () => {
             <Button
               size="lg"
               onClick={() => navigate("/register")}
-              className="bg-white text-primary-900 hover:bg-primary-50 text-lg gap-2 h-14 px-8 shadow-lg hover:shadow-xl transition-all duration-300"
+              className="bg-white text-primary-900 hover:bg-primary-50 text-lg gap-2 h-14 px-8 shadow-lg hover:shadow-xl transition-all duration-300 group"
             >
-              Começar Gratuitamente <ArrowRight className="h-5 w-5" />
+              Começar Gratuitamente <ArrowRight className="h-5 w-5 group-hover:translate-x-1 transition-transform" />
             </Button>
             <p className="text-primary-200 text-sm">
               Não é necessário cartão de crédito

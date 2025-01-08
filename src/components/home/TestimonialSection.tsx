@@ -5,14 +5,14 @@ const testimonials = [
   {
     name: "João Silva",
     role: "CEO, TechStart",
-    content: "A Converzion revolucionou nosso atendimento. Reduzimos o tempo de resposta em 80% e aumentamos a satisfação dos clientes em 60%. O ROI foi surpreendente já no primeiro mês de uso.",
+    content: "A Converzion revolucionou nosso atendimento. Reduzimos o tempo de resposta em 80% e aumentamos a satisfação dos clientes em 60%. O ROI foi surpreendente já no primeiro mês.",
     rating: 5,
     image: "https://i.pravatar.cc/150?img=1",
   },
   {
     name: "Maria Santos",
     role: "Gerente de Marketing, E-commerce Plus",
-    content: "Impressionante como a IA entende o contexto e responde de forma natural. Nossos clientes nem percebem que é um bot, e nossas vendas aumentaram 40% desde a implementação.",
+    content: "Impressionante como a IA entende o contexto e responde naturalmente. Nossos clientes nem percebem que é um bot, e nossas vendas aumentaram 40% desde a implementação.",
     rating: 5,
     image: "https://i.pravatar.cc/150?img=2",
   },
@@ -40,7 +40,7 @@ export const TestimonialSection = () => {
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           {testimonials.map((testimonial) => (
-            <Card key={testimonial.name} className="border-none shadow-lg hover:shadow-xl transition-all duration-300">
+            <Card key={testimonial.name} className="border-none shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
               <CardContent className="pt-6">
                 <Quote className="h-8 w-8 text-primary/20 mb-4" />
                 <div className="flex gap-1 mb-4">
@@ -67,19 +67,19 @@ export const TestimonialSection = () => {
 
         <div className="mt-16 text-center">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 max-w-4xl mx-auto">
-            <div className="p-6 bg-primary-50 rounded-lg">
+            <div className="p-8 bg-primary-50 rounded-lg hover:shadow-lg transition-all">
               <h3 className="text-4xl font-bold text-primary-800 mb-2">95%</h3>
               <p className="text-gray-600">Satisfação dos clientes</p>
             </div>
-            <div className="p-6 bg-primary-50 rounded-lg">
+            <div className="p-8 bg-primary-50 rounded-lg hover:shadow-lg transition-all">
               <h3 className="text-4xl font-bold text-primary-800 mb-2">24/7</h3>
               <p className="text-gray-600">Disponibilidade</p>
             </div>
-            <div className="p-6 bg-primary-50 rounded-lg">
+            <div className="p-8 bg-primary-50 rounded-lg hover:shadow-lg transition-all">
               <h3 className="text-4xl font-bold text-primary-800 mb-2">+40%</h3>
               <p className="text-gray-600">Aumento em vendas</p>
             </div>
-            <div className="p-6 bg-primary-50 rounded-lg">
+            <div className="p-8 bg-primary-50 rounded-lg hover:shadow-lg transition-all">
               <h3 className="text-4xl font-bold text-primary-800 mb-2">-80%</h3>
               <p className="text-gray-600">Tempo de resposta</p>
             </div>
