@@ -102,7 +102,7 @@ serve(async (req) => {
     const { error: updateError } = await supabaseClient
       .from('evolution_instances')
       .update({
-        qr_code: evolutionData.qrcode,
+        qr_code: evolutionData.qrcode?.base64 || evolutionData.qrcode,
         last_qr_update: new Date().toISOString(),
         connection_status: evolutionData.connected ? 'connected' : 'disconnected'
       })
@@ -114,7 +114,7 @@ serve(async (req) => {
       JSON.stringify({
         id: instance.id,
         name: instance.name,
-        qrCode: evolutionData.qrcode,
+        qrCode: evolutionData.qrcode?.base64 || evolutionData.qrcode,
         connected: evolutionData.connected
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
