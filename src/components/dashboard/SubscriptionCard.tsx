@@ -164,4 +164,5 @@ export function SubscriptionCard() {
         )}
       </CardContent>
     </Card>
-  </div>
+  )
+}
