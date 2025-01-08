@@ -17,6 +17,7 @@ serve(async (req) => {
     const webhookSecret = Deno.env.get('STRIPE_WEBHOOK_SECRET')
     
     if (!stripeKey || !webhookSecret) {
+      console.error('Missing required environment variables')
       throw new Error('Missing Stripe configuration')
     }
 
@@ -27,6 +28,7 @@ serve(async (req) => {
     // Get the signature from the headers
     const signature = req.headers.get('stripe-signature')
     if (!signature) {
+      console.error('No Stripe signature found in request')
       throw new Error('No signature provided')
     }
 
