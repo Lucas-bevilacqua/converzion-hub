@@ -25,7 +25,7 @@ export const CTASection = () => {
               Vender Mais Hoje
             </span>
           </h2>
-          <p className="text-gray-300 text-lg mb-8">
+          <p className="text-gray-200 text-lg mb-8 font-medium">
             Junte-se a centenas de empresas que já multiplicaram suas vendas com atendimento automático inteligente
           </p>
           
@@ -35,7 +35,7 @@ export const CTASection = () => {
                 <div className="flex-shrink-0 h-5 w-5 rounded-full bg-[#9b87f5]/20 flex items-center justify-center">
                   <Check className="h-3 w-3 text-[#9b87f5]" />
                 </div>
-                <span className="text-gray-300 text-sm">{benefit}</span>
+                <span className="text-gray-200 text-sm font-medium">{benefit}</span>
               </div>
             ))}
           </div>
@@ -44,7 +44,7 @@ export const CTASection = () => {
             <Button
               size="lg"
               onClick={() => navigate("/register")}
-              className="bg-[#9b87f5] hover:bg-[#8b77e5] text-white text-lg gap-2 h-14 px-8 shadow-lg hover:shadow-xl transition-all duration-300 group"
+              className="bg-[#9b87f5] hover:bg-[#8b77e5] text-white text-lg gap-2 h-14 px-8 shadow-lg hover:shadow-xl transition-all duration-300 group font-semibold"
             >
               Começar Agora <ArrowRight className="h-5 w-5 group-hover:translate-x-1 transition-transform" />
             </Button>

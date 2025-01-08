@@ -36,7 +36,7 @@ export const TestimonialSection = () => {
               Sucesso
             </span>
           </h2>
-          <p className="text-gray-300 text-lg">
+          <p className="text-gray-200 text-lg font-medium">
             Veja como empresas estão transformando seu atendimento com nossa plataforma
           </p>
         </div>
@@ -45,13 +45,13 @@ export const TestimonialSection = () => {
           {testimonials.map((testimonial) => (
             <Card key={testimonial.name} className="border-none bg-white/5 backdrop-blur-sm hover:bg-white/10 transition-all duration-300 hover:-translate-y-1">
               <CardContent className="pt-6">
-                <Quote className="h-8 w-8 text-[#9b87f5]/20 mb-4" />
+                <Quote className="h-8 w-8 text-[#9b87f5] mb-4 opacity-50" />
                 <div className="flex gap-1 mb-4">
                   {[...Array(testimonial.rating)].map((_, i) => (
                     <Star key={i} className="h-5 w-5 fill-[#9b87f5] text-[#9b87f5]" />
                   ))}
                 </div>
-                <p className="text-gray-300 mb-6 leading-relaxed">{testimonial.content}</p>
+                <p className="text-gray-200 mb-6 leading-relaxed font-medium">{testimonial.content}</p>
                 <div className="flex items-center gap-4">
                   <img
                     src={testimonial.image}
@@ -60,7 +60,7 @@ export const TestimonialSection = () => {
                   />
                   <div>
                     <p className="font-semibold text-white">{testimonial.name}</p>
-                    <p className="text-sm text-gray-400">{testimonial.role}</p>
+                    <p className="text-sm text-gray-300">{testimonial.role}</p>
                   </div>
                 </div>
               </CardContent>
@@ -72,19 +72,19 @@ export const TestimonialSection = () => {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 max-w-4xl mx-auto">
             <div className="p-8 bg-white/5 backdrop-blur-sm rounded-lg hover:bg-white/10 transition-all">
               <h3 className="text-4xl font-bold text-[#9b87f5] mb-2">95%</h3>
-              <p className="text-gray-300">Satisfação</p>
+              <p className="text-gray-200 font-medium">Satisfação</p>
             </div>
             <div className="p-8 bg-white/5 backdrop-blur-sm rounded-lg hover:bg-white/10 transition-all">
               <h3 className="text-4xl font-bold text-[#9b87f5] mb-2">24/7</h3>
-              <p className="text-gray-300">Disponibilidade</p>
+              <p className="text-gray-200 font-medium">Disponibilidade</p>
             </div>
             <div className="p-8 bg-white/5 backdrop-blur-sm rounded-lg hover:bg-white/10 transition-all">
               <h3 className="text-4xl font-bold text-[#9b87f5] mb-2">+40%</h3>
-              <p className="text-gray-300">Vendas</p>
+              <p className="text-gray-200 font-medium">Vendas</p>
             </div>
             <div className="p-8 bg-white/5 backdrop-blur-sm rounded-lg hover:bg-white/10 transition-all">
               <h3 className="text-4xl font-bold text-[#9b87f5] mb-2">-80%</h3>
-              <p className="text-gray-300">Tempo de Resposta</p>
+              <p className="text-gray-200 font-medium">Tempo de Resposta</p>
             </div>
           </div>
         </div>
