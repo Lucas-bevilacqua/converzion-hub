@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { Menu } from "lucide-react";
+import { Menu, Bot } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -76,15 +76,20 @@ export const Header = () => {
   return (
     <header className="fixed top-0 left-0 right-0 z-50 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container flex h-16 items-center justify-between">
-        <div className="flex items-center gap-6">
-          <Button
-            variant="ghost"
-            onClick={() => navigate("/")}
-            className="text-xl font-bold"
-          >
-            Converzion
-          </Button>
-        </div>
+        <Button
+          variant="ghost"
+          onClick={() => navigate("/")}
+          className="flex items-center gap-2 px-0 hover:bg-transparent"
+        >
+          <div className="flex items-center gap-2">
+            <div className="bg-gradient-to-r from-[#0056D2] to-[#00C896] p-2 rounded-lg">
+              <Bot className="h-6 w-6 text-white" />
+            </div>
+            <span className="text-xl font-bold bg-gradient-to-r from-[#0056D2] to-[#00C896] bg-clip-text text-transparent">
+              Converzion
+            </span>
+          </div>
+        </Button>
         {isMobile ? renderMobileMenu() : renderDesktopMenu()}
       </div>
     </header>
