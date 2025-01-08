@@ -15,24 +15,32 @@ serve(async (req) => {
   try {
     const stripeKey = Deno.env.get('STRIPE_SECRET_KEY')
     if (!stripeKey) {
-      console.error('STRIPE_SECRET_KEY is not set')
-      throw new Error('Stripe configuration error')
+      console.error('STRIPE_SECRET_KEY is not set in Edge Function secrets')
+      throw new Error('Stripe secret key is not configured')
     }
 
+    if (!stripeKey.startsWith('sk_')) {
+      console.error('Invalid Stripe secret key format')
+      throw new Error('Invalid Stripe secret key configuration')
+    }
+
+    console.log('Initializing Supabase client...')
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
     )
 
+    console.log('Getting user from auth header...')
     const authHeader = req.headers.get('Authorization')!
     const token = authHeader.replace('Bearer ', '')
     const { data: { user } } = await supabaseClient.auth.getUser(token)
 
     if (!user?.email) {
+      console.error('No user email found')
       throw new Error('No email found')
     }
 
-    console.log('Creating Stripe instance with secret key...')
+    console.log('Creating Stripe instance...')
     const stripe = new Stripe(stripeKey, {
       apiVersion: '2023-10-16',
     })
