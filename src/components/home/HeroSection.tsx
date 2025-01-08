@@ -1,37 +1,39 @@
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
-import { ArrowRight, MessageSquare, Shield, Zap } from "lucide-react";
+import { ArrowRight, MessageSquare, Shield, Zap, Check } from "lucide-react";
 
 export const HeroSection = () => {
   const navigate = useNavigate();
 
   return (
-    <section className="pt-32 pb-16 px-4 bg-gradient-to-b from-primary-50 to-white">
-      <div className="container">
+    <section className="pt-32 pb-24 px-4 bg-gradient-to-b from-primary-50/50 to-white relative overflow-hidden">
+      <div className="absolute inset-0 bg-grid-black/[0.02] -z-10" />
+      <div className="container relative">
         <div className="text-center max-w-4xl mx-auto">
           <div className="flex items-center justify-center gap-2 mb-6">
-            <span className="px-3 py-1 text-sm font-medium bg-primary-100 text-primary-800 rounded-full">
-              Novo
+            <span className="inline-flex items-center rounded-full px-3 py-1 text-sm font-medium bg-primary-100 text-primary-800">
+              <Zap className="mr-1 h-3 w-3" /> Novo
             </span>
             <span className="text-sm text-gray-600">
               Inteligência Artificial GPT-4 integrada
             </span>
           </div>
           
-          <h1 className="text-4xl md:text-6xl font-bold tracking-tight mb-6 bg-gradient-to-r from-primary-600 to-primary-800 bg-clip-text text-transparent">
-            Revolucione seu Atendimento no WhatsApp com IA
+          <h1 className="text-4xl md:text-6xl font-bold tracking-tight mb-6 bg-gradient-to-r from-primary-600 to-primary-800 bg-clip-text text-transparent animate-fade-in">
+            Automatize seu WhatsApp com IA e <br className="hidden md:block" />
+            Multiplique suas Vendas
           </h1>
           
-          <p className="text-xl text-gray-600 mb-8 max-w-3xl mx-auto">
-            Automatize suas conversas no WhatsApp com inteligência artificial avançada. 
-            Atenda mais clientes, venda mais e economize tempo com respostas automáticas 24/7.
+          <p className="text-xl text-gray-600 mb-8 max-w-3xl mx-auto leading-relaxed">
+            Transforme seu atendimento com respostas automáticas inteligentes 24/7.
+            Aumente suas vendas, reduza custos e encante seus clientes com uma experiência única.
           </p>
           
           <div className="flex flex-col sm:flex-row gap-4 justify-center mb-12">
             <Button
               size="lg"
               onClick={() => navigate("/register")}
-              className="bg-primary hover:bg-primary-600 text-lg gap-2"
+              className="bg-primary hover:bg-primary-600 text-lg gap-2 h-14 px-8 shadow-lg hover:shadow-xl transition-all duration-300"
             >
               Começar Gratuitamente <ArrowRight className="h-5 w-5" />
             </Button>
@@ -39,7 +41,7 @@ export const HeroSection = () => {
               size="lg"
               variant="outline"
               onClick={() => navigate("/contact")}
-              className="text-lg"
+              className="text-lg h-14 px-8 hover:bg-gray-50"
             >
               Falar com Especialista
             </Button>
@@ -47,16 +49,33 @@ export const HeroSection = () => {
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mt-16">
             <div className="flex items-center gap-3 justify-center">
-              <Zap className="h-6 w-6 text-primary" />
+              <div className="p-2 rounded-full bg-primary-50">
+                <Zap className="h-5 w-5 text-primary" />
+              </div>
               <span className="text-gray-600">Resposta em segundos</span>
             </div>
             <div className="flex items-center gap-3 justify-center">
-              <Shield className="h-6 w-6 text-primary" />
+              <div className="p-2 rounded-full bg-primary-50">
+                <Shield className="h-5 w-5 text-primary" />
+              </div>
               <span className="text-gray-600">Dados 100% seguros</span>
             </div>
             <div className="flex items-center gap-3 justify-center">
-              <MessageSquare className="h-6 w-6 text-primary" />
+              <div className="p-2 rounded-full bg-primary-50">
+                <MessageSquare className="h-5 w-5 text-primary" />
+              </div>
               <span className="text-gray-600">Suporte especializado</span>
+            </div>
+          </div>
+
+          <div className="mt-20 pt-10 border-t">
+            <p className="text-sm text-gray-500 mb-6">Empresas que confiam na Converzion</p>
+            <div className="flex flex-wrap justify-center gap-8 opacity-70">
+              {/* Placeholder logos - replace with actual client logos */}
+              <div className="h-8 w-24 bg-gray-200 rounded animate-pulse" />
+              <div className="h-8 w-24 bg-gray-200 rounded animate-pulse" />
+              <div className="h-8 w-24 bg-gray-200 rounded animate-pulse" />
+              <div className="h-8 w-24 bg-gray-200 rounded animate-pulse" />
             </div>
           </div>
         </div>
