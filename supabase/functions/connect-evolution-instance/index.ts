@@ -14,7 +14,7 @@ serve(async (req) => {
   try {
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? ''
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
     const authHeader = req.headers.get('Authorization')
@@ -35,11 +35,18 @@ serve(async (req) => {
       .from('subscriptions')
       .select('*')
       .eq('user_id', user.id)
+      .eq('status', 'active')
       .maybeSingle()
 
     if (subError) throw subError
-    if (!subscription || subscription.status !== 'active') {
-      throw new Error('Active subscription required')
+    if (!subscription) {
+      return new Response(
+        JSON.stringify({ error: 'Active subscription required' }),
+        { 
+          status: 400, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      )
     }
 
     const { instanceId } = await req.json()
@@ -56,7 +63,19 @@ serve(async (req) => {
     }
 
     // Connect to Evolution API
-    const evolutionResponse = await fetch(`${Deno.env.get('EVOLUTION_API_URL')}/instance/connect/${instance.name}`, {
+    const evolutionApiUrl = Deno.env.get('EVOLUTION_API_URL')
+    if (!evolutionApiUrl) {
+      throw new Error('Evolution API URL not configured')
+    }
+
+    // Remove trailing slash if present
+    const baseUrl = evolutionApiUrl.endsWith('/') 
+      ? evolutionApiUrl.slice(0, -1) 
+      : evolutionApiUrl
+
+    console.log('Making request to Evolution API:', `${baseUrl}/instance/connect/${instance.name}`)
+
+    const evolutionResponse = await fetch(`${baseUrl}/instance/connect/${instance.name}`, {
       method: 'GET',
       headers: {
         'apikey': Deno.env.get('EVOLUTION_API_KEY') ?? '',
@@ -64,10 +83,19 @@ serve(async (req) => {
     })
 
     if (!evolutionResponse.ok) {
-      throw new Error('Failed to connect to Evolution API')
+      const errorText = await evolutionResponse.text()
+      console.error('Evolution API error:', errorText)
+      return new Response(
+        JSON.stringify({ error: 'Failed to connect to Evolution API', details: errorText }),
+        { 
+          status: 400, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      )
     }
 
     const evolutionData = await evolutionResponse.json()
+    console.log('Evolution API response:', evolutionData)
 
     // Update instance status and QR code
     const { error: updateError } = await supabaseClient
@@ -91,9 +119,13 @@ serve(async (req) => {
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   } catch (error) {
+    console.error('Error in connect-evolution-instance:', error)
     return new Response(
       JSON.stringify({ error: error.message }),
-      { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { 
+        status: 400, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      }
     )
   }
 })

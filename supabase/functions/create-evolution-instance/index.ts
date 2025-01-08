@@ -81,8 +81,8 @@ serve(async (req) => {
       )
     }
 
-    const { instanceName, phoneNumber } = await req.json()
-    console.log('Creating instance with name:', instanceName, 'and phone:', phoneNumber)
+    const { instanceName } = await req.json()
+    console.log('Creating instance with name:', instanceName)
 
     // Create instance in Evolution API
     const evolutionApiUrl = Deno.env.get('EVOLUTION_API_URL')
@@ -106,8 +106,7 @@ serve(async (req) => {
       body: JSON.stringify({
         instanceName,
         qrcode: true,
-        number: phoneNumber,
-        token: true
+        integration: "WHATSAPP-BAILEYS"
       })
     })
 
@@ -132,7 +131,6 @@ serve(async (req) => {
       .insert({
         user_id: user.id,
         name: instanceName,
-        phone_number: phoneNumber,
         connection_status: 'disconnected'
       })
       .select()
