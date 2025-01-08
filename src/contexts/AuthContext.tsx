@@ -22,39 +22,38 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     console.log("Initializing auth state...");
-    
-    // Primeiro, pegamos a sessão atual
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      console.log("Initial session retrieved:", session ? "Session found" : "No session");
-      setSession(session);
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        console.log("Creating/updating profile for initial session user:", session.user.id);
-        createOrUpdateProfile(session.user).catch(error => {
-          console.error("Error creating/updating profile on initial session:", error);
-        });
-      }
-      setLoading(false);
-    });
+    let profileUpdateInProgress = false;
 
-    // Configuramos o listener de mudança de estado de autenticação
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      console.log("Auth state changed:", _event, session ? "Session exists" : "No session");
+    const handleSession = async (session: Session | null) => {
+      console.log("Handling session:", session ? "Session exists" : "No session");
       setSession(session);
       setUser(session?.user ?? null);
 
-      if (session?.user) {
-        console.log("Creating/updating profile after auth state change for user:", session.user.id);
+      if (session?.user && !profileUpdateInProgress) {
         try {
+          profileUpdateInProgress = true;
+          console.log("Creating/updating profile for user:", session.user.id);
           await createOrUpdateProfile(session.user);
         } catch (error) {
-          console.error("Error creating/updating profile on auth state change:", error);
+          console.error("Error creating/updating profile:", error);
+        } finally {
+          profileUpdateInProgress = false;
         }
       }
-
       setLoading(false);
+    };
+
+    // Initial session check
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      handleSession(session);
+    });
+
+    // Auth state change listener
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      console.log("Auth state changed:", _event);
+      handleSession(session);
     });
 
     return () => {
@@ -83,7 +82,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       console.log("Sign in successful for user:", data.user.id);
-      await createOrUpdateProfile(data.user);
     } catch (error) {
       console.error("Sign in catch block error:", error);
       if (error instanceof Error) {
@@ -119,7 +117,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       console.log("Sign up successful for user:", data.user.id);
-      await createOrUpdateProfile(data.user);
     } catch (error) {
       console.error("Sign up catch block error:", error);
       if (error instanceof Error) {
