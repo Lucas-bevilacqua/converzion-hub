@@ -30,9 +30,9 @@ serve(async (req) => {
     const token = authHeader.replace('Bearer ', '')
     const { data: { user } } = await supabaseClient.auth.getUser(token)
 
-    if (!user?.email) {
-      console.error('No user email found')
-      throw new Error('No email found')
+    if (!user?.email || !user?.id) {
+      console.error('No user email or id found')
+      throw new Error('User not found')
     }
 
     console.log('Creating Stripe instance...')
@@ -65,6 +65,7 @@ serve(async (req) => {
     const session = await stripe.checkout.sessions.create({
       customer: customer_id,
       customer_email: customer_id ? undefined : user.email,
+      client_reference_id: user.id, // Important: Pass the user ID here
       line_items: [
         {
           price: priceId,
