@@ -30,6 +30,8 @@ serve(async (req) => {
       throw userError || new Error('User not found')
     }
 
+    console.log('Checking subscription status for user:', user.id)
+
     // Check subscription status
     const { data: subscription, error: subError } = await supabaseClient
       .from('subscriptions')
@@ -37,9 +39,20 @@ serve(async (req) => {
       .eq('user_id', user.id)
       .maybeSingle()
 
-    if (subError) throw subError
+    if (subError) {
+      console.error('Error fetching subscription:', subError)
+      throw subError
+    }
+
     if (!subscription || subscription.status !== 'active') {
-      throw new Error('Active subscription required')
+      console.error('No active subscription found for user:', user.id)
+      return new Response(
+        JSON.stringify({ error: 'Active subscription required' }),
+        { 
+          status: 400, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      )
     }
 
     // Get instance count
@@ -48,15 +61,26 @@ serve(async (req) => {
       .select('*', { count: 'exact' })
       .eq('user_id', user.id)
 
-    if (countError) throw countError
+    if (countError) {
+      console.error('Error counting instances:', countError)
+      throw countError
+    }
 
     // Check instance limit based on plan
     const instanceLimit = subscription.plan_id?.includes('professional') ? 3 : 1
     if (count && count >= instanceLimit) {
-      throw new Error(`Instance limit (${instanceLimit}) reached for your plan`)
+      console.error('Instance limit reached for user:', user.id)
+      return new Response(
+        JSON.stringify({ error: `Instance limit (${instanceLimit}) reached for your plan` }),
+        { 
+          status: 400, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      )
     }
 
     const { instanceName, phoneNumber } = await req.json()
+    console.log('Creating instance with name:', instanceName, 'and phone:', phoneNumber)
 
     // Create instance in Evolution API
     const evolutionResponse = await fetch(`${Deno.env.get('EVOLUTION_API_URL')}/instance/create`, {
@@ -73,6 +97,7 @@ serve(async (req) => {
     })
 
     if (!evolutionResponse.ok) {
+      console.error('Evolution API error:', await evolutionResponse.text())
       throw new Error('Failed to create Evolution API instance')
     }
 
@@ -88,16 +113,24 @@ serve(async (req) => {
       .select()
       .single()
 
-    if (insertError) throw insertError
+    if (insertError) {
+      console.error('Error inserting instance:', insertError)
+      throw insertError
+    }
 
+    console.log('Instance created successfully:', instance)
     return new Response(
       JSON.stringify(instance),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   } catch (error) {
+    console.error('Error in create-evolution-instance:', error)
     return new Response(
       JSON.stringify({ error: error.message }),
-      { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { 
+        status: 400, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      }
     )
   }
 })
