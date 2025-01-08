@@ -85,7 +85,14 @@ serve(async (req) => {
     console.log('Creating instance with name:', instanceName, 'and phone:', phoneNumber)
 
     // Create instance in Evolution API
-    const evolutionResponse = await fetch(`${Deno.env.get('EVOLUTION_API_URL')}/instance/create`, {
+    const evolutionApiUrl = Deno.env.get('EVOLUTION_API_URL')
+    if (!evolutionApiUrl) {
+      throw new Error('Evolution API URL not configured')
+    }
+
+    console.log('Making request to Evolution API:', `${evolutionApiUrl}/instance/create`)
+    
+    const evolutionResponse = await fetch(`${evolutionApiUrl}/instance/create`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -94,15 +101,25 @@ serve(async (req) => {
       body: JSON.stringify({
         instanceName,
         qrcode: true,
-        integration: "WHATSAPP-BAILEYS"
+        number: phoneNumber,
+        token: true
       })
     })
 
     if (!evolutionResponse.ok) {
       const errorText = await evolutionResponse.text()
       console.error('Evolution API error:', errorText)
-      throw new Error('Failed to create Evolution API instance')
+      return new Response(
+        JSON.stringify({ error: 'Failed to create Evolution API instance', details: errorText }),
+        { 
+          status: 400, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      )
     }
+
+    const evolutionData = await evolutionResponse.json()
+    console.log('Evolution API response:', evolutionData)
 
     // Save instance to database using service role client
     const { data: instance, error: insertError } = await supabaseClient
