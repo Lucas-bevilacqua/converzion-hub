@@ -146,10 +146,11 @@ serve(async (req) => {
     }
 
     const evolutionData = await evolutionResponse.json()
-    console.log('Evolution API full response:', JSON.stringify(evolutionData, null, 2))
+    console.log('Evolution API response:', JSON.stringify(evolutionData, null, 2))
 
     // Extract QR code from response, checking all possible paths
-    const qrCode = evolutionData.qrcode?.base64 || 
+    const qrCode = evolutionData.base64 || 
+                  evolutionData.qrcode?.base64 || 
                   evolutionData.qrcode || 
                   evolutionData.data?.qrcode?.base64 || 
                   evolutionData.data?.qrcode
