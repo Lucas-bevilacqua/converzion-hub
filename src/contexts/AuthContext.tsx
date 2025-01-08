@@ -21,29 +21,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    console.log("Initializing auth state...");
     let mounted = true;
 
     async function initializeAuth() {
       try {
+        console.log("Initializing auth state...");
         const { data: { session: initialSession } } = await supabase.auth.getSession();
-        console.log("Initial session check:", initialSession ? "Session exists" : "No session");
         
-        if (mounted) {
+        if (!mounted) return;
+        
+        if (initialSession?.user) {
+          console.log("Initial session found for user:", initialSession.user.id);
           setSession(initialSession);
-          setUser(initialSession?.user ?? null);
-          
-          if (initialSession?.user) {
-            try {
-              await createOrUpdateProfile(initialSession.user);
-            } catch (error) {
-              console.error("Error in profile creation:", error);
-            }
+          setUser(initialSession.user);
+          try {
+            await createOrUpdateProfile(initialSession.user);
+          } catch (error) {
+            console.error("Error in profile creation:", error);
           }
-          setLoading(false);
+        } else {
+          console.log("No initial session found");
+          setSession(null);
+          setUser(null);
         }
       } catch (error) {
         console.error("Error in initial auth check:", error);
+      } finally {
         if (mounted) {
           setLoading(false);
         }
@@ -58,18 +61,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         
         if (!mounted) return;
 
-        setSession(currentSession);
-        setUser(currentSession?.user ?? null);
-
-        if (currentSession?.user) {
-          try {
+        try {
+          if (currentSession?.user) {
+            console.log("Session update for user:", currentSession.user.id);
+            setSession(currentSession);
+            setUser(currentSession.user);
             await createOrUpdateProfile(currentSession.user);
-          } catch (error) {
-            console.error("Error updating profile:", error);
+          } else {
+            console.log("No session in auth state change");
+            setSession(null);
+            setUser(null);
           }
+        } catch (error) {
+          console.error("Error in auth state change:", error);
+        } finally {
+          setLoading(false);
         }
-        
-        setLoading(false);
       }
     );
 
@@ -81,7 +88,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signIn = async (email: string, password: string) => {
     try {
-      setLoading(true);
       const { error } = await supabase.auth.signInWithPassword({
         email,
         password,
@@ -96,7 +102,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signUp = async (email: string, password: string, fullName: string) => {
     try {
-      setLoading(true);
       const { error } = await supabase.auth.signUp({
         email,
         password,
@@ -116,7 +121,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signOut = async () => {
     try {
-      setLoading(true);
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
     } catch (error) {
