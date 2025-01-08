@@ -10,7 +10,7 @@ export function SubscriptionCard() {
   const { user } = useAuth()
   const { toast } = useToast()
 
-  const { data: subscription, isLoading } = useQuery({
+  const { data: subscription, isLoading, error } = useQuery({
     queryKey: ['subscription', user?.id],
     queryFn: async () => {
       console.log('Fetching subscription for user:', user?.id)
@@ -96,6 +96,10 @@ export function SubscriptionCard() {
   }
 
   const planDetails = getPlanDetails()
+
+  if (error) {
+    console.error('Subscription query error:', error)
+  }
 
   return (
     <Card>
