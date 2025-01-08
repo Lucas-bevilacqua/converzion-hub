@@ -24,82 +24,80 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     console.log("Initializing auth state...");
     let mounted = true;
 
-    const handleSession = async (session: Session | null) => {
-      if (!mounted) return;
-
-      console.log("Handling session:", session ? "Session exists" : "No session");
-      setSession(session);
-      setUser(session?.user ?? null);
-
-      if (session?.user) {
-        try {
-          console.log("Creating/updating profile for user:", session.user.id);
-          await createOrUpdateProfile(session.user);
-        } catch (error) {
-          console.error("Error creating/updating profile:", error);
+    async function initializeAuth() {
+      try {
+        const { data: { session: initialSession } } = await supabase.auth.getSession();
+        console.log("Initial session check:", initialSession ? "Session exists" : "No session");
+        
+        if (mounted) {
+          setSession(initialSession);
+          setUser(initialSession?.user ?? null);
+          
+          if (initialSession?.user) {
+            try {
+              await createOrUpdateProfile(initialSession.user);
+            } catch (error) {
+              console.error("Error in profile creation:", error);
+            }
+          }
+          setLoading(false);
+        }
+      } catch (error) {
+        console.error("Error in initial auth check:", error);
+        if (mounted) {
+          setLoading(false);
         }
       }
-      
-      setLoading(false);
-    };
+    }
 
-    // Initial session check
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      handleSession(session);
-    });
+    initializeAuth();
 
-    // Auth state change listener
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log("Auth state changed:", event);
-      await handleSession(session);
-    });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, currentSession) => {
+        console.log("Auth state changed:", event);
+        
+        if (!mounted) return;
+
+        setSession(currentSession);
+        setUser(currentSession?.user ?? null);
+
+        if (currentSession?.user) {
+          try {
+            await createOrUpdateProfile(currentSession.user);
+          } catch (error) {
+            console.error("Error updating profile:", error);
+          }
+        }
+        
+        setLoading(false);
+      }
+    );
 
     return () => {
-      console.log("Cleaning up auth subscription");
       mounted = false;
       subscription.unsubscribe();
     };
   }, []);
 
   const signIn = async (email: string, password: string) => {
-    console.log("Attempting sign in for email:", email);
-    setLoading(true);
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
+      setLoading(true);
+      const { error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
 
-      if (error) {
-        console.error("Sign in error:", error);
-        const errorMessage = parseAuthError(error);
-        throw new Error(errorMessage);
-      }
-
-      if (!data?.user) {
-        console.error("No user data returned after successful sign in");
-        throw new Error("Erro ao fazer login");
-      }
-
-      console.log("Sign in successful for user:", data.user.id);
+      if (error) throw error;
     } catch (error) {
-      console.error("Sign in catch block error:", error);
-      setLoading(false);
-      if (error instanceof Error) {
-        throw error;
-      }
       const errorMessage = parseAuthError(error as any);
       throw new Error(errorMessage);
     }
   };
 
   const signUp = async (email: string, password: string, fullName: string) => {
-    console.log("Attempting sign up for email:", email);
-    setLoading(true);
     try {
-      const { data, error } = await supabase.auth.signUp({
+      setLoading(true);
+      const { error } = await supabase.auth.signUp({
         email,
         password,
         options: {
@@ -109,46 +107,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         },
       });
 
-      if (error) {
-        console.error("Sign up error:", error);
-        const errorMessage = parseAuthError(error);
-        throw new Error(errorMessage);
-      }
-
-      if (!data?.user) {
-        console.error("No user data returned after successful sign up");
-        throw new Error("Erro ao criar conta");
-      }
-
-      console.log("Sign up successful for user:", data.user.id);
+      if (error) throw error;
     } catch (error) {
-      console.error("Sign up catch block error:", error);
-      setLoading(false);
-      if (error instanceof Error) {
-        throw error;
-      }
       const errorMessage = parseAuthError(error as any);
       throw new Error(errorMessage);
     }
   };
 
   const signOut = async () => {
-    console.log("Attempting sign out...");
-    setLoading(true);
     try {
+      setLoading(true);
       const { error } = await supabase.auth.signOut();
-      if (error) {
-        console.error("Sign out error:", error);
-        const errorMessage = parseAuthError(error);
-        throw new Error(errorMessage);
-      }
-      console.log("Sign out successful");
+      if (error) throw error;
     } catch (error) {
-      console.error("Sign out catch block error:", error);
       const errorMessage = parseAuthError(error as any);
       throw new Error(errorMessage);
-    } finally {
-      setLoading(false);
     }
   };
 
