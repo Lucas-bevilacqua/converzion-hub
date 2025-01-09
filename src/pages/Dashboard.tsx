@@ -1,95 +1,82 @@
-import { useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import { useAuth } from "@/contexts/auth/AuthContext";
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
-import { SubscriptionCard } from "@/components/dashboard/SubscriptionCard";
-import { InstancesCard } from "@/components/dashboard/InstancesCard";
-import { Loader2, LogOut } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { useToast } from "@/components/ui/use-toast";
+import { useState } from "react"
+import { useAuth } from "@/contexts/auth/AuthContext"
+import { useQuery } from "@tanstack/react-query"
+import { supabase } from "@/integrations/supabase/client"
+import { SubscriptionCard } from "@/components/dashboard/SubscriptionCard"
+import { InstancesCard } from "@/components/dashboard/InstancesCard"
+import { AISettingsCard } from "@/components/dashboard/AISettingsCard"
+import { Loader2 } from "lucide-react"
+import { SidebarProvider } from "@/components/ui/sidebar"
+import { DashboardSidebar } from "@/components/dashboard/DashboardSidebar"
 
 export default function Dashboard() {
-  const { user, signOut } = useAuth();
-  const navigate = useNavigate();
-  const { toast } = useToast();
+  const { user } = useAuth()
+  const [activeSection, setActiveSection] = useState("overview")
 
   const { data: subscription, isLoading: isLoadingSubscription } = useQuery({
     queryKey: ['subscription', user?.id],
     queryFn: async () => {
-      console.log('Fetching subscription for dashboard:', user?.id);
+      console.log('Fetching subscription for dashboard:', user?.id)
       const { data, error } = await supabase
         .from('subscriptions')
         .select('*')
         .eq('user_id', user?.id)
-        .maybeSingle();
+        .maybeSingle()
       
       if (error) {
-        console.error('Error fetching subscription:', error);
-        throw error;
+        console.error('Error fetching subscription:', error)
+        throw error
       }
       
-      console.log('Subscription data:', data);
-      return data;
+      console.log('Subscription data:', data)
+      return data
     },
     enabled: !!user?.id,
-  });
-
-  useEffect(() => {
-    if (!user) {
-      console.log('No user found, redirecting to login');
-      navigate("/login");
-    }
-  }, [user, navigate]);
-
-  const handleSignOut = async () => {
-    try {
-      await signOut();
-      toast({
-        title: "Desconectado com sucesso",
-        description: "Você foi desconectado da sua conta.",
-      });
-      navigate("/login");
-    } catch (error) {
-      console.error("Error signing out:", error);
-      toast({
-        variant: "destructive",
-        title: "Erro ao desconectar",
-        description: "Ocorreu um erro ao tentar desconectar. Tente novamente.",
-      });
-    }
-  };
+  })
 
   if (isLoadingSubscription) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin" />
       </div>
-    );
+    )
+  }
+
+  const renderContent = () => {
+    switch (activeSection) {
+      case "overview":
+        return (
+          <div className="space-y-6">
+            <SubscriptionCard />
+            {(subscription?.status === 'active' || subscription?.status === 'trial') && (
+              <>
+                <InstancesCard />
+                <AISettingsCard />
+              </>
+            )}
+          </div>
+        )
+      case "instances":
+        return <InstancesCard />
+      case "ai-settings":
+        return <AISettingsCard />
+      case "subscription":
+        return <SubscriptionCard />
+      default:
+        return null
+    }
   }
 
   return (
-    <div className="min-h-screen bg-background pt-16">
-      <div className="container py-8">
-        <div className="flex justify-between items-center mb-8">
-          <h1 className="text-3xl font-bold">Dashboard</h1>
-          <Button 
-            variant="outline" 
-            onClick={handleSignOut}
-            className="gap-2"
-          >
-            <LogOut className="h-4 w-4" />
-            Desconectar
-          </Button>
-        </div>
-        
-        <div className="grid gap-6">
-          <SubscriptionCard />
-          {subscription?.status === 'active' && (
-            <InstancesCard />
-          )}
-        </div>
+    <SidebarProvider>
+      <div className="min-h-screen flex w-full bg-background">
+        <DashboardSidebar />
+        <main className="flex-1 p-8">
+          <div className="max-w-6xl mx-auto">
+            {renderContent()}
+          </div>
+        </main>
       </div>
-    </div>
-  );
+    </SidebarProvider>
+  )
 }
