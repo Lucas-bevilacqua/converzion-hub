@@ -1,6 +1,8 @@
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { MessageSquare, Plus, QrCode, Settings } from "lucide-react"
+import { useState } from "react"
+import { QRCodeDialog } from "./QRCodeDialog"
 
 interface InstanceSlotCardProps {
   isUsed: boolean
@@ -10,6 +12,8 @@ interface InstanceSlotCardProps {
 }
 
 export function InstanceSlotCard({ isUsed, instance, onClick, onConfigurePrompt }: InstanceSlotCardProps) {
+  const [showQRCode, setShowQRCode] = useState(false)
+
   if (!isUsed) {
     return (
       <Card className="cursor-pointer hover:bg-accent/50 transition-colors" onClick={onClick}>
@@ -26,8 +30,6 @@ export function InstanceSlotCard({ isUsed, instance, onClick, onConfigurePrompt 
   }
 
   const isConnected = instance?.connection_status === 'connected'
-  const hasQrCode = !!instance?.qr_code
-  const shouldShowQrCode = !isConnected && hasQrCode
 
   return (
     <Card>
@@ -44,22 +46,6 @@ export function InstanceSlotCard({ isUsed, instance, onClick, onConfigurePrompt 
           </div>
         </div>
 
-        {shouldShowQrCode && (
-          <div className="flex flex-col items-center justify-center space-y-4">
-            <img 
-              src={instance.qr_code.startsWith('data:image') ? instance.qr_code : `data:image/png;base64,${instance.qr_code}`}
-              alt="QR Code" 
-              className="w-48 h-48"
-            />
-            <p className="text-sm text-muted-foreground text-center">
-              Abra o WhatsApp no seu celular<br/>
-              Toque em Menu ou Configurações e selecione Aparelhos Conectados<br/>
-              Toque em Conectar um Aparelho<br/>
-              Aponte seu celular para esta tela para capturar o código QR
-            </p>
-          </div>
-        )}
-
         <div className="flex items-center gap-2 justify-end">
           <Button
             variant="outline"
@@ -73,8 +59,17 @@ export function InstanceSlotCard({ isUsed, instance, onClick, onConfigurePrompt 
             <Settings className="h-4 w-4" />
           </Button>
           
-          {!isConnected && !hasQrCode && (
-            <Button variant="outline" onClick={onClick} className="gap-2">
+          {!isConnected && (
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                onClick?.()
+                if (instance?.qr_code) {
+                  setShowQRCode(true)
+                }
+              }} 
+              className="gap-2"
+            >
               <QrCode className="h-4 w-4" />
               Conectar
             </Button>
@@ -88,6 +83,12 @@ export function InstanceSlotCard({ isUsed, instance, onClick, onConfigurePrompt 
           )}
         </div>
       </CardContent>
+
+      <QRCodeDialog
+        open={showQRCode}
+        onOpenChange={setShowQRCode}
+        qrCode={instance?.qr_code}
+      />
     </Card>
   )
 }
