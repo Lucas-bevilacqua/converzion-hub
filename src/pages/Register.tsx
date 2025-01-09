@@ -4,7 +4,6 @@ import { useAuth } from "@/contexts/auth/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/components/ui/use-toast";
-import { supabase } from "@/integrations/supabase/client";
 
 export default function Register() {
   const navigate = useNavigate();
@@ -26,18 +25,11 @@ export default function Register() {
     setLoading(true);
 
     try {
-      const { error } = await signUp({
-        email: formData.email,
-        password: formData.password,
-        options: {
-          data: {
-            full_name: formData.fullName,
-            selected_plan: selectedPlan, // Passa o plano selecionado
-          },
-        },
-      });
-
-      if (error) throw error;
+      await signUp(
+        formData.email,
+        formData.password,
+        formData.fullName
+      );
 
       toast({
         title: "Conta criada com sucesso!",
@@ -135,4 +127,4 @@ export default function Register() {
       </div>
     </div>
   );
-};
+}
