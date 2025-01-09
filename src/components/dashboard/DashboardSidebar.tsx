@@ -2,6 +2,7 @@ import { Home, MessageSquare, Bot, Crown, LogOut } from "lucide-react"
 import { useNavigate } from "react-router-dom"
 import { useAuth } from "@/contexts/auth/AuthContext"
 import { useToast } from "@/components/ui/use-toast"
+import { useIsMobile } from "@/hooks/use-mobile"
 import {
   Sidebar,
   SidebarContent,
@@ -22,6 +23,9 @@ export function DashboardSidebar({ onSectionChange, activeSection }: DashboardSi
   const navigate = useNavigate()
   const { signOut } = useAuth()
   const { toast } = useToast()
+  const isMobile = useIsMobile()
+
+  console.log("DashboardSidebar - Mobile:", isMobile, "Active Section:", activeSection)
 
   const handleSignOut = async () => {
     try {
@@ -65,7 +69,7 @@ export function DashboardSidebar({ onSectionChange, activeSection }: DashboardSi
   ]
 
   return (
-    <Sidebar>
+    <Sidebar variant={isMobile ? "floating" : "sidebar"} collapsible="offcanvas">
       <SidebarContent>
         <SidebarGroup>
           <SidebarGroupLabel>Menu</SidebarGroupLabel>

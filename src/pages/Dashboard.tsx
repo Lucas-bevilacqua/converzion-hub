@@ -4,13 +4,15 @@ import { useQuery } from "@tanstack/react-query"
 import { supabase } from "@/integrations/supabase/client"
 import { SubscriptionCard } from "@/components/dashboard/SubscriptionCard"
 import { InstancesCard } from "@/components/dashboard/InstancesCard"
-import { Loader2 } from "lucide-react"
-import { SidebarProvider } from "@/components/ui/sidebar"
+import { Loader2, Menu } from "lucide-react"
+import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar"
 import { DashboardSidebar } from "@/components/dashboard/DashboardSidebar"
+import { useIsMobile } from "@/hooks/use-mobile"
 
 export default function Dashboard() {
   const { user } = useAuth()
   const [activeSection, setActiveSection] = useState("overview")
+  const isMobile = useIsMobile()
 
   const { data: subscription, isLoading: isLoadingSubscription } = useQuery({
     queryKey: ['subscription', user?.id],
@@ -79,13 +81,20 @@ export default function Dashboard() {
   }
 
   return (
-    <SidebarProvider defaultOpen>
+    <SidebarProvider defaultOpen={!isMobile}>
       <div className="min-h-screen flex w-full bg-background">
         <DashboardSidebar 
           onSectionChange={setActiveSection} 
           activeSection={activeSection} 
         />
         <main className="flex-1 p-8">
+          <div className="flex items-center gap-4 mb-6">
+            {isMobile && (
+              <SidebarTrigger>
+                <Menu className="h-6 w-6" />
+              </SidebarTrigger>
+            )}
+          </div>
           <div className="max-w-6xl mx-auto">
             {renderContent()}
           </div>
