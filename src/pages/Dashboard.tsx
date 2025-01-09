@@ -42,18 +42,22 @@ export default function Dashboard() {
     )
   }
 
+  const hasAccess = subscription?.status === 'active' || subscription?.status === 'trial'
+
   const renderContent = () => {
+    // Se não tem acesso, mostra apenas o card de assinatura
+    if (!hasAccess) {
+      return <SubscriptionCard />
+    }
+
+    // Se tem acesso (trial ou assinatura ativa), mostra o conteúdo baseado na seção ativa
     switch (activeSection) {
       case "overview":
         return (
           <div className="space-y-6">
             <SubscriptionCard />
-            {(subscription?.status === 'active' || subscription?.status === 'trial') && (
-              <>
-                <InstancesCard />
-                <AISettingsCard />
-              </>
-            )}
+            <InstancesCard />
+            <AISettingsCard />
           </div>
         )
       case "instances":
@@ -70,7 +74,12 @@ export default function Dashboard() {
   return (
     <SidebarProvider defaultOpen>
       <div className="min-h-screen flex w-full bg-background">
-        <DashboardSidebar onSectionChange={setActiveSection} activeSection={activeSection} />
+        {hasAccess && (
+          <DashboardSidebar 
+            onSectionChange={setActiveSection} 
+            activeSection={activeSection} 
+          />
+        )}
         <main className="flex-1 p-8">
           <div className="max-w-6xl mx-auto">
             {renderContent()}
