@@ -99,7 +99,6 @@ export default function Dashboard() {
               instances={instances || []} 
             />
             <InstancesCard />
-            <SubscriptionCard />
           </div>
         )
       case "instances":
