@@ -1,0 +1,3 @@
+project_id = "vodexhppkasbulogmcqb"
+[functions.connect-evolution-instance]
+verify_jwt = true

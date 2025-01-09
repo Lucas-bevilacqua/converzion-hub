@@ -1,12 +1,10 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
+import { corsHeaders } from './cors.ts'
+import { checkInstance, createInstance, connectInstance } from './evolution-api.ts'
 
 serve(async (req) => {
+  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
   }
@@ -30,7 +28,7 @@ serve(async (req) => {
       throw userError || new Error('User not found')
     }
 
-    // Check subscription status - now including trial status
+    // Check subscription status
     const { data: subscription, error: subError } = await supabaseClient
       .from('subscriptions')
       .select('*')
@@ -70,88 +68,24 @@ serve(async (req) => {
       throw new Error('Evolution API configuration not found')
     }
 
-    // Clean up the base URL and construct the endpoint
     const baseUrl = evolutionApiUrl.replace(/\/+$/, '')
     const instanceName = encodeURIComponent(instance.name)
     
     console.log('Evolution API Base URL:', baseUrl)
     console.log('Instance Name:', instanceName)
 
-    // First, check if instance exists in Evolution API
-    const checkInstanceUrl = `${baseUrl}/instance/fetchInstances`
-    console.log('Checking instances at:', checkInstanceUrl)
-    
-    const checkResponse = await fetch(checkInstanceUrl, {
-      method: 'GET',
-      headers: {
-        'apikey': evolutionApiKey,
-        'Content-Type': 'application/json'
-      }
-    })
+    // Check if instance exists
+    const instanceExists = await checkInstance(baseUrl, evolutionApiKey, instance.name)
 
-    if (!checkResponse.ok) {
-      const errorText = await checkResponse.text()
-      console.error('Evolution API check instance error:', errorText)
-      throw new Error(`Evolution API check failed: ${errorText}`)
-    }
-
-    const instances = await checkResponse.json()
-    console.log('Available instances:', instances)
-
-    const instanceExists = instances.find((inst: any) => inst.instanceName === instance.name)
-
-    // Only create instance if it doesn't exist
+    // Create instance if it doesn't exist
     if (!instanceExists) {
-      console.log('Instance not found, creating new instance:', instance.name)
-      
-      const createUrl = `${baseUrl}/instance/create`
-      const createResponse = await fetch(createUrl, {
-        method: 'POST',
-        headers: {
-          'apikey': evolutionApiKey,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          instanceName: instance.name,
-          token: "any",
-          qrcode: true,
-          integration: "WHATSAPP-BAILEYS"
-        })
-      })
-
-      if (!createResponse.ok) {
-        const errorText = await createResponse.text()
-        console.error('Evolution API create instance error:', errorText)
-        
-        // If instance already exists, continue with connection
-        if (!errorText.includes('already in use')) {
-          throw new Error(`Failed to create instance: ${errorText}`)
-        }
-      }
+      await createInstance(baseUrl, evolutionApiKey, instance.name)
     }
 
-    // Now connect to get QR code
-    const connectUrl = `${baseUrl}/instance/connect/${instanceName}`
-    console.log('Connecting to instance at:', connectUrl)
-    
-    const evolutionResponse = await fetch(connectUrl, {
-      method: 'GET',
-      headers: {
-        'apikey': evolutionApiKey,
-        'Content-Type': 'application/json'
-      }
-    })
+    // Connect and get QR code
+    const evolutionData = await connectInstance(baseUrl, evolutionApiKey, instance.name)
 
-    if (!evolutionResponse.ok) {
-      const errorText = await evolutionResponse.text()
-      console.error('Evolution API connect error:', errorText)
-      throw new Error(`Evolution API returned status ${evolutionResponse.status}: ${errorText}`)
-    }
-
-    const evolutionData = await evolutionResponse.json()
-    console.log('Evolution API response:', evolutionData)
-
-    // Extract QR code from response, checking all possible paths
+    // Extract QR code from response
     const qrCode = evolutionData.base64 || 
                   evolutionData.qrcode?.base64 || 
                   evolutionData.qrcode || 
@@ -184,7 +118,12 @@ serve(async (req) => {
         qrCode: qrCode,
         connected: evolutionData.connected || false
       }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { 
+        headers: { 
+          ...corsHeaders, 
+          'Content-Type': 'application/json'
+        } 
+      }
     )
   } catch (error) {
     console.error('Error in connect-evolution-instance:', error)
