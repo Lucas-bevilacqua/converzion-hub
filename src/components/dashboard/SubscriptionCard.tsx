@@ -144,10 +144,7 @@ export function SubscriptionCard() {
       return (
         <div className="space-y-6">
           <TrialIndicator daysRemaining={daysRemaining} />
-          <TrialCard
-            trialEndsAt={subscription.trial_ends_at}
-            onUpgrade={() => handleUpgrade(plans[1])}
-          />
+          <TrialCard onUpgrade={() => handleUpgrade(plans[1])} />
           <Card>
             <CardContent className="py-6">
               <div className="grid gap-6">
