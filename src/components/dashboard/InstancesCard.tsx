@@ -5,7 +5,6 @@ import { useState } from "react"
 import { useToast } from "@/components/ui/use-toast"
 import { InstanceSlotCard } from "./instance-components/InstanceSlotCard"
 import { NewInstanceForm } from "./instance-components/NewInstanceForm"
-import { QRCodeDialog } from "./instance-components/QRCodeDialog"
 import { InstancePromptDialog } from "./instance-components/InstancePromptDialog"
 import { useInstanceQueries } from "./instance-components/useInstanceQueries"
 import { useInstanceMutations } from "./instance-components/InstanceMutations"
@@ -13,7 +12,6 @@ import { useInstanceMutations } from "./instance-components/InstanceMutations"
 export function InstancesCard() {
   const { user } = useAuth()
   const { toast } = useToast()
-  const [showQRCode, setShowQRCode] = useState(false)
   const [selectedInstance, setSelectedInstance] = useState<any>(null)
   const [showNewInstanceForm, setShowNewInstanceForm] = useState(false)
   const [showPromptDialog, setShowPromptDialog] = useState(false)
@@ -123,12 +121,6 @@ export function InstancesCard() {
           </div>
         )}
       </CardContent>
-
-      <QRCodeDialog
-        open={showQRCode}
-        onOpenChange={setShowQRCode}
-        qrCode={selectedInstance?.qrCode}
-      />
 
       <InstancePromptDialog
         open={showPromptDialog}
