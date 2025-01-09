@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query"
 import { supabase } from "@/integrations/supabase/client"
 import { SubscriptionCard } from "@/components/dashboard/SubscriptionCard"
 import { InstancesCard } from "@/components/dashboard/InstancesCard"
+import { DashboardOverview } from "@/components/dashboard/overview/DashboardOverview"
 import { Loader2, Menu } from "lucide-react"
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar"
 import { DashboardSidebar } from "@/components/dashboard/DashboardSidebar"
@@ -42,6 +43,25 @@ export default function Dashboard() {
     staleTime: 1000 * 60 * 5,
   })
 
+  const { data: instances } = useQuery({
+    queryKey: ['instances', user?.id],
+    queryFn: async () => {
+      try {
+        const { data, error } = await supabase
+          .from('evolution_instances')
+          .select('*')
+          .eq('user_id', user?.id)
+        
+        if (error) throw error
+        return data
+      } catch (error) {
+        console.error('Error fetching instances:', error)
+        throw error
+      }
+    },
+    enabled: !!user?.id
+  })
+
   if (isLoadingSubscription) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -67,6 +87,10 @@ export default function Dashboard() {
       case "overview":
         return (
           <div className="space-y-6">
+            <DashboardOverview 
+              subscription={subscription} 
+              instances={instances || []} 
+            />
             <SubscriptionCard />
             <InstancesCard />
           </div>
