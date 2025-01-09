@@ -37,8 +37,8 @@ export default function Dashboard() {
       }
     },
     enabled: !!user?.id,
-    retry: 3, // Adiciona retentativas em caso de falha
-    staleTime: 1000 * 60 * 5, // Cache por 5 minutos
+    retry: 3,
+    staleTime: 1000 * 60 * 5,
   })
 
   if (isLoadingSubscription) {
@@ -51,7 +51,7 @@ export default function Dashboard() {
 
   // Verifica se tem acesso (trial ou assinatura ativa)
   const hasAccess = subscription?.status === 'trial' || subscription?.status === 'active'
-  console.log('Has access:', hasAccess, 'Subscription status:', subscription?.status)
+  console.log('Access check - Status:', subscription?.status, 'Has access:', hasAccess)
 
   const renderContent = () => {
     // Se não tem acesso, mostra apenas o card de assinatura
