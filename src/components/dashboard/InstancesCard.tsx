@@ -61,15 +61,14 @@ export function InstancesCard() {
   const getInstanceLimit = () => {
     if (!subscription) return 0
     
-    // Se está em trial ou tem plano professional ativo, retorna 3 instâncias
-    if ((subscription.status === 'trial') || 
-        (subscription.status === 'active' && subscription.plan_id?.includes('professional'))) {
-      return 3
+    // Se está em trial, usa o limite do plano que está testando
+    if (subscription.status === 'trial') {
+      return subscription.plan_id === 'professional' ? 3 : 1
     }
     
-    // Se tem plano starter ativo, retorna 1 instância
+    // Se tem plano ativo, verifica qual é o plano
     if (subscription.status === 'active') {
-      return 1
+      return subscription.plan_id === 'professional' ? 3 : 1
     }
     
     return 0
