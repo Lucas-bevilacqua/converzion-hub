@@ -4,7 +4,40 @@ import { useSubscription } from "./subscription/useSubscription"
 import { useUpgradeSubscription } from "./subscription/useUpgradeSubscription"
 import { ActiveSubscriptionCard } from "./subscription/ActiveSubscriptionCard"
 import { TrialAlert } from "./overview/TrialAlert"
+import { PlansDisplay } from "./subscription/PlansDisplay"
 import { isAfter } from "date-fns"
+
+const plans = [
+  {
+    name: "Starter",
+    price: "497,00",
+    description: "Perfeito para começar",
+    features: [
+      "1 Instância",
+      "5.000 Interações de IA",
+      "Suporte por email",
+      "Integração básica com HubSpot",
+      "Modelo de IA: GPT-4",
+      "Análises básicas",
+    ],
+    priceId: "price_1QbuUvKkjJ7tububiklS9tAc"
+  },
+  {
+    name: "Professional",
+    price: "997,00",
+    description: "Para negócios em crescimento",
+    features: [
+      "3 Instâncias",
+      "15.000 Interações de IA",
+      "Suporte prioritário",
+      "Modelo de IA: GPT-4",
+      "Análises avançadas",
+      "Treinamento de IA",
+    ],
+    highlighted: true,
+    priceId: "price_1QbuUvKkjJ7tububiklS9tAc"
+  }
+]
 
 export function SubscriptionCard() {
   const { data: subscription, isLoading } = useSubscription()
@@ -30,8 +63,17 @@ export function SubscriptionCard() {
         return <TrialAlert trialEndsAt={subscription.trial_ends_at} />
       }
       
-      // Na página de assinatura, mostra apenas o status do trial
-      return <TrialAlert trialEndsAt={subscription.trial_ends_at} />
+      // Na página de assinatura, mostra o status do trial e os planos disponíveis
+      return (
+        <div className="space-y-6">
+          <TrialAlert trialEndsAt={subscription.trial_ends_at} />
+          <PlansDisplay 
+            plans={plans}
+            onUpgrade={handleUpgrade}
+            trialPlanName="Starter"
+          />
+        </div>
+      )
     }
   }
 
@@ -42,25 +84,39 @@ export function SubscriptionCard() {
       return null
     }
     
-    // Na página de assinatura, mostra apenas uma mensagem de que não há assinatura ativa
+    // Na página de assinatura, mostra os planos disponíveis
     return (
-      <Card>
-        <CardContent className="p-6">
-          <p className="text-center text-muted-foreground">
-            Você não possui uma assinatura ativa no momento.
-          </p>
-        </CardContent>
-      </Card>
+      <PlansDisplay 
+        plans={plans}
+        onUpgrade={handleUpgrade}
+      />
     )
   }
 
-  // Se há uma assinatura ativa, mostra os detalhes da assinatura
-  return (
+  // Se há uma assinatura ativa
+  const content = (
     <ActiveSubscriptionCard
-      planName={subscription.plan_id?.includes('professional') ? 'Profissional' : 'Inicial'}
+      planName={subscription.plan_id?.includes('professional') ? 'Professional' : 'Starter'}
       instances={subscription.plan_id?.includes('professional') ? 3 : 1}
       currentPeriodEnd={subscription.current_period_end!}
       onUpgrade={() => handleUpgrade('price_1QbuUvKkjJ7tububiklS9tAc')}
     />
   )
+
+  // Na página de assinatura, mostra também os planos disponíveis
+  if (window.location.pathname === '/dashboard/subscription') {
+    return (
+      <div className="space-y-6">
+        {content}
+        <PlansDisplay 
+          plans={plans}
+          onUpgrade={handleUpgrade}
+          currentPlanId={subscription.plan_id}
+        />
+      </div>
+    )
+  }
+
+  // Na visão geral, mostra apenas o status da assinatura
+  return content
 }
