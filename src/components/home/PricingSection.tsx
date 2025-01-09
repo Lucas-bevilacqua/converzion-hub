@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/auth/AuthContext";
 import { useToast } from "@/components/ui/use-toast";
 import { Check } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 
 const plans = [
   {
@@ -55,6 +56,8 @@ export const PricingSection = () => {
   const { toast } = useToast();
 
   const handleSubscribe = async (plan: typeof plans[0]) => {
+    console.log("Handling subscription for plan:", plan.name);
+    
     if (plan.price === "Personalizado") {
       navigate("/contact");
       return;
@@ -71,6 +74,8 @@ export const PricingSection = () => {
 
     try {
       console.log("Creating checkout session for plan:", plan.name);
+      const { data: { session } } = await supabase.auth.getSession();
+      
       const response = await fetch(
         "https://vodexhppkasbulogmcqb.functions.supabase.co/stripe-checkout",
         {
@@ -81,7 +86,9 @@ export const PricingSection = () => {
           },
           body: JSON.stringify({ 
             planName: plan.name,
-            priceAmount: plan.price
+            priceId: plan.name === "Professional Plan" 
+              ? "price_1QbuUiKkjJ7tububpw8Vpsrp" 
+              : "price_1QbuUiKkjJ7tububpw8Vpsrp"
           }),
         }
       );
