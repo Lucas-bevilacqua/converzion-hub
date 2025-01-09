@@ -18,6 +18,7 @@ const plans = [
       "Modelo de IA: GPT-4",
       "Análises básicas",
     ],
+    planId: "starter"
   },
   {
     name: "Professional Plan",
@@ -32,6 +33,7 @@ const plans = [
       "Treinamento de IA",
     ],
     highlighted: true,
+    planId: "professional"
   },
   {
     name: "Enterprise",
@@ -55,8 +57,8 @@ export const PricingSection = () => {
   const { user } = useAuth();
   const { toast } = useToast();
 
-  const handleSubscribe = async (plan: typeof plans[0]) => {
-    console.log("Handling subscription for plan:", plan.name);
+  const handleStartTrial = async (plan: typeof plans[0]) => {
+    console.log("Iniciando trial para o plano:", plan.name);
     
     if (plan.price === "Personalizado") {
       navigate("/contact");
@@ -64,51 +66,38 @@ export const PricingSection = () => {
     }
 
     if (!user) {
-      toast({
-        title: "Login necessário",
-        description: "Faça login para assinar um plano",
+      // Se não estiver logado, redireciona para registro
+      navigate("/register", { 
+        state: { selectedPlan: plan.planId }
       });
-      navigate("/login");
       return;
     }
 
     try {
-      console.log("Creating checkout session for plan:", plan.name);
-      const { data: { session } } = await supabase.auth.getSession();
+      // Atualiza a subscription do usuário com o plano selecionado
+      const { error } = await supabase
+        .from('subscriptions')
+        .update({ 
+          plan_id: plan.planId,
+          trial_started_at: new Date().toISOString(),
+          trial_ends_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+          status: 'trial'
+        })
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Trial iniciado com sucesso!",
+        description: `Você tem 7 dias para experimentar o plano ${plan.name}.`,
+      });
       
-      const response = await fetch(
-        "https://vodexhppkasbulogmcqb.functions.supabase.co/stripe-checkout",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${session?.access_token}`,
-          },
-          body: JSON.stringify({ 
-            planName: plan.name,
-            priceId: plan.name === "Professional Plan" 
-              ? "price_1QbuUiKkjJ7tububpw8Vpsrp" 
-              : "price_1QbuUiKkjJ7tububpw8Vpsrp"
-          }),
-        }
-      );
-
-      if (!response.ok) {
-        const error = await response.json();
-        console.error("Checkout error:", error);
-        throw new Error(error.message || "Failed to create checkout session");
-      }
-
-      const { url } = await response.json();
-      if (url) {
-        console.log("Redirecting to checkout URL:", url);
-        window.location.href = url;
-      }
+      navigate("/dashboard");
     } catch (error) {
-      console.error("Erro ao criar sessão de checkout:", error);
+      console.error("Erro ao iniciar trial:", error);
       toast({
         title: "Erro",
-        description: "Não foi possível processar sua assinatura",
+        description: "Não foi possível iniciar seu período de trial. Tente novamente.",
         variant: "destructive",
       });
     }
@@ -124,7 +113,7 @@ export const PricingSection = () => {
             Planos que cabem no seu bolso
           </h2>
           <p className="text-[#333333]/80 text-lg">
-            Escolha o plano ideal para o seu negócio
+            Escolha o plano ideal para o seu negócio e teste grátis por 7 dias
           </p>
         </div>
 
@@ -178,7 +167,7 @@ export const PricingSection = () => {
               </div>
 
               <Button
-                onClick={() => handleSubscribe(plan)}
+                onClick={() => handleStartTrial(plan)}
                 className={`w-full ${
                   plan.highlighted
                     ? "bg-[#0056D2] hover:bg-[#0056D2]/90"
@@ -188,7 +177,7 @@ export const PricingSection = () => {
               >
                 {plan.price === "Personalizado"
                   ? "Falar com Vendas"
-                  : "Começar Agora"}
+                  : "Testar Grátis por 7 Dias"}
               </Button>
             </div>
           ))}
