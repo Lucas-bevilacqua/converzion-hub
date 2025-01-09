@@ -10,18 +10,18 @@ export const TrialCard = ({ onUpgrade }: TrialCardProps) => {
     <Card>
       <CardContent className="p-6">
         <div className="space-y-4">
-          <div className="p-4 border rounded-lg bg-purple-50 border-purple-200">
+          <div className="p-4 rounded-lg bg-purple-50">
             <h3 className="text-lg font-semibold text-purple-600 mb-2">
               Plano Professional
             </h3>
-            <p className="text-sm text-muted-foreground">
+            <p className="text-sm text-purple-600">
               Acesso completo a todas as funcionalidades
             </p>
           </div>
 
           <Button 
             onClick={onUpgrade} 
-            className="w-full"
+            className="w-full bg-emerald-500 hover:bg-emerald-600"
           >
             Assinar Agora
           </Button>
