@@ -9,6 +9,7 @@ import { InstanceListItem } from "./instance-components/InstanceListItem"
 import { NewInstanceForm } from "./instance-components/NewInstanceForm"
 import { QRCodeDialog } from "./instance-components/QRCodeDialog"
 import { InstanceSlotCard } from "./instance-components/InstanceSlotCard"
+import { InstancePromptDialog } from "./instance-components/InstancePromptDialog"
 
 export function InstancesCard() {
   const { user } = useAuth()
@@ -17,6 +18,7 @@ export function InstancesCard() {
   const [showQRCode, setShowQRCode] = useState(false)
   const [selectedInstance, setSelectedInstance] = useState<any>(null)
   const [showNewInstanceForm, setShowNewInstanceForm] = useState(false)
+  const [showPromptDialog, setShowPromptDialog] = useState(false)
   const [newInstance, setNewInstance] = useState({
     name: "",
     phone_number: ""
@@ -56,7 +58,6 @@ export function InstancesCard() {
     enabled: !!user?.id
   })
 
-  // Create instance mutation
   const createMutation = useMutation({
     mutationFn: async () => {
       console.log('Creating new instance:', newInstance)
@@ -151,29 +152,13 @@ export function InstancesCard() {
   }
 
   const getInstanceLimit = () => {
-    if (!subscription || subscription.status !== 'active') return 0
+    if (!subscription || (subscription.status !== 'active' && subscription.status !== 'trial')) return 0
     return subscription.plan_id?.includes('professional') ? 3 : 1
   }
 
   const instanceLimit = getInstanceLimit()
   const usedSlots = instances?.length || 0
   const availableSlots = Math.max(0, instanceLimit - usedSlots)
-
-  // Auto-refresh QR code every 30 seconds when dialog is open
-  useQuery({
-    queryKey: ['qrCode', selectedInstance?.id],
-    queryFn: async () => {
-      if (!selectedInstance?.id) return null
-      const { data: response, error } = await supabase.functions.invoke('connect-evolution-instance', {
-        body: { instanceId: selectedInstance.id }
-      })
-      if (error) throw error
-      setSelectedInstance(response)
-      return response
-    },
-    enabled: !!selectedInstance?.id && showQRCode,
-    refetchInterval: 30000 // Refresh every 30 seconds
-  })
 
   return (
     <Card>
@@ -193,25 +178,18 @@ export function InstancesCard() {
           </div>
         ) : (
           <div className="space-y-6">
-            {instances && instances.length > 0 && (
-              <div className="space-y-4">
-                {instances.map((instance) => (
-                  <InstanceListItem
-                    key={instance.id}
-                    instance={instance}
-                    onConnect={handleConnect}
-                  />
-                ))}
-              </div>
-            )}
-            
-            {subscription?.status === 'active' && (
+            {(subscription?.status === 'active' || subscription?.status === 'trial') && (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {instances?.map((instance) => (
                   <InstanceSlotCard
                     key={instance.id}
                     isUsed={true}
+                    instance={instance}
                     onClick={() => {}}
+                    onConfigurePrompt={() => {
+                      setSelectedInstance(instance)
+                      setShowPromptDialog(true)
+                    }}
                   />
                 ))}
                 {Array.from({ length: availableSlots }).map((_, index) => (
@@ -241,6 +219,13 @@ export function InstancesCard() {
         open={showQRCode}
         onOpenChange={setShowQRCode}
         qrCode={selectedInstance?.qrCode}
+      />
+
+      <InstancePromptDialog
+        open={showPromptDialog}
+        onOpenChange={setShowPromptDialog}
+        instanceId={selectedInstance?.id}
+        currentPrompt={selectedInstance?.system_prompt}
       />
     </Card>
   )
