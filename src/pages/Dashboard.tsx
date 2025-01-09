@@ -17,21 +17,28 @@ export default function Dashboard() {
     queryKey: ['subscription', user?.id],
     queryFn: async () => {
       console.log('Fetching subscription for dashboard:', user?.id)
-      const { data, error } = await supabase
-        .from('subscriptions')
-        .select('*')
-        .eq('user_id', user?.id)
-        .maybeSingle()
-      
-      if (error) {
-        console.error('Error fetching subscription:', error)
+      try {
+        const { data, error } = await supabase
+          .from('subscriptions')
+          .select('*')
+          .eq('user_id', user?.id)
+          .maybeSingle()
+        
+        if (error) {
+          console.error('Error fetching subscription:', error)
+          throw error
+        }
+        
+        console.log('Subscription data:', data)
+        return data
+      } catch (error) {
+        console.error('Error in subscription query:', error)
         throw error
       }
-      
-      console.log('Subscription data:', data)
-      return data
     },
     enabled: !!user?.id,
+    retry: 3, // Adiciona retentativas em caso de falha
+    staleTime: 1000 * 60 * 5, // Cache por 5 minutos
   })
 
   if (isLoadingSubscription) {
@@ -78,12 +85,10 @@ export default function Dashboard() {
   return (
     <SidebarProvider defaultOpen>
       <div className="min-h-screen flex w-full bg-background">
-        {hasAccess && (
-          <DashboardSidebar 
-            onSectionChange={setActiveSection} 
-            activeSection={activeSection} 
-          />
-        )}
+        <DashboardSidebar 
+          onSectionChange={setActiveSection} 
+          activeSection={activeSection} 
+        />
         <main className="flex-1 p-8">
           <div className="max-w-6xl mx-auto">
             {renderContent()}
