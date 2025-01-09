@@ -94,6 +94,51 @@ export type Database = {
           },
         ]
       }
+      instance_metrics: {
+        Row: {
+          connection_time_minutes: number | null
+          created_at: string | null
+          id: string
+          instance_id: string
+          messages_sent: number | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          connection_time_minutes?: number | null
+          created_at?: string | null
+          id?: string
+          instance_id: string
+          messages_sent?: number | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          connection_time_minutes?: number | null
+          created_at?: string | null
+          id?: string
+          instance_id?: string
+          messages_sent?: number | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "instance_metrics_instance_id_fkey"
+            columns: ["instance_id"]
+            isOneToOne: false
+            referencedRelation: "evolution_instances"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "instance_metrics_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           created_at: string
