@@ -42,15 +42,19 @@ export default function Dashboard() {
     )
   }
 
-  const hasAccess = subscription?.status === 'active' || subscription?.status === 'trial'
+  // Verifica se tem acesso (trial ou assinatura ativa)
+  const hasAccess = subscription?.status === 'trial' || subscription?.status === 'active'
+  console.log('Has access:', hasAccess, 'Subscription status:', subscription?.status)
 
   const renderContent = () => {
     // Se não tem acesso, mostra apenas o card de assinatura
     if (!hasAccess) {
+      console.log('No access, showing subscription card only')
       return <SubscriptionCard />
     }
 
     // Se tem acesso (trial ou assinatura ativa), mostra o conteúdo baseado na seção ativa
+    console.log('Has access, showing content for section:', activeSection)
     switch (activeSection) {
       case "overview":
         return (
