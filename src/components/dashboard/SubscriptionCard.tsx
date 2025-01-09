@@ -7,7 +7,8 @@ import { useToast } from "@/components/ui/use-toast"
 import { PlanCard } from "./subscription/PlanCard"
 import { TrialCard } from "./subscription/TrialCard"
 import { ActiveSubscriptionCard } from "./subscription/ActiveSubscriptionCard"
-import { isAfter } from "date-fns"
+import { TrialIndicator } from "./subscription/TrialIndicator"
+import { isAfter, differenceInDays } from "date-fns"
 
 const plans = [
   {
@@ -137,10 +138,12 @@ export function SubscriptionCard() {
   // Se está em trial e ainda não terminou, mostra o cartão de trial
   if (subscription?.status === 'trial' && subscription.trial_ends_at) {
     const trialEnded = isAfter(new Date(), new Date(subscription.trial_ends_at))
+    const daysRemaining = differenceInDays(new Date(subscription.trial_ends_at), new Date())
     
     if (!trialEnded) {
       return (
         <div className="space-y-6">
+          <TrialIndicator daysRemaining={daysRemaining} />
           <TrialCard
             trialEndsAt={subscription.trial_ends_at}
             onUpgrade={() => handleUpgrade(plans[1])}
