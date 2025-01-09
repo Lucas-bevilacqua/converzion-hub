@@ -6,7 +6,9 @@ import { useAuth } from "@/contexts/auth/AuthContext"
 import { useToast } from "@/components/ui/use-toast"
 import { PlanCard } from "./subscription/PlanCard"
 import { ActiveSubscriptionCard } from "./subscription/ActiveSubscriptionCard"
-import { isAfter, differenceInDays } from "date-fns"
+import { PlansDisplay } from "./subscription/PlansDisplay"
+import { TrialAlert } from "./overview/TrialAlert"
+import { isAfter } from "date-fns"
 
 const plans = [
   {
@@ -60,7 +62,6 @@ export function SubscriptionCard() {
           throw error
         }
 
-        // Se tiver trial e já passou da data de término, atualiza o status
         if (data?.status === 'trial' && data.trial_ends_at) {
           const trialEnded = isAfter(new Date(), new Date(data.trial_ends_at))
           
@@ -74,7 +75,6 @@ export function SubscriptionCard() {
             if (updateError) {
               console.error('Error updating subscription status:', updateError)
             } else {
-              // Retorna os dados atualizados
               return {
                 ...data,
                 status: null
@@ -133,28 +133,21 @@ export function SubscriptionCard() {
     )
   }
 
-  // Se está em trial e ainda não terminou, mostra o indicador de trial
+  // Se está em trial e ainda não terminou, mostra o indicador de trial na visão geral
   if (subscription?.status === 'trial' && subscription.trial_ends_at) {
     const trialEnded = isAfter(new Date(), new Date(subscription.trial_ends_at))
-    const daysRemaining = differenceInDays(new Date(subscription.trial_ends_at), new Date())
     
     if (!trialEnded) {
       return (
         <div className="space-y-6">
-          <Card>
-            <CardContent className="py-6">
-              <div className="grid gap-6">
-                {plans.map((plan) => (
-                  <PlanCard
-                    key={plan.name}
-                    {...plan}
-                    onSelect={() => handleUpgrade(plan)}
-                    isTrial={plan.name === "Professional Plan"}
-                  />
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+          {window.location.pathname === '/dashboard' && (
+            <TrialAlert trialEndsAt={subscription.trial_ends_at} />
+          )}
+          <PlansDisplay
+            plans={plans}
+            onUpgrade={handleUpgrade}
+            trialPlanName="Professional Plan"
+          />
         </div>
       )
     }
@@ -163,19 +156,10 @@ export function SubscriptionCard() {
   // Se não há assinatura ativa ou trial expirado, mostra os planos disponíveis
   if (!subscription || subscription.status !== 'active') {
     return (
-      <Card>
-        <CardContent className="py-6">
-          <div className="grid gap-6">
-            {plans.map((plan) => (
-              <PlanCard
-                key={plan.name}
-                {...plan}
-                onSelect={() => handleUpgrade(plan)}
-              />
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+      <PlansDisplay
+        plans={plans}
+        onUpgrade={handleUpgrade}
+      />
     )
   }
 
@@ -188,20 +172,11 @@ export function SubscriptionCard() {
         currentPeriodEnd={subscription.current_period_end!}
         onUpgrade={() => handleUpgrade(plans[1])}
       />
-      <Card>
-        <CardContent className="py-6">
-          <div className="grid gap-6">
-            {plans.map((plan) => (
-              <PlanCard
-                key={plan.name}
-                {...plan}
-                onSelect={() => handleUpgrade(plan)}
-                buttonText={plan.name === subscription.plan_id ? 'Plano Atual' : 'Assinar Agora'}
-              />
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+      <PlansDisplay
+        plans={plans}
+        onUpgrade={handleUpgrade}
+        currentPlanId={subscription.plan_id}
+      />
     </div>
   )
 }
