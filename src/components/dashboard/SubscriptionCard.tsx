@@ -37,7 +37,7 @@ const plans = [
       "Treinamento de IA",
     ],
     highlighted: true,
-    priceId: "price_1QbuUiKkjJ7tububpw8Vpsrp"
+    priceId: "price_1QbuUvKkjJ7tububiklS9tAc"
   }
 ]
 
@@ -140,10 +140,25 @@ export function SubscriptionCard() {
     
     if (!trialEnded) {
       return (
-        <TrialCard
-          trialEndsAt={subscription.trial_ends_at}
-          onUpgrade={() => handleUpgrade(plans[1])}
-        />
+        <div className="space-y-6">
+          <TrialCard
+            trialEndsAt={subscription.trial_ends_at}
+            onUpgrade={() => handleUpgrade(plans[1])}
+          />
+          <Card>
+            <CardContent className="py-6">
+              <div className="grid gap-6">
+                {plans.map((plan) => (
+                  <PlanCard
+                    key={plan.name}
+                    {...plan}
+                    onSelect={() => handleUpgrade(plan)}
+                  />
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       )
     }
   }
@@ -167,13 +182,29 @@ export function SubscriptionCard() {
     )
   }
 
-  // Se há uma assinatura ativa, mostra os detalhes da assinatura
+  // Se há uma assinatura ativa, mostra os detalhes da assinatura e os planos disponíveis
   return (
-    <ActiveSubscriptionCard
-      planName={subscription.plan_id?.includes('professional') ? 'Profissional' : 'Inicial'}
-      instances={subscription.plan_id?.includes('professional') ? 3 : 1}
-      currentPeriodEnd={subscription.current_period_end!}
-      onUpgrade={() => handleUpgrade(plans[1])}
-    />
+    <div className="space-y-6">
+      <ActiveSubscriptionCard
+        planName={subscription.plan_id?.includes('professional') ? 'Profissional' : 'Inicial'}
+        instances={subscription.plan_id?.includes('professional') ? 3 : 1}
+        currentPeriodEnd={subscription.current_period_end!}
+        onUpgrade={() => handleUpgrade(plans[1])}
+      />
+      <Card>
+        <CardContent className="py-6">
+          <div className="grid gap-6">
+            {plans.map((plan) => (
+              <PlanCard
+                key={plan.name}
+                {...plan}
+                onSelect={() => handleUpgrade(plan)}
+                buttonText={plan.name === subscription.plan_id ? 'Plano Atual' : 'Mudar para este Plano'}
+              />
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+    </div>
   )
 }
