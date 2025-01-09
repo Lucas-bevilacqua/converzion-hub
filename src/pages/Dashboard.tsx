@@ -9,6 +9,7 @@ import { Loader2, Menu } from "lucide-react"
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar"
 import { DashboardSidebar } from "@/components/dashboard/DashboardSidebar"
 import { useIsMobile } from "@/hooks/use-mobile"
+import { TrialAlert } from "@/components/dashboard/overview/TrialAlert"
 
 export default function Dashboard() {
   const { user } = useAuth()
@@ -87,12 +88,18 @@ export default function Dashboard() {
       case "overview":
         return (
           <div className="space-y-6">
+            {subscription?.status === 'trial' && subscription.trial_ends_at && (
+              <TrialAlert 
+                trialEndsAt={subscription.trial_ends_at}
+                trialPlanName={subscription.plan_id === 'professional' ? 'Professional' : 'Starter'}
+              />
+            )}
             <DashboardOverview 
               subscription={subscription} 
               instances={instances || []} 
             />
-            <SubscriptionCard />
             <InstancesCard />
+            <SubscriptionCard />
           </div>
         )
       case "instances":

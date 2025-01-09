@@ -3,7 +3,6 @@ import { Loader2 } from "lucide-react"
 import { useSubscription } from "./subscription/useSubscription"
 import { useUpgradeSubscription } from "./subscription/useUpgradeSubscription"
 import { ActiveSubscriptionCard } from "./subscription/ActiveSubscriptionCard"
-import { TrialAlert } from "./overview/TrialAlert"
 import { PlansDisplay } from "./subscription/PlansDisplay"
 import { isAfter } from "date-fns"
 
@@ -58,27 +57,6 @@ export function SubscriptionCard() {
     )
   }
 
-  // Se está em trial e ainda não terminou, mostra o indicador de trial e os planos
-  if (subscription?.status === 'trial' && subscription.trial_ends_at) {
-    const trialEnded = isAfter(new Date(), new Date(subscription.trial_ends_at))
-    
-    if (!trialEnded) {
-      return (
-        <div className="space-y-6">
-          <TrialAlert 
-            trialEndsAt={subscription.trial_ends_at} 
-            trialPlanName={subscription.plan_id === 'professional' ? 'Professional' : 'Starter'}
-          />
-          <PlansDisplay 
-            plans={plans}
-            onUpgrade={handlePlanUpgrade}
-            trialPlanName={subscription.plan_id === 'professional' ? 'Professional' : 'Starter'}
-          />
-        </div>
-      )
-    }
-  }
-
   // Se não há assinatura ativa ou trial expirado, mostra os planos disponíveis
   if (!subscription || subscription.status !== 'active') {
     return (
@@ -89,20 +67,13 @@ export function SubscriptionCard() {
     )
   }
 
-  // Se há uma assinatura ativa, mostra o status da assinatura e os planos disponíveis
+  // Se há uma assinatura ativa, mostra o status da assinatura
   return (
-    <div className="space-y-6">
-      <ActiveSubscriptionCard
-        planName={subscription.plan_id === 'professional' ? 'Professional' : 'Starter'}
-        instances={subscription.plan_id === 'professional' ? 3 : 1}
-        currentPeriodEnd={subscription.current_period_end!}
-        onUpgrade={() => handleUpgrade('price_1QbuUvKkjJ7tububiklS9tAc')}
-      />
-      <PlansDisplay 
-        plans={plans}
-        onUpgrade={handlePlanUpgrade}
-        currentPlanId={subscription.plan_id}
-      />
-    </div>
+    <ActiveSubscriptionCard
+      planName={subscription.plan_id === 'professional' ? 'Professional' : 'Starter'}
+      instances={subscription.plan_id === 'professional' ? 3 : 1}
+      currentPeriodEnd={subscription.current_period_end!}
+      onUpgrade={() => handleUpgrade('price_1QbuUvKkjJ7tububiklS9tAc')}
+    />
   )
 }
