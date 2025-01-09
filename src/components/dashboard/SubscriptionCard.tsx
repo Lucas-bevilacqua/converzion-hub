@@ -43,6 +43,11 @@ export function SubscriptionCard() {
   const { data: subscription, isLoading } = useSubscription()
   const { handleUpgrade } = useUpgradeSubscription()
 
+  // Wrapper function to handle Plan object
+  const handlePlanUpgrade = (plan: typeof plans[0]) => {
+    handleUpgrade(plan.priceId)
+  }
+
   if (isLoading) {
     return (
       <Card>
@@ -69,7 +74,7 @@ export function SubscriptionCard() {
           <TrialAlert trialEndsAt={subscription.trial_ends_at} />
           <PlansDisplay 
             plans={plans}
-            onUpgrade={handleUpgrade}
+            onUpgrade={handlePlanUpgrade}
             trialPlanName="Starter"
           />
         </div>
@@ -88,7 +93,7 @@ export function SubscriptionCard() {
     return (
       <PlansDisplay 
         plans={plans}
-        onUpgrade={handleUpgrade}
+        onUpgrade={handlePlanUpgrade}
       />
     )
   }
@@ -110,7 +115,7 @@ export function SubscriptionCard() {
         {content}
         <PlansDisplay 
           plans={plans}
-          onUpgrade={handleUpgrade}
+          onUpgrade={handlePlanUpgrade}
           currentPlanId={subscription.plan_id}
         />
       </div>
