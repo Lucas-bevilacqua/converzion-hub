@@ -9,6 +9,7 @@ interface PlanCardProps {
   highlighted?: boolean
   onSelect: () => void
   buttonText?: string
+  isTrial?: boolean
 }
 
 export const PlanCard = ({ 
@@ -18,7 +19,8 @@ export const PlanCard = ({
   features, 
   highlighted = false,
   onSelect,
-  buttonText = "Começar Agora"
+  buttonText = "Assinar Agora",
+  isTrial = false
 }: PlanCardProps) => {
   return (
     <div
@@ -32,6 +34,14 @@ export const PlanCard = ({
         <div className="absolute -top-3 left-4 bg-primary px-3 py-1 rounded-full">
           <span className="text-xs font-medium text-primary-foreground">
             Mais Popular
+          </span>
+        </div>
+      )}
+
+      {isTrial && (
+        <div className="absolute -top-3 right-4 bg-purple-500 px-3 py-1 rounded-full">
+          <span className="text-xs font-medium text-white">
+            Trial Ativo
           </span>
         </div>
       )}

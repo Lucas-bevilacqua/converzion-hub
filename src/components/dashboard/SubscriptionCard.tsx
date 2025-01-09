@@ -5,9 +5,7 @@ import { supabase } from "@/integrations/supabase/client"
 import { useAuth } from "@/contexts/auth/AuthContext"
 import { useToast } from "@/components/ui/use-toast"
 import { PlanCard } from "./subscription/PlanCard"
-import { TrialCard } from "./subscription/TrialCard"
 import { ActiveSubscriptionCard } from "./subscription/ActiveSubscriptionCard"
-import { TrialIndicator } from "./subscription/TrialIndicator"
 import { isAfter, differenceInDays } from "date-fns"
 
 const plans = [
@@ -135,7 +133,7 @@ export function SubscriptionCard() {
     )
   }
 
-  // Se está em trial e ainda não terminou, mostra o cartão de trial
+  // Se está em trial e ainda não terminou, mostra o indicador de trial
   if (subscription?.status === 'trial' && subscription.trial_ends_at) {
     const trialEnded = isAfter(new Date(), new Date(subscription.trial_ends_at))
     const daysRemaining = differenceInDays(new Date(subscription.trial_ends_at), new Date())
@@ -143,8 +141,6 @@ export function SubscriptionCard() {
     if (!trialEnded) {
       return (
         <div className="space-y-6">
-          <TrialIndicator daysRemaining={daysRemaining} />
-          <TrialCard onUpgrade={() => handleUpgrade(plans[1])} />
           <Card>
             <CardContent className="py-6">
               <div className="grid gap-6">
@@ -153,6 +149,7 @@ export function SubscriptionCard() {
                     key={plan.name}
                     {...plan}
                     onSelect={() => handleUpgrade(plan)}
+                    isTrial={plan.name === "Professional Plan"}
                   />
                 ))}
               </div>
@@ -199,7 +196,7 @@ export function SubscriptionCard() {
                 key={plan.name}
                 {...plan}
                 onSelect={() => handleUpgrade(plan)}
-                buttonText={plan.name === subscription.plan_id ? 'Plano Atual' : 'Mudar para este Plano'}
+                buttonText={plan.name === subscription.plan_id ? 'Plano Atual' : 'Assinar Agora'}
               />
             ))}
           </div>
