@@ -3,13 +3,20 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { corsHeaders } from './cors.ts'
 import { checkInstance, createInstance, connectInstance } from './evolution-api.ts'
 
+console.log('Connect Evolution Instance function started')
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders })
+    console.log('Handling OPTIONS request')
+    return new Response(null, { 
+      headers: { ...corsHeaders }
+    })
   }
 
   try {
+    console.log('Processing request:', req.method)
+    
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
@@ -25,6 +32,7 @@ serve(async (req) => {
     )
 
     if (userError || !user) {
+      console.error('User auth error:', userError)
       throw userError || new Error('User not found')
     }
 
@@ -36,8 +44,13 @@ serve(async (req) => {
       .or('status.eq.active,status.eq.trial')
       .maybeSingle()
 
-    if (subError) throw subError
+    if (subError) {
+      console.error('Subscription check error:', subError)
+      throw subError
+    }
+    
     if (!subscription) {
+      console.log('No active subscription found')
       return new Response(
         JSON.stringify({ error: 'Active or trial subscription required' }),
         { 
@@ -48,6 +61,7 @@ serve(async (req) => {
     }
 
     const { instanceId } = await req.json()
+    console.log('Processing instance:', instanceId)
 
     // Get instance details
     const { data: instance, error: instanceError } = await supabaseClient
@@ -57,6 +71,7 @@ serve(async (req) => {
       .single()
 
     if (instanceError || !instance) {
+      console.error('Instance fetch error:', instanceError)
       throw instanceError || new Error('Instance not found')
     }
 
@@ -65,6 +80,7 @@ serve(async (req) => {
     const evolutionApiKey = Deno.env.get('EVOLUTION_API_KEY')
     
     if (!evolutionApiUrl || !evolutionApiKey) {
+      console.error('Missing Evolution API configuration')
       throw new Error('Evolution API configuration not found')
     }
 
@@ -76,13 +92,16 @@ serve(async (req) => {
 
     // Check if instance exists
     const instanceExists = await checkInstance(baseUrl, evolutionApiKey, instance.name)
+    console.log('Instance exists?', instanceExists)
 
     // Create instance if it doesn't exist
     if (!instanceExists) {
+      console.log('Creating new instance')
       await createInstance(baseUrl, evolutionApiKey, instance.name)
     }
 
     // Connect and get QR code
+    console.log('Connecting instance')
     const evolutionData = await connectInstance(baseUrl, evolutionApiKey, instance.name)
 
     // Extract QR code from response
@@ -109,7 +128,12 @@ serve(async (req) => {
       })
       .eq('id', instanceId)
 
-    if (updateError) throw updateError
+    if (updateError) {
+      console.error('Instance update error:', updateError)
+      throw updateError
+    }
+
+    console.log('Successfully processed instance connection')
 
     return new Response(
       JSON.stringify({
