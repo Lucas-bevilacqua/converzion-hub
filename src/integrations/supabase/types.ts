@@ -176,7 +176,7 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      subscription_status: "active" | "canceled" | "past_due"
+      subscription_status: "active" | "canceled" | "past_due" | "trial"
     }
     CompositeTypes: {
       [_ in never]: never

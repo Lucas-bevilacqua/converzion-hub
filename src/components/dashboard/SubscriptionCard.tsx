@@ -1,13 +1,12 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Crown, Loader2, AlertTriangle, CheckCircle2 } from "lucide-react"
+import { Card, CardContent } from "@/components/ui/card"
+import { Loader2 } from "lucide-react"
 import { useQuery } from "@tanstack/react-query"
 import { supabase } from "@/integrations/supabase/client"
 import { useAuth } from "@/contexts/auth/AuthContext"
 import { useToast } from "@/components/ui/use-toast"
 import { PlanCard } from "./subscription/PlanCard"
-import { TrialBadge } from "./subscription/TrialBadge"
-import { differenceInDays } from "date-fns"
+import { TrialCard } from "./subscription/TrialCard"
+import { ActiveSubscriptionCard } from "./subscription/ActiveSubscriptionCard"
 
 const plans = [
   {
@@ -74,7 +73,6 @@ export function SubscriptionCard() {
   const handleUpgrade = async (plan: typeof plans[0]) => {
     try {
       console.log('Iniciando processo de checkout para o plano:', plan.name)
-      const { data: { session } } = await supabase.auth.getSession()
       
       const { data, error } = await supabase.functions.invoke('stripe-checkout', {
         body: { 
@@ -102,14 +100,6 @@ export function SubscriptionCard() {
     }
   }
 
-  const getDaysRemaining = () => {
-    if (!subscription?.trial_ends_at) return 0
-    const daysRemaining = differenceInDays(new Date(subscription.trial_ends_at), new Date())
-    return Math.max(0, daysRemaining)
-  }
-
-  const isInTrial = subscription?.status === 'trial' && getDaysRemaining() > 0
-
   if (isLoading) {
     return (
       <Card>
@@ -120,41 +110,13 @@ export function SubscriptionCard() {
     )
   }
 
-  // Se está em trial, mostra o badge com dias restantes
-  if (isInTrial) {
+  // Se está em trial, mostra o cartão de trial
+  if (subscription?.status === 'trial' && subscription.trial_ends_at) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Crown className="h-5 w-5 text-purple-500" />
-            Trial Professional Ativo
-          </CardTitle>
-          <CardDescription>
-            Aproveite todos os recursos do plano Professional
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            <TrialBadge daysRemaining={getDaysRemaining()} />
-            
-            <div className="p-4 border rounded-lg bg-purple-50 border-purple-200">
-              <h3 className="text-lg font-semibold text-purple-600 mb-2">
-                Plano Professional
-              </h3>
-              <p className="text-sm text-muted-foreground">
-                Acesso completo a todas as funcionalidades
-              </p>
-            </div>
-
-            <Button 
-              onClick={() => handleUpgrade(plans[1])} 
-              className="w-full"
-            >
-              Assinar Agora
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+      <TrialCard
+        trialEndsAt={subscription.trial_ends_at}
+        onUpgrade={() => handleUpgrade(plans[1])}
+      />
     )
   }
 
@@ -162,16 +124,7 @@ export function SubscriptionCard() {
   if (!subscription || subscription.status !== 'active') {
     return (
       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Crown className="h-5 w-5 text-primary" />
-            Escolha seu plano
-          </CardTitle>
-          <CardDescription>
-            Selecione o plano ideal para o seu negócio
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
+        <CardContent className="py-6">
           <div className="grid gap-6">
             {plans.map((plan) => (
               <PlanCard
@@ -187,59 +140,12 @@ export function SubscriptionCard() {
   }
 
   // Se há uma assinatura ativa, mostra os detalhes da assinatura
-  const planDetails = subscription.plan_id?.includes('professional')
-    ? {
-        name: 'Profissional',
-        instances: 3,
-        color: 'text-purple-500',
-        bgColor: 'bg-purple-50',
-        borderColor: 'border-purple-200'
-      }
-    : {
-        name: 'Inicial',
-        instances: 1,
-        color: 'text-blue-500',
-        bgColor: 'bg-blue-50',
-        borderColor: 'border-blue-200'
-      }
-
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Crown className={`h-5 w-5 ${planDetails.color}`} />
-          Plano Atual
-        </CardTitle>
-        <CardDescription>
-          Gerencie sua assinatura
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-4">
-          <div className={`p-4 border rounded-lg ${planDetails.bgColor} ${planDetails.borderColor}`}>
-            <div className="flex items-center justify-between mb-2">
-              <h3 className={`text-lg font-semibold ${planDetails.color}`}>
-                Plano {planDetails.name}
-              </h3>
-              <CheckCircle2 className="h-5 w-5 text-green-500" />
-            </div>
-            <p className="text-sm text-muted-foreground">
-              {planDetails.instances} instância{planDetails.instances !== 1 ? 's' : ''} disponíve{planDetails.instances !== 1 ? 'is' : 'l'}
-            </p>
-            <p className="text-sm text-muted-foreground mt-1">
-              Válido até: {new Date(subscription.current_period_end!).toLocaleDateString()}
-            </p>
-          </div>
-
-          <Button 
-            onClick={() => handleUpgrade(plans[1])} 
-            className="w-full"
-            variant="outline"
-          >
-            Fazer Upgrade
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
+    <ActiveSubscriptionCard
+      planName={subscription.plan_id?.includes('professional') ? 'Profissional' : 'Inicial'}
+      instances={subscription.plan_id?.includes('professional') ? 3 : 1}
+      currentPeriodEnd={subscription.current_period_end!}
+      onUpgrade={() => handleUpgrade(plans[1])}
+    />
   )
 }
