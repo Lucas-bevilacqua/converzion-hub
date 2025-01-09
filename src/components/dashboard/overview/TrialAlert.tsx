@@ -4,9 +4,10 @@ import { differenceInDays } from "date-fns"
 
 interface TrialAlertProps {
   trialEndsAt: string;
+  trialPlanName?: string;
 }
 
-export const TrialAlert = ({ trialEndsAt }: TrialAlertProps) => {
+export const TrialAlert = ({ trialEndsAt, trialPlanName = 'Starter' }: TrialAlertProps) => {
   const daysRemaining = differenceInDays(new Date(trialEndsAt), new Date())
   
   return (
@@ -14,7 +15,7 @@ export const TrialAlert = ({ trialEndsAt }: TrialAlertProps) => {
       <Crown className="h-5 w-5 text-purple-500" />
       <AlertTitle className="text-purple-700">Período Trial Ativo</AlertTitle>
       <AlertDescription className="text-purple-600">
-        Você está no período trial do plano Professional. 
+        Você está no período trial do plano {trialPlanName}. 
         Expira em {new Date(trialEndsAt).toLocaleDateString()} 
         ({daysRemaining} {daysRemaining === 1 ? 'dia' : 'dias'} restantes).
       </AlertDescription>
