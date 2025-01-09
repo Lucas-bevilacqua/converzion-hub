@@ -133,28 +133,35 @@ export function SubscriptionCard() {
     )
   }
 
-  // Se está em trial e ainda não terminou, mostra o indicador de trial na visão geral
+  // Se está em trial e ainda não terminou, mostra apenas o indicador de trial na visão geral
   if (subscription?.status === 'trial' && subscription.trial_ends_at) {
     const trialEnded = isAfter(new Date(), new Date(subscription.trial_ends_at))
     
     if (!trialEnded) {
+      // Na visão geral, mostra apenas o alerta de trial
+      if (window.location.pathname === '/dashboard') {
+        return <TrialAlert trialEndsAt={subscription.trial_ends_at} />
+      }
+      
+      // Na página de assinatura, mostra os planos
       return (
-        <div className="space-y-6">
-          {window.location.pathname === '/dashboard' && (
-            <TrialAlert trialEndsAt={subscription.trial_ends_at} />
-          )}
-          <PlansDisplay
-            plans={plans}
-            onUpgrade={handleUpgrade}
-            trialPlanName="Professional Plan"
-          />
-        </div>
+        <PlansDisplay
+          plans={plans}
+          onUpgrade={handleUpgrade}
+          trialPlanName="Professional Plan"
+        />
       )
     }
   }
 
-  // Se não há assinatura ativa ou trial expirado, mostra os planos disponíveis
+  // Se não há assinatura ativa ou trial expirado
   if (!subscription || subscription.status !== 'active') {
+    // Na visão geral, não mostra nada
+    if (window.location.pathname === '/dashboard') {
+      return null
+    }
+    
+    // Na página de assinatura, mostra os planos disponíveis
     return (
       <PlansDisplay
         plans={plans}
@@ -163,7 +170,20 @@ export function SubscriptionCard() {
     )
   }
 
-  // Se há uma assinatura ativa, mostra os detalhes da assinatura e os planos disponíveis
+  // Se há uma assinatura ativa
+  if (window.location.pathname === '/dashboard') {
+    // Na visão geral, mostra apenas o card com os detalhes da assinatura
+    return (
+      <ActiveSubscriptionCard
+        planName={subscription.plan_id?.includes('professional') ? 'Profissional' : 'Inicial'}
+        instances={subscription.plan_id?.includes('professional') ? 3 : 1}
+        currentPeriodEnd={subscription.current_period_end!}
+        onUpgrade={() => handleUpgrade(plans[1])}
+      />
+    )
+  }
+
+  // Na página de assinatura, mostra os detalhes da assinatura e os planos disponíveis
   return (
     <div className="space-y-6">
       <ActiveSubscriptionCard
