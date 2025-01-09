@@ -4,7 +4,6 @@ import { useQuery } from "@tanstack/react-query"
 import { supabase } from "@/integrations/supabase/client"
 import { SubscriptionCard } from "@/components/dashboard/SubscriptionCard"
 import { InstancesCard } from "@/components/dashboard/InstancesCard"
-import { AISettingsCard } from "@/components/dashboard/AISettingsCard"
 import { Loader2 } from "lucide-react"
 import { SidebarProvider } from "@/components/ui/sidebar"
 import { DashboardSidebar } from "@/components/dashboard/DashboardSidebar"
@@ -68,13 +67,10 @@ export default function Dashboard() {
           <div className="space-y-6">
             <SubscriptionCard />
             <InstancesCard />
-            <AISettingsCard />
           </div>
         )
       case "instances":
         return <InstancesCard />
-      case "ai-settings":
-        return <AISettingsCard />
       case "subscription":
         return <SubscriptionCard />
       default:
