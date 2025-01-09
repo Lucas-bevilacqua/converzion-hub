@@ -1,4 +1,4 @@
-import { Home, MessageSquare, Bot, Crown, LogOut } from "lucide-react"
+import { Home, MessageSquare, Crown, LogOut } from "lucide-react"
 import { useNavigate } from "react-router-dom"
 import { useAuth } from "@/contexts/auth/AuthContext"
 import { useToast } from "@/components/ui/use-toast"
@@ -55,11 +55,6 @@ export function DashboardSidebar({ onSectionChange, activeSection }: DashboardSi
       title: "Instâncias WhatsApp",
       icon: MessageSquare,
       id: "instances"
-    },
-    {
-      title: "Configurações IA",
-      icon: Bot,
-      id: "ai-settings"
     },
     {
       title: "Assinatura",
