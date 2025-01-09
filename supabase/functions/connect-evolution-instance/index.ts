@@ -30,18 +30,18 @@ serve(async (req) => {
       throw userError || new Error('User not found')
     }
 
-    // Check subscription status
+    // Check subscription status - now including trial status
     const { data: subscription, error: subError } = await supabaseClient
       .from('subscriptions')
       .select('*')
       .eq('user_id', user.id)
-      .eq('status', 'active')
+      .or('status.eq.active,status.eq.trial')
       .maybeSingle()
 
     if (subError) throw subError
     if (!subscription) {
       return new Response(
-        JSON.stringify({ error: 'Active subscription required' }),
+        JSON.stringify({ error: 'Active or trial subscription required' }),
         { 
           status: 400, 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
