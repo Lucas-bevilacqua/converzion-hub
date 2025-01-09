@@ -7,6 +7,7 @@ import { useToast } from "@/components/ui/use-toast"
 import { PlanCard } from "./subscription/PlanCard"
 import { TrialCard } from "./subscription/TrialCard"
 import { ActiveSubscriptionCard } from "./subscription/ActiveSubscriptionCard"
+import { isAfter } from "date-fns"
 
 const plans = [
   {
@@ -60,6 +61,29 @@ export function SubscriptionCard() {
           throw error
         }
 
+        // Se tiver trial e já passou da data de término, atualiza o status
+        if (data?.status === 'trial' && data.trial_ends_at) {
+          const trialEnded = isAfter(new Date(), new Date(data.trial_ends_at))
+          
+          if (trialEnded) {
+            console.log('Trial period ended, updating status')
+            const { error: updateError } = await supabase
+              .from('subscriptions')
+              .update({ status: null })
+              .eq('id', data.id)
+            
+            if (updateError) {
+              console.error('Error updating subscription status:', updateError)
+            } else {
+              // Retorna os dados atualizados
+              return {
+                ...data,
+                status: null
+              }
+            }
+          }
+        }
+
         console.log('Subscription data:', data)
         return data
       } catch (error) {
@@ -110,14 +134,18 @@ export function SubscriptionCard() {
     )
   }
 
-  // Se está em trial, mostra o cartão de trial
+  // Se está em trial e ainda não terminou, mostra o cartão de trial
   if (subscription?.status === 'trial' && subscription.trial_ends_at) {
-    return (
-      <TrialCard
-        trialEndsAt={subscription.trial_ends_at}
-        onUpgrade={() => handleUpgrade(plans[1])}
-      />
-    )
+    const trialEnded = isAfter(new Date(), new Date(subscription.trial_ends_at))
+    
+    if (!trialEnded) {
+      return (
+        <TrialCard
+          trialEndsAt={subscription.trial_ends_at}
+          onUpgrade={() => handleUpgrade(plans[1])}
+        />
+      )
+    }
   }
 
   // Se não há assinatura ativa ou trial expirado, mostra os planos disponíveis
