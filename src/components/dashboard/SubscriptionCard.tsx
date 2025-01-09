@@ -65,11 +65,14 @@ export function SubscriptionCard() {
     if (!trialEnded) {
       return (
         <div className="space-y-6">
-          <TrialAlert trialEndsAt={subscription.trial_ends_at} />
+          <TrialAlert 
+            trialEndsAt={subscription.trial_ends_at} 
+            trialPlanName={subscription.plan_id === 'professional' ? 'Professional' : 'Starter'}
+          />
           <PlansDisplay 
             plans={plans}
             onUpgrade={handlePlanUpgrade}
-            trialPlanName="Starter"
+            trialPlanName={subscription.plan_id === 'professional' ? 'Professional' : 'Starter'}
           />
         </div>
       )
@@ -90,8 +93,8 @@ export function SubscriptionCard() {
   return (
     <div className="space-y-6">
       <ActiveSubscriptionCard
-        planName={subscription.plan_id?.includes('professional') ? 'Professional' : 'Starter'}
-        instances={subscription.plan_id?.includes('professional') ? 3 : 1}
+        planName={subscription.plan_id === 'professional' ? 'Professional' : 'Starter'}
+        instances={subscription.plan_id === 'professional' ? 3 : 1}
         currentPeriodEnd={subscription.current_period_end!}
         onUpgrade={() => handleUpgrade('price_1QbuUvKkjJ7tububiklS9tAc')}
       />
