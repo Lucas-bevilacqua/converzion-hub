@@ -1,10 +1,13 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Crown, Loader2, AlertTriangle, CheckCircle2, Check } from "lucide-react"
+import { Crown, Loader2, AlertTriangle, CheckCircle2 } from "lucide-react"
 import { useQuery } from "@tanstack/react-query"
 import { supabase } from "@/integrations/supabase/client"
 import { useAuth } from "@/contexts/auth/AuthContext"
 import { useToast } from "@/components/ui/use-toast"
+import { PlanCard } from "./subscription/PlanCard"
+import { TrialBadge } from "./subscription/TrialBadge"
+import { differenceInDays } from "date-fns"
 
 const plans = [
   {
@@ -36,7 +39,7 @@ const plans = [
     highlighted: true,
     priceId: "price_1QbuUiKkjJ7tububpw8Vpsrp"
   }
-];
+]
 
 export function SubscriptionCard() {
   const { user } = useAuth()
@@ -99,35 +102,13 @@ export function SubscriptionCard() {
     }
   }
 
-  const getPlanDetails = () => {
-    if (!subscription || subscription.status !== 'active') {
-      return {
-        name: 'Gratuito',
-        instances: 0,
-        color: 'text-gray-500',
-        bgColor: 'bg-gray-50',
-        borderColor: 'border-gray-200'
-      }
-    }
-
-    return subscription.plan_id?.includes('professional')
-      ? {
-          name: 'Profissional',
-          instances: 3,
-          color: 'text-purple-500',
-          bgColor: 'bg-purple-50',
-          borderColor: 'border-purple-200'
-        }
-      : {
-          name: 'Inicial',
-          instances: 1,
-          color: 'text-blue-500',
-          bgColor: 'bg-blue-50',
-          borderColor: 'border-blue-200'
-        }
+  const getDaysRemaining = () => {
+    if (!subscription?.trial_ends_at) return 0
+    const daysRemaining = differenceInDays(new Date(subscription.trial_ends_at), new Date())
+    return Math.max(0, daysRemaining)
   }
 
-  const planDetails = getPlanDetails()
+  const isInTrial = subscription?.status === 'trial' && getDaysRemaining() > 0
 
   if (isLoading) {
     return (
@@ -139,7 +120,45 @@ export function SubscriptionCard() {
     )
   }
 
-  // Se não há assinatura ativa, mostra os planos disponíveis
+  // Se está em trial, mostra o badge com dias restantes
+  if (isInTrial) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Crown className="h-5 w-5 text-purple-500" />
+            Trial Professional Ativo
+          </CardTitle>
+          <CardDescription>
+            Aproveite todos os recursos do plano Professional
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <TrialBadge daysRemaining={getDaysRemaining()} />
+            
+            <div className="p-4 border rounded-lg bg-purple-50 border-purple-200">
+              <h3 className="text-lg font-semibold text-purple-600 mb-2">
+                Plano Professional
+              </h3>
+              <p className="text-sm text-muted-foreground">
+                Acesso completo a todas as funcionalidades
+              </p>
+            </div>
+
+            <Button 
+              onClick={() => handleUpgrade(plans[1])} 
+              className="w-full"
+            >
+              Assinar Agora
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  // Se não há assinatura ativa ou trial expirado, mostra os planos disponíveis
   if (!subscription || subscription.status !== 'active') {
     return (
       <Card>
@@ -155,53 +174,11 @@ export function SubscriptionCard() {
         <CardContent>
           <div className="grid gap-6">
             {plans.map((plan) => (
-              <div
+              <PlanCard
                 key={plan.name}
-                className={`relative rounded-lg border p-6 ${
-                  plan.highlighted
-                    ? 'border-primary bg-primary/5'
-                    : 'border-border bg-card'
-                }`}
-              >
-                {plan.highlighted && (
-                  <div className="absolute -top-3 left-4 bg-primary px-3 py-1 rounded-full">
-                    <span className="text-xs font-medium text-primary-foreground">
-                      Mais Popular
-                    </span>
-                  </div>
-                )}
-
-                <div className="mb-4">
-                  <h3 className="text-xl font-semibold">{plan.name}</h3>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    {plan.description}
-                  </p>
-                  <div className="mt-2 flex items-baseline">
-                    <span className="text-2xl font-bold">R$</span>
-                    <span className="text-4xl font-bold">{plan.price}</span>
-                    <span className="text-muted-foreground">/mês</span>
-                  </div>
-                </div>
-
-                <div className="space-y-3 mb-6">
-                  {plan.features.map((feature) => (
-                    <div key={feature} className="flex items-center gap-2">
-                      <div className="rounded-full p-1 bg-primary/10">
-                        <Check className="h-4 w-4 text-primary" />
-                      </div>
-                      <span className="text-sm">{feature}</span>
-                    </div>
-                  ))}
-                </div>
-
-                <Button
-                  onClick={() => handleUpgrade(plan)}
-                  className="w-full"
-                  variant={plan.highlighted ? 'default' : 'outline'}
-                >
-                  Começar Agora
-                </Button>
-              </div>
+                {...plan}
+                onSelect={() => handleUpgrade(plan)}
+              />
             ))}
           </div>
         </CardContent>
@@ -209,7 +186,23 @@ export function SubscriptionCard() {
     )
   }
 
-  // Se há uma assinatura ativa, mostra os detalhes da assinatura atual
+  // Se há uma assinatura ativa, mostra os detalhes da assinatura
+  const planDetails = subscription.plan_id?.includes('professional')
+    ? {
+        name: 'Profissional',
+        instances: 3,
+        color: 'text-purple-500',
+        bgColor: 'bg-purple-50',
+        borderColor: 'border-purple-200'
+      }
+    : {
+        name: 'Inicial',
+        instances: 1,
+        color: 'text-blue-500',
+        bgColor: 'bg-blue-50',
+        borderColor: 'border-blue-200'
+      }
+
   return (
     <Card>
       <CardHeader>
@@ -228,35 +221,22 @@ export function SubscriptionCard() {
               <h3 className={`text-lg font-semibold ${planDetails.color}`}>
                 Plano {planDetails.name}
               </h3>
-              {subscription?.status === 'active' && (
-                <CheckCircle2 className="h-5 w-5 text-green-500" />
-              )}
+              <CheckCircle2 className="h-5 w-5 text-green-500" />
             </div>
             <p className="text-sm text-muted-foreground">
               {planDetails.instances} instância{planDetails.instances !== 1 ? 's' : ''} disponíve{planDetails.instances !== 1 ? 'is' : 'l'}
             </p>
-            {subscription?.status === 'active' && (
-              <p className="text-sm text-muted-foreground mt-1">
-                Válido até: {new Date(subscription.current_period_end!).toLocaleDateString()}
-              </p>
-            )}
+            <p className="text-sm text-muted-foreground mt-1">
+              Válido até: {new Date(subscription.current_period_end!).toLocaleDateString()}
+            </p>
           </div>
-
-          {subscription?.status !== 'active' && (
-            <div className="flex items-center gap-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-              <AlertTriangle className="h-5 w-5 text-yellow-500" />
-              <p className="text-sm text-yellow-700">
-                Você precisa de uma assinatura ativa para usar as instâncias
-              </p>
-            </div>
-          )}
 
           <Button 
             onClick={() => handleUpgrade(plans[1])} 
             className="w-full"
-            variant={subscription?.status === 'active' ? 'outline' : 'default'}
+            variant="outline"
           >
-            {subscription?.status === 'active' ? 'Fazer Upgrade' : 'Assinar Agora'}
+            Fazer Upgrade
           </Button>
         </div>
       </CardContent>
