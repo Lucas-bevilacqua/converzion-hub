@@ -54,7 +54,7 @@ export const Header = () => {
           <Menu className="h-6 w-6" />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
+      <DropdownMenuContent align="end" className="bg-background border-border">
         {menuItems.map((item) => (
           <DropdownMenuItem
             key={item.path}
