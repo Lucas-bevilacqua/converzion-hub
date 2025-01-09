@@ -13,7 +13,12 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
 
-export function DashboardSidebar() {
+interface DashboardSidebarProps {
+  onSectionChange: (section: string) => void
+  activeSection: string
+}
+
+export function DashboardSidebar({ onSectionChange, activeSection }: DashboardSidebarProps) {
   const navigate = useNavigate()
   const { signOut } = useAuth()
   const { toast } = useToast()
@@ -68,7 +73,10 @@ export function DashboardSidebar() {
             <SidebarMenu>
               {menuItems.map((item) => (
                 <SidebarMenuItem key={item.id}>
-                  <SidebarMenuButton>
+                  <SidebarMenuButton 
+                    onClick={() => onSectionChange(item.id)}
+                    data-active={activeSection === item.id}
+                  >
                     <item.icon className="h-4 w-4" />
                     <span>{item.title}</span>
                   </SidebarMenuButton>
