@@ -38,7 +38,7 @@ serve(async (req) => {
       .from('subscriptions')
       .select('*')
       .eq('user_id', user.id)
-      .eq('status', 'active')
+      .or('status.eq.active,status.eq.trial')
       .maybeSingle()
 
     if (subError) {
@@ -47,9 +47,9 @@ serve(async (req) => {
     }
 
     if (!subscription) {
-      console.error('No active subscription found for user:', user.id)
+      console.error('No active or trial subscription found for user:', user.id)
       return new Response(
-        JSON.stringify({ error: 'Active subscription required' }),
+        JSON.stringify({ error: 'Active or trial subscription required' }),
         { 
           status: 400, 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -90,7 +90,6 @@ serve(async (req) => {
       throw new Error('Evolution API URL not configured')
     }
 
-    // Remove trailing slash if present and construct URL properly
     const baseUrl = evolutionApiUrl.endsWith('/') 
       ? evolutionApiUrl.slice(0, -1) 
       : evolutionApiUrl
