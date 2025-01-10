@@ -11,7 +11,8 @@ export const useInstanceMutations = () => {
       console.log('Creating new instance:', newInstance);
       const { data: response, error } = await supabase.functions.invoke('create-evolution-instance', {
         body: { 
-          instanceName: newInstance.name
+          name: newInstance.name,
+          phone_number: newInstance.phone_number
         }
       });
       
