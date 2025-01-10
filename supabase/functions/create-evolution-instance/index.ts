@@ -39,7 +39,8 @@ serve(async (req) => {
         instanceName: name,
         qrcode: true,
         number: phone_number,
-        token: EVOLUTION_API_KEY
+        token: EVOLUTION_API_KEY,
+        integration: "whatsapp-md" // Updated to use the correct integration type
       })
     })
 
