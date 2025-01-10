@@ -89,8 +89,13 @@ serve(async (req) => {
       throw new Error('Dify configuration missing')
     }
 
-    console.log('Creating Dify agent with URL:', `${difyApiUrl}/api/v1/apps`)
-    const difyResponse = await fetch(`${difyApiUrl}/api/v1/apps`, {
+    // Clean and construct the Dify API URL
+    const cleanDifyUrl = difyApiUrl.replace(/\/+$/, '') // Remove trailing slashes
+    const difyEndpoint = '/api/v1/apps'
+    const fullDifyUrl = `${cleanDifyUrl}${difyEndpoint}`
+    
+    console.log('Creating Dify agent with URL:', fullDifyUrl)
+    const difyResponse = await fetch(fullDifyUrl, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${difyApiKey}`,
@@ -112,7 +117,8 @@ serve(async (req) => {
       console.error('Dify API error response:', {
         status: difyResponse.status,
         statusText: difyResponse.statusText,
-        body: errorText
+        body: errorText,
+        url: fullDifyUrl
       })
       throw new Error(`Failed to create Dify agent: ${errorText}`)
     }
@@ -167,7 +173,7 @@ serve(async (req) => {
       body: JSON.stringify({
         enabled: true,
         apiKey: difyData.api_key,
-        apiUrl: difyApiUrl,
+        apiUrl: cleanDifyUrl,
         appId: difyData.id
       })
     })
