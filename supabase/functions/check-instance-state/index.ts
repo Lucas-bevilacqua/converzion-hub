@@ -82,11 +82,12 @@ serve(async (req) => {
     console.log('State response:', stateData)
 
     // Map Evolution API state to our connection status
+    // The API returns { state: "CONNECTED" | "CONNECTING" | "CLOSE" }
     let connectionStatus = 'disconnected'
     
-    if (stateData.state === 'open') {
+    if (stateData.state === 'CONNECTED') {
       connectionStatus = 'connected'
-    } else if (stateData.state === 'connecting') {
+    } else if (stateData.state === 'CONNECTING') {
       connectionStatus = 'pending'
     }
 
