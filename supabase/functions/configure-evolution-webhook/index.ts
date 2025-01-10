@@ -28,23 +28,20 @@ serve(async (req) => {
     // URL do webhook que receberá os eventos
     const webhookUrl = `${SUPABASE_URL}/functions/v1/evolution-webhook`
     
-    // Configura o webhook na Evolution API
-    const response = await fetch(`${cleanBaseUrl}/webhook/set`, {
+    // Configura o webhook na Evolution API usando a URL correta com o nome da instância
+    const response = await fetch(`${cleanBaseUrl}/instance/${instanceName}/webhook/set`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'apikey': EVOLUTION_API_KEY
       },
       body: JSON.stringify({
-        instanceName: instanceName,
-        webhook: {
-          url: webhookUrl,
-          enabled: true,
-          events: [
-            "messages.upsert",  // Evento de novas mensagens
-            "connection.update" // Evento de atualização de conexão
-          ]
-        }
+        url: webhookUrl,
+        enabled: true,
+        events: [
+          "messages.upsert",  // Evento de novas mensagens
+          "connection.update" // Evento de atualização de conexão
+        ]
       })
     })
 
