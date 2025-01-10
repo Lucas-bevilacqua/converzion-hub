@@ -41,6 +41,8 @@ export function InstancesCard() {
       })
       return
     }
+    
+    console.log('Criando nova instância:', newInstance)
     createMutation.mutate(newInstance)
     setShowNewInstanceForm(false)
     setNewInstance({ name: "", phone_number: "" })
@@ -55,18 +57,17 @@ export function InstancesCard() {
       })
       return
     }
+    console.log('Conectando instância:', instanceId)
     connectMutation.mutate(instanceId)
   }
 
   const getInstanceLimit = () => {
     if (!subscription) return 0
     
-    // Se está em trial, usa o limite do plano que está testando
     if (subscription.status === 'trial') {
       return subscription.plan_id === 'professional' ? 3 : 1
     }
     
-    // Se tem plano ativo, verifica qual é o plano
     if (subscription.status === 'active') {
       return subscription.plan_id === 'professional' ? 3 : 1
     }
