@@ -28,7 +28,7 @@ serve(async (req) => {
     const cleanBaseUrl = EVOLUTION_API_URL?.replace(/\/+$/, '')
     console.log('Clean base URL:', cleanBaseUrl)
 
-    // Criar instância na Evolution API
+    // Create instance in Evolution API
     const createInstanceResponse = await fetch(`${cleanBaseUrl}/instance/create`, {
       method: 'POST',
       headers: {
@@ -40,7 +40,7 @@ serve(async (req) => {
         qrcode: true,
         number: phone_number,
         token: EVOLUTION_API_KEY,
-        integration: "whatsapp" // Updated to use the correct integration type
+        integration: "WHATSAPP-BAILEYS"
       })
     })
 
@@ -53,62 +53,7 @@ serve(async (req) => {
     const instanceData = await createInstanceResponse.json()
     console.log('Instance created successfully:', instanceData)
 
-    // Configurar webhook para a instância usando a estrutura correta
-    console.log('Configuring webhook for instance:', name)
-    const webhookUrl = `${SUPABASE_URL}/functions/v1/chat-with-openai`
-    const configureWebhookResponse = await fetch(`${cleanBaseUrl}/webhook/set/${name}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'apikey': EVOLUTION_API_KEY
-      },
-      body: JSON.stringify({
-        webhook: {
-          enabled: true,
-          url: webhookUrl,
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          byEvents: false,
-          base64: false,
-          events: [
-            "APPLICATION_STARTUP",
-            "QRCODE_UPDATED",
-            "MESSAGES_SET",
-            "MESSAGES_UPSERT",
-            "MESSAGES_UPDATE",
-            "MESSAGES_DELETE",
-            "SEND_MESSAGE",
-            "CONTACTS_SET",
-            "CONTACTS_UPSERT",
-            "CONTACTS_UPDATE",
-            "PRESENCE_UPDATE",
-            "CHATS_SET",
-            "CHATS_UPSERT",
-            "CHATS_UPDATE",
-            "CHATS_DELETE",
-            "GROUPS_UPSERT",
-            "GROUP_UPDATE",
-            "GROUP_PARTICIPANTS_UPDATE",
-            "CONNECTION_UPDATE",
-            "LABELS_EDIT",
-            "LABELS_ASSOCIATION",
-            "CALL"
-          ]
-        }
-      })
-    })
-
-    if (!configureWebhookResponse.ok) {
-      const error = await configureWebhookResponse.text()
-      console.error('Error configuring webhook:', error)
-      throw new Error(`Error configuring webhook: ${error}`)
-    }
-
-    const webhookData = await configureWebhookResponse.json()
-    console.log('Webhook configured successfully:', webhookData)
-
-    // Criar instância no Supabase
+    // Create instance in Supabase
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
     
     const { data: instance, error: dbError } = await supabase
