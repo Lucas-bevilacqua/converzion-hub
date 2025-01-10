@@ -82,11 +82,18 @@ serve(async (req) => {
     console.log('Creating instance with name:', instanceName)
 
     // Create Dify agent first
-    console.log('Creating Dify agent...')
-    const difyResponse = await fetch(`${Deno.env.get('DIFY_API_URL')}/api/v1/apps`, {
+    const difyApiUrl = Deno.env.get('DIFY_API_URL')
+    const difyApiKey = Deno.env.get('DIFY_API_KEY')
+    
+    if (!difyApiUrl || !difyApiKey) {
+      throw new Error('Dify configuration missing')
+    }
+
+    console.log('Creating Dify agent with URL:', `${difyApiUrl}/api/v1/apps`)
+    const difyResponse = await fetch(`${difyApiUrl}/api/v1/apps`, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${Deno.env.get('DIFY_API_KEY')}`,
+        'Authorization': `Bearer ${difyApiKey}`,
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
@@ -102,7 +109,11 @@ serve(async (req) => {
 
     if (!difyResponse.ok) {
       const errorText = await difyResponse.text()
-      console.error('Dify API error:', errorText)
+      console.error('Dify API error response:', {
+        status: difyResponse.status,
+        statusText: difyResponse.statusText,
+        body: errorText
+      })
       throw new Error(`Failed to create Dify agent: ${errorText}`)
     }
 
@@ -156,7 +167,7 @@ serve(async (req) => {
       body: JSON.stringify({
         enabled: true,
         apiKey: difyData.api_key,
-        apiUrl: Deno.env.get('DIFY_API_URL'),
+        apiUrl: difyApiUrl,
         appId: difyData.id
       })
     })
@@ -164,7 +175,6 @@ serve(async (req) => {
     if (!difyConfigResponse.ok) {
       const errorText = await difyConfigResponse.text()
       console.error('Evolution Dify config error:', errorText)
-      // Don't throw here, we'll just log the error since the instance was created
       console.warn('Failed to configure Dify in Evolution:', errorText)
     } else {
       console.log('Dify configured in Evolution instance successfully')
