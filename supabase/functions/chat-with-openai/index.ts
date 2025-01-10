@@ -12,11 +12,11 @@ serve(async (req) => {
   }
 
   try {
-    const { message, instanceId } = await req.json()
-    console.log('Received message request:', { message, instanceId })
+    const { message, instanceId, phoneNumber } = await req.json()
+    console.log('Received webhook request:', { message, instanceId, phoneNumber })
 
-    if (!message || !instanceId) {
-      throw new Error('Message and instanceId are required')
+    if (!message || !instanceId || !phoneNumber) {
+      throw new Error('Message, instanceId and phoneNumber are required')
     }
 
     const supabaseClient = createClient(
@@ -113,8 +113,28 @@ serve(async (req) => {
     }
 
     const data = await openaiResponse.json()
-    const response = data.choices[0].message.content
-    console.log('Generated response:', response)
+    const aiResponse = data.choices[0].message.content
+    console.log('Generated response:', aiResponse)
+
+    // Send response back through Evolution API
+    console.log('Sending response through Evolution API')
+    const evolutionResponse = await fetch(`${Deno.env.get('EVOLUTION_API_URL')}/message/sendText/${instance.name}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': Deno.env.get('EVOLUTION_API_KEY') || '',
+      },
+      body: JSON.stringify({
+        number: phoneNumber,
+        text: aiResponse
+      }),
+    })
+
+    if (!evolutionResponse.ok) {
+      const error = await evolutionResponse.text()
+      console.error('Evolution API error:', error)
+      throw new Error(`Evolution API error: ${error}`)
+    }
 
     // Save the AI response to chat history
     console.log('Saving AI response to chat history')
@@ -124,7 +144,7 @@ serve(async (req) => {
         instance_id: instanceId,
         user_id: instance.user_id,
         sender_type: 'assistant',
-        content: response
+        content: aiResponse
       })
 
     if (saveResponseError) {
@@ -133,7 +153,7 @@ serve(async (req) => {
     }
 
     return new Response(
-      JSON.stringify({ response }),
+      JSON.stringify({ response: aiResponse }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   } catch (error) {
