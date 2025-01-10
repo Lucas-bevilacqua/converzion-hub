@@ -20,8 +20,12 @@ serve(async (req) => {
     const { name, phone_number, userId } = await req.json()
     console.log('Creating instance:', { name, phone_number, userId })
 
+    // Clean the base URL by removing trailing slashes
+    const cleanBaseUrl = EVOLUTION_API_URL?.replace(/\/+$/, '')
+    console.log('Clean base URL:', cleanBaseUrl)
+
     // Criar instância na Evolution API
-    const createInstanceResponse = await fetch(`${EVOLUTION_API_URL}/instance/create`, {
+    const createInstanceResponse = await fetch(`${cleanBaseUrl}/instance/create`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -47,7 +51,7 @@ serve(async (req) => {
     // Configurar webhook para a instância usando a estrutura correta
     console.log('Configuring webhook for instance:', name)
     const webhookUrl = `${SUPABASE_URL}/functions/v1/chat-with-openai`
-    const configureWebhookResponse = await fetch(`${EVOLUTION_API_URL}/webhook/set/${name}`, {
+    const configureWebhookResponse = await fetch(`${cleanBaseUrl}/webhook/set/${name}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
