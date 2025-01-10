@@ -1,48 +1,65 @@
-import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { MessageSquare, Plus, QrCode, Settings, Trash2 } from "lucide-react"
-import { useState } from "react"
-import { QRCodeDialog } from "./QRCodeDialog"
-import { useInstanceMutations } from "./InstanceMutations"
+import { Card, CardContent } from "@/components/ui/card"
+import { MessageSquare, QrCode, Settings, LogOut } from "lucide-react"
+import { useQuery } from "@tanstack/react-query"
+import { supabase } from "@/integrations/supabase/client"
 
 interface InstanceSlotCardProps {
   isUsed: boolean
   instance?: any
   onClick?: () => void
+  onDisconnect?: () => void
   onConfigurePrompt?: () => void
 }
 
-export function InstanceSlotCard({ isUsed, instance, onClick, onConfigurePrompt }: InstanceSlotCardProps) {
-  const [showQRCode, setShowQRCode] = useState(false)
-  const { deleteMutation } = useInstanceMutations()
+export function InstanceSlotCard({ 
+  isUsed, 
+  instance, 
+  onClick, 
+  onDisconnect,
+  onConfigurePrompt 
+}: InstanceSlotCardProps) {
+  // Query para verificar o estado da instância
+  const { data: stateData } = useQuery({
+    queryKey: ['instanceState', instance?.id],
+    queryFn: async () => {
+      if (!instance?.id) return null
+      
+      console.log('Checking state for instance:', instance.id)
+      try {
+        const { data, error } = await supabase.functions.invoke('check-instance-state', {
+          body: { instanceId: instance.id }
+        })
+        
+        if (error) throw error
+        return data
+      } catch (error) {
+        console.error('Error checking instance state:', error)
+        return null
+      }
+    },
+    enabled: !!instance?.id,
+    refetchInterval: 5000
+  })
+
+  const isConnected = stateData?.state === 'connected'
 
   if (!isUsed) {
     return (
-      <Card className="cursor-pointer hover:bg-accent/50 transition-colors" onClick={onClick}>
-        <CardContent className="p-6 flex flex-col items-center justify-center gap-4 min-h-[200px]">
-          <div className="p-3 bg-primary/10 rounded-lg">
-            <Plus className="h-6 w-6 text-primary" />
+      <Card className="flex items-center justify-center p-6 cursor-pointer hover:bg-accent/50 transition-colors" onClick={onClick}>
+        <CardContent className="flex flex-col items-center gap-2 p-0">
+          <div className="p-2 bg-primary/10 rounded-lg">
+            <MessageSquare className="h-5 w-5 text-primary" />
           </div>
-          <p className="text-sm text-muted-foreground text-center">
-            Clique para adicionar uma nova instância
-          </p>
+          <p className="text-sm font-medium">Adicionar Instância</p>
         </CardContent>
       </Card>
     )
   }
 
-  const isConnected = instance?.connection_status === 'connected'
-
-  const handleDelete = (e: React.MouseEvent) => {
-    e.stopPropagation()
-    if (window.confirm('Tem certeza que deseja deletar esta instância?')) {
-      deleteMutation.mutate(instance.id)
-    }
-  }
-
   return (
-    <Card>
-      <CardContent className="p-6 space-y-4">
+    <Card className="p-6">
+      <CardContent className="space-y-4 p-0">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-primary/10 rounded-lg">
@@ -53,61 +70,38 @@ export function InstanceSlotCard({ isUsed, instance, onClick, onConfigurePrompt 
               <p className="text-sm text-muted-foreground">{instance.phone_number}</p>
             </div>
           </div>
-        </div>
-
-        <div className="flex items-center gap-2 justify-end">
           <Button
-            variant="outline"
+            variant="ghost"
             size="icon"
-            onClick={(e) => {
-              e.stopPropagation()
-              onConfigurePrompt?.()
-            }}
+            onClick={onConfigurePrompt}
             title="Configurar Prompt"
           >
             <Settings className="h-4 w-4" />
           </Button>
+        </div>
 
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={handleDelete}
-            title="Deletar Instância"
-            className="text-destructive hover:text-destructive"
-          >
-            <Trash2 className="h-4 w-4" />
-          </Button>
-          
-          {!isConnected && (
-            <Button 
-              variant="outline" 
-              onClick={() => {
-                onClick?.()
-                if (instance?.qr_code) {
-                  setShowQRCode(true)
-                }
-              }} 
-              className="gap-2"
+        <div className="flex items-center gap-2">
+          {isConnected ? (
+            <Button
+              variant="destructive"
+              className="w-full gap-2"
+              onClick={onDisconnect}
+            >
+              <LogOut className="h-4 w-4" />
+              Desconectar
+            </Button>
+          ) : (
+            <Button
+              variant="outline"
+              className="w-full gap-2"
+              onClick={onClick}
             >
               <QrCode className="h-4 w-4" />
               Conectar
             </Button>
           )}
-          
-          {isConnected && (
-            <Button variant="outline" className="gap-2" disabled>
-              <MessageSquare className="h-4 w-4" />
-              Conectado
-            </Button>
-          )}
         </div>
       </CardContent>
-
-      <QRCodeDialog
-        open={showQRCode}
-        onOpenChange={setShowQRCode}
-        qrCode={instance?.qr_code}
-      />
     </Card>
   )
 }

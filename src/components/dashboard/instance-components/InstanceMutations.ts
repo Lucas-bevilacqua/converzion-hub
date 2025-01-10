@@ -78,28 +78,29 @@ export const useInstanceMutations = () => {
     }
   });
 
-  const deleteMutation = useMutation({
+  const disconnectMutation = useMutation({
     mutationFn: async (instanceId: string) => {
-      console.log('Deleting instance:', instanceId);
-      const { error } = await supabase
-        .from('evolution_instances')
-        .delete()
-        .eq('id', instanceId);
+      console.log('Disconnecting instance:', instanceId);
+      const { data: response, error } = await supabase.functions.invoke('disconnect-evolution-instance', {
+        body: { instanceId }
+      });
       
       if (error) throw error;
+      return response;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['instances'] });
+      queryClient.invalidateQueries({ queryKey: ['instanceStates'] });
       toast({
         title: "Sucesso",
-        description: "Instância deletada com sucesso",
+        description: "Instância desconectada com sucesso",
       });
     },
     onError: (error) => {
-      console.error('Error deleting instance:', error);
+      console.error('Error disconnecting instance:', error);
       toast({
         title: "Erro",
-        description: "Não foi possível deletar a instância. Tente novamente.",
+        description: "Não foi possível desconectar a instância. Tente novamente.",
         variant: "destructive",
       });
     }
@@ -108,6 +109,6 @@ export const useInstanceMutations = () => {
   return {
     createMutation,
     connectMutation,
-    deleteMutation
+    disconnectMutation
   };
 };

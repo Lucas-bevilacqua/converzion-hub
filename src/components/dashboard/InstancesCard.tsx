@@ -1,5 +1,5 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { MessageSquare, Loader2 } from "lucide-react"
+import { MessageSquare, Loader2, LogOut } from "lucide-react"
 import { useAuth } from "@/contexts/auth/AuthContext"
 import { useState } from "react"
 import { useToast } from "@/components/ui/use-toast"
@@ -21,7 +21,7 @@ export function InstancesCard() {
   })
 
   const { subscription, instances, isLoading } = useInstanceQueries(user?.id)
-  const { createMutation, connectMutation } = useInstanceMutations()
+  const { createMutation, connectMutation, disconnectMutation } = useInstanceMutations()
 
   const handleAdd = () => {
     if (!subscription || (subscription.status !== 'active' && subscription.status !== 'trial')) {
@@ -59,6 +59,19 @@ export function InstancesCard() {
     }
     console.log('Conectando instância:', instanceId)
     connectMutation.mutate(instanceId)
+  }
+
+  const handleDisconnect = (instanceId: string) => {
+    if (!subscription || (subscription.status !== 'active' && subscription.status !== 'trial')) {
+      toast({
+        title: "Erro",
+        description: "Você precisa ter uma assinatura ativa ou trial para desconectar instâncias.",
+        variant: "destructive",
+      })
+      return
+    }
+    console.log('Desconectando instância:', instanceId)
+    disconnectMutation.mutate(instanceId)
   }
 
   const getInstanceLimit = () => {
@@ -105,6 +118,7 @@ export function InstancesCard() {
                     isUsed={true}
                     instance={instance}
                     onClick={() => handleConnect(instance.id)}
+                    onDisconnect={() => handleDisconnect(instance.id)}
                     onConfigurePrompt={() => {
                       setSelectedInstance(instance)
                       setShowPromptDialog(true)
