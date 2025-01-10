@@ -6,134 +6,103 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+const EVOLUTION_API_URL = Deno.env.get('EVOLUTION_API_URL')
+const EVOLUTION_API_KEY = Deno.env.get('EVOLUTION_API_KEY')
+const SUPABASE_URL = Deno.env.get('SUPABASE_URL')
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
   }
 
   try {
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    )
+    const { name, phone_number, userId } = await req.json()
+    console.log('Creating instance:', { name, phone_number, userId })
 
-    const authHeader = req.headers.get('Authorization')
-    if (!authHeader) {
-      throw new Error('No authorization header')
-    }
-
-    const { data: { user }, error: userError } = await supabaseClient.auth.getUser(
-      authHeader.replace('Bearer ', '')
-    )
-
-    if (userError || !user) {
-      console.error('User error:', userError)
-      throw userError || new Error('User not found')
-    }
-
-    console.log('Checking subscription status for user:', user.id)
-
-    const { data: subscription, error: subError } = await supabaseClient
-      .from('subscriptions')
-      .select('*')
-      .eq('user_id', user.id)
-      .or('status.eq.active,status.eq.trial')
-      .maybeSingle()
-
-    if (subError) {
-      console.error('Error fetching subscription:', subError)
-      throw subError
-    }
-
-    if (!subscription) {
-      console.error('No active or trial subscription found for user:', user.id)
-      return new Response(
-        JSON.stringify({ error: 'Active or trial subscription required' }),
-        { 
-          status: 400, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        }
-      )
-    }
-
-    const { count, error: countError } = await supabaseClient
-      .from('evolution_instances')
-      .select('*', { count: 'exact' })
-      .eq('user_id', user.id)
-
-    if (countError) {
-      console.error('Error counting instances:', countError)
-      throw countError
-    }
-
-    const instanceLimit = subscription.plan_id?.includes('professional') ? 3 : 1
-    if (count && count >= instanceLimit) {
-      console.error('Instance limit reached for user:', user.id)
-      return new Response(
-        JSON.stringify({ error: `Instance limit (${instanceLimit}) reached for your plan` }),
-        { 
-          status: 400, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        }
-      )
-    }
-
-    const { instanceName } = await req.json()
-    console.log('Creating instance with name:', instanceName)
-
-    // Create instance in Evolution API
-    const evolutionApiUrl = Deno.env.get('EVOLUTION_API_URL')
-    if (!evolutionApiUrl) {
-      throw new Error('Evolution API URL not configured')
-    }
-
-    const baseUrl = evolutionApiUrl.endsWith('/') 
-      ? evolutionApiUrl.slice(0, -1) 
-      : evolutionApiUrl
-
-    console.log('Creating Evolution instance...')
-    const evolutionResponse = await fetch(`${baseUrl}/instance/create`, {
+    // Criar instância na Evolution API
+    const createInstanceResponse = await fetch(`${EVOLUTION_API_URL}/instance/create`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'apikey': Deno.env.get('EVOLUTION_API_KEY') ?? '',
+        'apikey': EVOLUTION_API_KEY
       },
       body: JSON.stringify({
-        instanceName,
+        instanceName: name,
         qrcode: true,
-        integration: "WHATSAPP-BAILEYS"
+        number: phone_number,
+        token: EVOLUTION_API_KEY
       })
     })
 
-    if (!evolutionResponse.ok) {
-      const errorText = await evolutionResponse.text()
-      console.error('Evolution API error:', errorText)
-      return new Response(
-        JSON.stringify({ error: 'Failed to create Evolution API instance', details: errorText }),
-        { 
-          status: 400, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        }
-      )
+    if (!createInstanceResponse.ok) {
+      const error = await createInstanceResponse.text()
+      console.error('Error creating instance:', error)
+      throw new Error(`Evolution API error: ${error}`)
     }
 
-    // Save instance to database
-    const { data: instance, error: insertError } = await supabaseClient
+    const instanceData = await createInstanceResponse.json()
+    console.log('Instance created successfully:', instanceData)
+
+    // Configurar webhook para a instância
+    console.log('Configuring webhook for instance:', name)
+    const webhookUrl = `${SUPABASE_URL}/functions/v1/chat-with-openai`
+    const configureWebhookResponse = await fetch(`${EVOLUTION_API_URL}/webhook/set/${name}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': EVOLUTION_API_KEY
+      },
+      body: JSON.stringify({
+        url: webhookUrl,
+        webhook_by_events: true,
+        events: [
+          "messages.upsert",
+          "messages.update",
+          "messages.delete",
+          "messages.reaction",
+          "messages.read",
+          "messages.media",
+          "messages.set",
+          "messages.delete",
+          "messages.reaction",
+          "messages.read",
+          "messages.media",
+          "messages.set"
+        ]
+      })
+    })
+
+    if (!configureWebhookResponse.ok) {
+      const error = await configureWebhookResponse.text()
+      console.error('Error configuring webhook:', error)
+      throw new Error(`Error configuring webhook: ${error}`)
+    }
+
+    const webhookData = await configureWebhookResponse.json()
+    console.log('Webhook configured successfully:', webhookData)
+
+    // Criar instância no Supabase
+    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+    
+    const { data: instance, error: dbError } = await supabase
       .from('evolution_instances')
       .insert({
-        user_id: user.id,
-        name: instanceName,
-        connection_status: 'disconnected'
+        name: name,
+        phone_number: phone_number,
+        user_id: userId,
+        status: 'disconnected'
       })
       .select()
       .single()
 
-    if (insertError) {
-      console.error('Error inserting instance:', insertError)
-      throw insertError
+    if (dbError) {
+      console.error('Error saving instance to database:', dbError)
+      throw dbError
     }
 
-    console.log('Instance created successfully:', instance)
+    console.log('Instance saved to database:', instance)
+
     return new Response(
       JSON.stringify(instance),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
