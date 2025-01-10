@@ -91,7 +91,7 @@ serve(async (req) => {
 
     // Clean and construct the Dify API URL
     const cleanDifyUrl = difyApiUrl.replace(/\/+$/, '') // Remove trailing slashes
-    const difyEndpoint = '/api/v1/apps'
+    const difyEndpoint = '/v1/apps' // Changed from /api/v1/apps to /v1/apps
     const fullDifyUrl = `${cleanDifyUrl}${difyEndpoint}`
     
     console.log('Creating Dify agent with URL:', fullDifyUrl)
