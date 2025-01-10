@@ -1,10 +1,12 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
+import { useAuth } from "@/contexts/auth/AuthContext";
 
 export const useInstanceMutations = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { user } = useAuth();
 
   const createMutation = useMutation({
     mutationFn: async (newInstance: { name: string; phone_number: string }) => {
@@ -12,7 +14,8 @@ export const useInstanceMutations = () => {
       const { data: response, error } = await supabase.functions.invoke('create-evolution-instance', {
         body: { 
           name: newInstance.name,
-          phone_number: newInstance.phone_number
+          phone_number: newInstance.phone_number,
+          userId: user?.id
         }
       });
       
