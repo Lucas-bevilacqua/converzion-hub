@@ -44,10 +44,12 @@ serve(async (req) => {
       .single()
 
     if (instanceError) {
+      console.error('Database error:', instanceError)
       throw instanceError
     }
 
     if (!instance) {
+      console.error('Instance not found in database')
       throw new Error('Instance not found')
     }
 
@@ -61,6 +63,43 @@ serve(async (req) => {
       ? evolutionApiUrl.slice(0, -1) 
       : evolutionApiUrl
 
+    // First check if instance exists in Evolution API
+    console.log('Checking if instance exists in Evolution API')
+    const checkInstanceUrl = `${baseUrl}/instance/fetchInstances`
+    const checkResponse = await fetch(checkInstanceUrl, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': Deno.env.get('EVOLUTION_API_KEY') ?? '',
+      }
+    })
+
+    if (!checkResponse.ok) {
+      console.error('Error checking instances:', await checkResponse.text())
+      throw new Error('Failed to check instances in Evolution API')
+    }
+
+    const instances = await checkResponse.json()
+    const instanceExists = instances.some((inst: any) => inst.instanceName === instance.name)
+
+    if (!instanceExists) {
+      console.log('Instance does not exist in Evolution API:', instance.name)
+      // Update instance status in database to disconnected
+      await supabaseClient
+        .from('evolution_instances')
+        .update({
+          connection_status: 'disconnected',
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', instanceId)
+
+      return new Response(
+        JSON.stringify({ state: 'disconnected' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    // If instance exists, check its state
     const stateUrl = `${baseUrl}/instance/connectionState/${instance.name}`
     console.log('Checking state at:', stateUrl)
 
@@ -73,16 +112,14 @@ serve(async (req) => {
     })
 
     if (!stateResponse.ok) {
-      const errorText = await stateResponse.text()
-      console.error('Evolution API state check error:', errorText)
-      throw new Error(`Failed to get instance state: ${errorText}`)
+      console.error('Evolution API state check error:', await stateResponse.text())
+      throw new Error('Failed to get instance state')
     }
 
     const stateData = await stateResponse.json()
     console.log('State response:', stateData)
 
     // Map Evolution API state to our connection status
-    // The API returns { instance: { instanceName: string, state: "open" | "close" } }
     let connectionStatus = 'disconnected'
     
     if (stateData.instance?.state === 'open') {

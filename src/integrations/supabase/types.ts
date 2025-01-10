@@ -258,6 +258,41 @@ export type Database = {
           },
         ]
       }
+      Users_clientes: {
+        Row: {
+          ConversationId: string | null
+          created_at: string
+          id: number
+          NomeClientes: string | null
+          NomeDaEmpresa: string | null
+          TelefoneClientes: string | null
+        }
+        Insert: {
+          ConversationId?: string | null
+          created_at?: string
+          id?: number
+          NomeClientes?: string | null
+          NomeDaEmpresa?: string | null
+          TelefoneClientes?: string | null
+        }
+        Update: {
+          ConversationId?: string | null
+          created_at?: string
+          id?: number
+          NomeClientes?: string | null
+          NomeDaEmpresa?: string | null
+          TelefoneClientes?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "Users_clientes_NomeDaEmpresa_fkey"
+            columns: ["NomeDaEmpresa"]
+            isOneToOne: false
+            referencedRelation: "evolution_instances"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
