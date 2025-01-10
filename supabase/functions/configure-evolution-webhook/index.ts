@@ -36,7 +36,7 @@ serve(async (req) => {
         'apikey': EVOLUTION_API_KEY
       },
       body: JSON.stringify({
-        url: webhookUrl,
+        webhook: webhookUrl,
         enabled: true,
         events: [
           "messages.upsert",  // Evento de novas mensagens
