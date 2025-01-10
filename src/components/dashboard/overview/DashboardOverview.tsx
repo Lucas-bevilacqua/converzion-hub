@@ -4,6 +4,8 @@ import { format } from "date-fns"
 import { ptBR } from "date-fns/locale"
 import { ChartContainer } from "@/components/ui/chart"
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts"
+import { useQuery } from "@tanstack/react-query"
+import { supabase } from "@/integrations/supabase/client"
 
 interface DashboardOverviewProps {
   subscription: any
@@ -16,10 +18,36 @@ export function DashboardOverview({ subscription, instances }: DashboardOverview
     return subscription.plan_id === 'professional' ? 3 : 1
   }
 
+  // Query para verificar o estado atual de todas as instâncias
+  const { data: instanceStates } = useQuery({
+    queryKey: ['instanceStates', instances?.map(i => i.id)],
+    queryFn: async () => {
+      const states: Record<string, string> = {}
+      
+      if (!instances?.length) return states
+      
+      await Promise.all(instances.map(async (instance) => {
+        try {
+          const response = await supabase.functions.invoke('check-instance-state', {
+            body: { instanceId: instance.id }
+          })
+          states[instance.id] = response.data?.state || 'disconnected'
+        } catch (error) {
+          console.error(`Error checking state for instance ${instance.id}:`, error)
+          states[instance.id] = 'disconnected'
+        }
+      }))
+      
+      return states
+    },
+    enabled: !!instances?.length,
+    refetchInterval: 5000 // Atualiza a cada 5 segundos
+  })
+
   const instanceStats = {
     total: instances?.length || 0,
-    connected: instances?.filter(i => i.connection_status === 'connected').length || 0,
-    disconnected: instances?.filter(i => i.connection_status === 'disconnected').length || 0,
+    connected: instances?.filter(i => instanceStates?.[i.id] === 'connected').length || 0,
+    disconnected: instances?.filter(i => instanceStates?.[i.id] !== 'connected').length || 0,
     limit: getInstanceLimit()
   }
 
