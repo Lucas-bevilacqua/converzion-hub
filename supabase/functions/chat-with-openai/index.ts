@@ -93,7 +93,7 @@ serve(async (req) => {
     // Add current message
     messages.push({ role: 'user', content: message })
 
-    console.log('Sending request to OpenAI')
+    console.log('Sending request to OpenAI with messages:', messages)
     const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -101,7 +101,7 @@ serve(async (req) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-3.5-turbo',
+        model: 'gpt-4o-mini',
         messages: messages,
         temperature: 0.7,
       }),
