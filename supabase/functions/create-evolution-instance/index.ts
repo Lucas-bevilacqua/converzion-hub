@@ -40,7 +40,7 @@ serve(async (req) => {
         qrcode: true,
         number: phone_number,
         token: EVOLUTION_API_KEY,
-        integration: "whatsapp-md" // Updated to use the correct integration type
+        integration: "whatsapp" // Updated to use the correct integration type
       })
     })
 
