@@ -1,10 +1,12 @@
 import { corsHeaders } from './cors.ts'
 
 export async function checkInstance(baseUrl: string, evolutionApiKey: string, instanceName: string) {
-  console.log('Checking instances at:', `${baseUrl}/instance/fetchInstances`)
+  // Remove any trailing slashes and colons from the base URL
+  const cleanBaseUrl = baseUrl.replace(/[:/]+$/, '')
+  console.log('Checking instances at:', `${cleanBaseUrl}/instance/fetchInstances`)
   
   try {
-    const checkResponse = await fetch(`${baseUrl}/instance/fetchInstances`, {
+    const checkResponse = await fetch(`${cleanBaseUrl}/instance/fetchInstances`, {
       method: 'GET',
       headers: {
         'apikey': evolutionApiKey,
@@ -29,10 +31,12 @@ export async function checkInstance(baseUrl: string, evolutionApiKey: string, in
 }
 
 export async function createInstance(baseUrl: string, evolutionApiKey: string, instanceName: string) {
+  // Remove any trailing slashes and colons from the base URL
+  const cleanBaseUrl = baseUrl.replace(/[:/]+$/, '')
   console.log('Creating new instance:', instanceName)
   
   try {
-    const createResponse = await fetch(`${baseUrl}/instance/create`, {
+    const createResponse = await fetch(`${cleanBaseUrl}/instance/create`, {
       method: 'POST',
       headers: {
         'apikey': evolutionApiKey,
@@ -60,7 +64,9 @@ export async function createInstance(baseUrl: string, evolutionApiKey: string, i
 }
 
 export async function connectInstance(baseUrl: string, evolutionApiKey: string, instanceName: string) {
-  const connectUrl = `${baseUrl}/instance/connect/${instanceName}`
+  // Remove any trailing slashes and colons from the base URL
+  const cleanBaseUrl = baseUrl.replace(/[:/]+$/, '')
+  const connectUrl = `${cleanBaseUrl}/instance/connect/${instanceName}`
   console.log('Connecting to instance at:', connectUrl)
   
   try {
