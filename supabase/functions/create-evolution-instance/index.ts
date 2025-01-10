@@ -33,7 +33,6 @@ serve(async (req) => {
 
     console.log('Checking subscription status for user:', user.id)
 
-    // Check subscription status using service role client
     const { data: subscription, error: subError } = await supabaseClient
       .from('subscriptions')
       .select('*')
@@ -57,7 +56,6 @@ serve(async (req) => {
       )
     }
 
-    // Get instance count
     const { count, error: countError } = await supabaseClient
       .from('evolution_instances')
       .select('*', { count: 'exact' })
@@ -68,7 +66,6 @@ serve(async (req) => {
       throw countError
     }
 
-    // Check instance limit based on plan
     const instanceLimit = subscription.plan_id?.includes('professional') ? 3 : 1
     if (count && count >= instanceLimit) {
       console.error('Instance limit reached for user:', user.id)
@@ -86,7 +83,7 @@ serve(async (req) => {
 
     // Create Dify agent first
     console.log('Creating Dify agent...')
-    const difyResponse = await fetch(`${Deno.env.get('DIFY_API_URL')}/applications`, {
+    const difyResponse = await fetch(`${Deno.env.get('DIFY_API_URL')}/api/v1/apps`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${Deno.env.get('DIFY_API_KEY')}`,
