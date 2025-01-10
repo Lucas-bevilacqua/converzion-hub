@@ -84,6 +84,34 @@ serve(async (req) => {
     const { instanceName } = await req.json()
     console.log('Creating instance with name:', instanceName)
 
+    // Create Dify agent first
+    console.log('Creating Dify agent...')
+    const difyResponse = await fetch(`${Deno.env.get('DIFY_API_URL')}/applications`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${Deno.env.get('DIFY_API_KEY')}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        name: `WhatsApp Assistant - ${instanceName}`,
+        mode: "completion",
+        model: {
+          provider: "openai",
+          name: "gpt-3.5-turbo",
+          mode: "chat"
+        }
+      })
+    })
+
+    if (!difyResponse.ok) {
+      const errorText = await difyResponse.text()
+      console.error('Dify API error:', errorText)
+      throw new Error(`Failed to create Dify agent: ${errorText}`)
+    }
+
+    const difyData = await difyResponse.json()
+    console.log('Dify agent created:', difyData)
+
     // Create instance in Evolution API
     const evolutionApiUrl = Deno.env.get('EVOLUTION_API_URL')
     if (!evolutionApiUrl) {
@@ -94,8 +122,7 @@ serve(async (req) => {
       ? evolutionApiUrl.slice(0, -1) 
       : evolutionApiUrl
 
-    console.log('Making request to Evolution API:', `${baseUrl}/instance/create`)
-    
+    console.log('Creating Evolution instance...')
     const evolutionResponse = await fetch(`${baseUrl}/instance/create`, {
       method: 'POST',
       headers: {
@@ -121,16 +148,39 @@ serve(async (req) => {
       )
     }
 
-    const evolutionData = await evolutionResponse.json()
-    console.log('Evolution API response:', evolutionData)
+    // Configure Dify in Evolution instance
+    console.log('Configuring Dify in Evolution instance...')
+    const difyConfigResponse = await fetch(`${baseUrl}/instance/dify/set/${instanceName}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': Deno.env.get('EVOLUTION_API_KEY') ?? '',
+      },
+      body: JSON.stringify({
+        enabled: true,
+        apiKey: difyData.api_key,
+        apiUrl: Deno.env.get('DIFY_API_URL'),
+        appId: difyData.id
+      })
+    })
 
-    // Save instance to database using service role client
+    if (!difyConfigResponse.ok) {
+      const errorText = await difyConfigResponse.text()
+      console.error('Evolution Dify config error:', errorText)
+      // Don't throw here, we'll just log the error since the instance was created
+      console.warn('Failed to configure Dify in Evolution:', errorText)
+    } else {
+      console.log('Dify configured in Evolution instance successfully')
+    }
+
+    // Save instance to database with Dify app ID
     const { data: instance, error: insertError } = await supabaseClient
       .from('evolution_instances')
       .insert({
         user_id: user.id,
         name: instanceName,
-        connection_status: 'disconnected'
+        connection_status: 'disconnected',
+        dify_app_id: difyData.id
       })
       .select()
       .single()
