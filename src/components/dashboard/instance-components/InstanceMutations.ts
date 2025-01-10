@@ -59,8 +59,36 @@ export const useInstanceMutations = () => {
     }
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: async (instanceId: string) => {
+      console.log('Deleting instance:', instanceId);
+      const { error } = await supabase
+        .from('evolution_instances')
+        .delete()
+        .eq('id', instanceId);
+      
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['instances'] });
+      toast({
+        title: "Sucesso",
+        description: "Instância deletada com sucesso",
+      });
+    },
+    onError: (error) => {
+      console.error('Error deleting instance:', error);
+      toast({
+        title: "Erro",
+        description: "Não foi possível deletar a instância. Tente novamente.",
+        variant: "destructive",
+      });
+    }
+  });
+
   return {
     createMutation,
-    connectMutation
+    connectMutation,
+    deleteMutation
   };
 };

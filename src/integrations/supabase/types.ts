@@ -48,6 +48,7 @@ export type Database = {
         Row: {
           connection_status: string | null
           created_at: string
+          dify_app_id: string | null
           id: string
           last_qr_update: string | null
           name: string
@@ -61,6 +62,7 @@ export type Database = {
         Insert: {
           connection_status?: string | null
           created_at?: string
+          dify_app_id?: string | null
           id?: string
           last_qr_update?: string | null
           name: string
@@ -74,6 +76,7 @@ export type Database = {
         Update: {
           connection_status?: string | null
           created_at?: string
+          dify_app_id?: string | null
           id?: string
           last_qr_update?: string | null
           name?: string

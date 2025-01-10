@@ -1,8 +1,9 @@
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { MessageSquare, Plus, QrCode, Settings } from "lucide-react"
+import { MessageSquare, Plus, QrCode, Settings, Trash2 } from "lucide-react"
 import { useState } from "react"
 import { QRCodeDialog } from "./QRCodeDialog"
+import { useInstanceMutations } from "./InstanceMutations"
 
 interface InstanceSlotCardProps {
   isUsed: boolean
@@ -13,6 +14,7 @@ interface InstanceSlotCardProps {
 
 export function InstanceSlotCard({ isUsed, instance, onClick, onConfigurePrompt }: InstanceSlotCardProps) {
   const [showQRCode, setShowQRCode] = useState(false)
+  const { deleteMutation } = useInstanceMutations()
 
   if (!isUsed) {
     return (
@@ -30,6 +32,13 @@ export function InstanceSlotCard({ isUsed, instance, onClick, onConfigurePrompt 
   }
 
   const isConnected = instance?.connection_status === 'connected'
+
+  const handleDelete = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (window.confirm('Tem certeza que deseja deletar esta instância?')) {
+      deleteMutation.mutate(instance.id)
+    }
+  }
 
   return (
     <Card>
@@ -57,6 +66,16 @@ export function InstanceSlotCard({ isUsed, instance, onClick, onConfigurePrompt 
             title="Configurar Prompt"
           >
             <Settings className="h-4 w-4" />
+          </Button>
+
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={handleDelete}
+            title="Deletar Instância"
+            className="text-destructive hover:text-destructive"
+          >
+            <Trash2 className="h-4 w-4" />
           </Button>
           
           {!isConnected && (
