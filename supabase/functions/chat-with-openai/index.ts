@@ -44,8 +44,53 @@ serve(async (req) => {
       userName: instance.profiles?.full_name
     })
 
-    const systemPrompt = instance.system_prompt || "You are a helpful AI assistant."
-    console.log('Using system prompt:', systemPrompt)
+    // Get recent chat history
+    console.log('Fetching recent chat history')
+    const { data: chatHistory, error: chatError } = await supabaseClient
+      .from('chat_messages')
+      .select('*')
+      .eq('instance_id', instanceId)
+      .order('created_at', { ascending: true })
+      .limit(10)
+
+    if (chatError) {
+      console.error('Error fetching chat history:', chatError)
+      throw chatError
+    }
+
+    // Save the new user message
+    console.log('Saving user message to chat history')
+    const { error: saveError } = await supabaseClient
+      .from('chat_messages')
+      .insert({
+        instance_id: instanceId,
+        user_id: instance.user_id,
+        sender_type: 'user',
+        content: message
+      })
+
+    if (saveError) {
+      console.error('Error saving message:', saveError)
+      throw saveError
+    }
+
+    // Prepare messages array for OpenAI
+    const messages = [
+      { role: 'system', content: instance.system_prompt || "You are a helpful AI assistant." }
+    ]
+
+    // Add chat history to context
+    if (chatHistory) {
+      chatHistory.forEach((msg) => {
+        messages.push({
+          role: msg.sender_type === 'user' ? 'user' : 'assistant',
+          content: msg.content
+        })
+      })
+    }
+
+    // Add current message
+    messages.push({ role: 'user', content: message })
 
     console.log('Sending request to OpenAI with model gpt-4o-mini')
     const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -56,10 +101,7 @@ serve(async (req) => {
       },
       body: JSON.stringify({
         model: 'gpt-4o-mini',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: message }
-        ],
+        messages: messages,
         temperature: 0.7,
       }),
     })
@@ -73,6 +115,22 @@ serve(async (req) => {
     const data = await openaiResponse.json()
     const response = data.choices[0].message.content
     console.log('Generated response:', response)
+
+    // Save the AI response to chat history
+    console.log('Saving AI response to chat history')
+    const { error: saveResponseError } = await supabaseClient
+      .from('chat_messages')
+      .insert({
+        instance_id: instanceId,
+        user_id: instance.user_id,
+        sender_type: 'assistant',
+        content: response
+      })
+
+    if (saveResponseError) {
+      console.error('Error saving AI response:', saveResponseError)
+      throw saveResponseError
+    }
 
     return new Response(
       JSON.stringify({ response }),
