@@ -20,6 +20,10 @@ serve(async (req) => {
     const { name, phone_number, userId } = await req.json()
     console.log('Creating instance:', { name, phone_number, userId })
 
+    if (!name) {
+      throw new Error('Instance name is required')
+    }
+
     // Clean the base URL by removing trailing slashes
     const cleanBaseUrl = EVOLUTION_API_URL?.replace(/\/+$/, '')
     console.log('Clean base URL:', cleanBaseUrl)
