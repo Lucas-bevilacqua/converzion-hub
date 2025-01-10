@@ -82,7 +82,7 @@ serve(async (req) => {
     console.log('State response:', stateData)
 
     // Map Evolution API state to our connection status
-    // The API returns { state: "CONNECTED" | "CONNECTING" | "CLOSE" }
+    // The API returns { state: "CONNECTED" | "CONNECTING" | "CLOSE" | "DISCONNECTED" }
     let connectionStatus = 'disconnected'
     
     if (stateData.state === 'CONNECTED') {
@@ -91,7 +91,7 @@ serve(async (req) => {
       connectionStatus = 'pending'
     }
 
-    console.log('Updating instance status to:', connectionStatus)
+    console.log('Mapped connection status:', connectionStatus)
 
     // Update instance state in database
     const { error: updateError } = await supabaseClient
@@ -107,7 +107,7 @@ serve(async (req) => {
       throw updateError
     }
 
-    console.log('Instance status updated successfully')
+    console.log('Instance status updated successfully to:', connectionStatus)
 
     return new Response(
       JSON.stringify({ state: connectionStatus }),
