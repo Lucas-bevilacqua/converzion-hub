@@ -45,7 +45,7 @@ serve(async (req) => {
             'Content-Type': 'application/json'
           },
           byEvents: false,
-          base64: false,
+          base64: true,
           events: [
             "MESSAGES_UPSERT",
             "CONNECTION_UPDATE"
