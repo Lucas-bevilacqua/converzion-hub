@@ -63,12 +63,28 @@ serve(async (req) => {
           byEvents: false,
           base64: false,
           events: [
+            "APPLICATION_STARTUP",
+            "QRCODE_UPDATED",
+            "MESSAGES_SET",
             "MESSAGES_UPSERT",
             "MESSAGES_UPDATE",
             "MESSAGES_DELETE",
-            "MESSAGES_SET",
+            "SEND_MESSAGE",
+            "CONTACTS_SET",
+            "CONTACTS_UPSERT",
+            "CONTACTS_UPDATE",
+            "PRESENCE_UPDATE",
+            "CHATS_SET",
+            "CHATS_UPSERT",
+            "CHATS_UPDATE",
+            "CHATS_DELETE",
+            "GROUPS_UPSERT",
+            "GROUP_UPDATE",
+            "GROUP_PARTICIPANTS_UPDATE",
             "CONNECTION_UPDATE",
-            "QRCODE_UPDATED"
+            "LABELS_EDIT",
+            "LABELS_ASSOCIATION",
+            "CALL"
           ]
         }
       })
