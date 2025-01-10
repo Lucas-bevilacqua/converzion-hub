@@ -36,6 +36,7 @@ serve(async (req) => {
 
     const systemPrompt = instance.system_prompt || "You are a helpful AI assistant."
 
+    console.log('Sending request to OpenAI with model gpt-4o-mini')
     const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
