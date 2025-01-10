@@ -50,6 +50,7 @@ serve(async (req) => {
       .from('chat_messages')
       .select('*')
       .eq('instance_id', instanceId)
+      .eq('user_id', instance.user_id)
       .order('created_at', { ascending: true })
       .limit(10)
 
@@ -92,7 +93,7 @@ serve(async (req) => {
     // Add current message
     messages.push({ role: 'user', content: message })
 
-    console.log('Sending request to OpenAI with model gpt-4o-mini')
+    console.log('Sending request to OpenAI')
     const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -100,7 +101,7 @@ serve(async (req) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4o-mini',
+        model: 'gpt-3.5-turbo',
         messages: messages,
         temperature: 0.7,
       }),
@@ -136,6 +137,9 @@ serve(async (req) => {
       throw new Error(`Evolution API error: ${error}`)
     }
 
+    const evolutionData = await evolutionResponse.json()
+    console.log('Evolution API response:', evolutionData)
+
     // Save the AI response to chat history
     console.log('Saving AI response to chat history')
     const { error: saveResponseError } = await supabaseClient
@@ -153,13 +157,20 @@ serve(async (req) => {
     }
 
     return new Response(
-      JSON.stringify({ response: aiResponse }),
+      JSON.stringify({ 
+        success: true,
+        response: aiResponse,
+        evolutionResponse: evolutionData 
+      }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   } catch (error) {
     console.error('Error in chat-with-openai:', error)
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ 
+        success: false,
+        error: error.message 
+      }),
       { 
         status: 400, 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
