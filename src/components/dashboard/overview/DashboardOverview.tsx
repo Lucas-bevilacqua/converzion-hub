@@ -1,11 +1,13 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { ChartBar, Calendar, Server, CheckCircle, AlertCircle } from "lucide-react"
+import { ChartBar, Calendar, Server, CheckCircle, AlertCircle, LogOut } from "lucide-react"
 import { format } from "date-fns"
 import { ptBR } from "date-fns/locale"
 import { ChartContainer } from "@/components/ui/chart"
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts"
-import { useQuery } from "@tanstack/react-query"
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { supabase } from "@/integrations/supabase/client"
+import { Button } from "@/components/ui/button"
+import { useToast } from "@/components/ui/use-toast"
 
 interface DashboardOverviewProps {
   subscription: any
@@ -13,6 +15,9 @@ interface DashboardOverviewProps {
 }
 
 export function DashboardOverview({ subscription, instances }: DashboardOverviewProps) {
+  const { toast } = useToast()
+  const queryClient = useQueryClient()
+
   const getInstanceLimit = () => {
     if (!subscription) return 0
     return subscription.plan_id === 'professional' ? 3 : 1
@@ -42,6 +47,35 @@ export function DashboardOverview({ subscription, instances }: DashboardOverview
     },
     enabled: !!instances?.length,
     refetchInterval: 5000 // Atualiza a cada 5 segundos
+  })
+
+  // Mutation para desconectar instância
+  const disconnectMutation = useMutation({
+    mutationFn: async (instanceId: string) => {
+      console.log('Desconectando instância:', instanceId)
+      const { data, error } = await supabase.functions.invoke('disconnect-evolution-instance', {
+        body: { instanceId }
+      })
+      
+      if (error) throw error
+      return data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['instanceStates'] })
+      queryClient.invalidateQueries({ queryKey: ['instances'] })
+      toast({
+        title: "Sucesso",
+        description: "Instância desconectada com sucesso",
+      })
+    },
+    onError: (error) => {
+      console.error('Erro ao desconectar instância:', error)
+      toast({
+        title: "Erro",
+        description: "Não foi possível desconectar a instância. Tente novamente.",
+        variant: "destructive",
+      })
+    }
   })
 
   const instanceStats = {
@@ -135,12 +169,35 @@ export function DashboardOverview({ subscription, instances }: DashboardOverview
           )}
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold text-gray-900">
-            {instanceStats.connected}/{instanceStats.total}
+          <div className="space-y-4">
+            <div>
+              <div className="text-2xl font-bold text-gray-900">
+                {instanceStats.connected}/{instanceStats.total}
+              </div>
+              <p className="text-xs text-gray-500">
+                Instâncias conectadas
+              </p>
+            </div>
+            
+            {/* Lista de instâncias com botão de desconectar */}
+            {instances?.map((instance) => (
+              <div key={instance.id} className="flex items-center justify-between text-sm">
+                <span>{instance.name}</span>
+                {instanceStates?.[instance.id] === 'connected' && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-2"
+                    onClick={() => disconnectMutation.mutate(instance.id)}
+                    disabled={disconnectMutation.isPending}
+                  >
+                    <LogOut className="h-4 w-4" />
+                    Desconectar
+                  </Button>
+                )}
+              </div>
+            ))}
           </div>
-          <p className="text-xs text-gray-500 mt-1">
-            Instâncias conectadas
-          </p>
         </CardContent>
       </Card>
 
