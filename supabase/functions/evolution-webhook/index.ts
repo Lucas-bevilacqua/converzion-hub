@@ -27,16 +27,25 @@ serve(async (req) => {
     if (payload.event === 'messages.upsert') {
       console.log('Received message event:', payload)
       
+      // Validate webhook payload
+      if (!payload.message) {
+        console.error('No message data in payload')
+        throw new Error('No message data in payload')
+      }
+
       // Extract instance name from the webhook data
       const instanceName = payload.instance?.instanceName
       if (!instanceName) {
+        console.error('Instance name not found in webhook payload')
         throw new Error('Instance name not found in webhook payload')
       }
+
+      console.log('Looking for instance:', instanceName)
 
       // Get instance details from database
       const { data: instance, error: instanceError } = await supabaseClient
         .from('evolution_instances')
-        .select('*')
+        .select('*, profiles!inner(*)')
         .eq('name', instanceName)
         .single()
 
@@ -46,14 +55,26 @@ serve(async (req) => {
       }
 
       if (!instance) {
+        console.error(`Instance not found: ${instanceName}`)
         throw new Error(`Instance not found: ${instanceName}`)
       }
 
+      console.log('Found instance:', {
+        id: instance.id,
+        name: instance.name,
+        userId: instance.user_id
+      })
+
       // Process incoming message if it's from a user (not from the bot)
       if (payload.message?.fromMe === false) {
-        console.log('Processing incoming message from user')
+        console.log('Processing incoming message:', {
+          content: payload.message.content,
+          from: payload.message.from,
+          instanceId: instance.id
+        })
         
         // Call chat-with-openai function to process the message
+        console.log('Calling chat-with-openai function')
         const { data: response, error } = await supabaseClient.functions.invoke('chat-with-openai', {
           body: {
             message: payload.message.content,
@@ -67,7 +88,9 @@ serve(async (req) => {
           throw error
         }
 
-        console.log('Successfully processed message:', response)
+        console.log('Successfully processed message. Response:', response)
+      } else {
+        console.log('Skipping message from bot (fromMe=true)')
       }
     } else if (payload.event === 'connection.update') {
       console.log('Received connection update event:', payload)
@@ -75,6 +98,7 @@ serve(async (req) => {
       // Update instance connection status
       const instanceName = payload.instance?.instanceName
       if (instanceName) {
+        console.log('Updating connection status for instance:', instanceName)
         const { error: updateError } = await supabaseClient
           .from('evolution_instances')
           .update({ 
@@ -87,7 +111,11 @@ serve(async (req) => {
           console.error('Error updating instance status:', updateError)
           throw updateError
         }
+
+        console.log('Successfully updated instance status')
       }
+    } else {
+      console.log('Unhandled event type:', payload.event)
     }
 
     return new Response(
