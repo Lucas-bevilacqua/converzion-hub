@@ -44,7 +44,7 @@ serve(async (req) => {
     const instanceData = await createInstanceResponse.json()
     console.log('Instance created successfully:', instanceData)
 
-    // Configurar webhook para a instância usando a rota correta
+    // Configurar webhook para a instância usando a estrutura correta
     console.log('Configuring webhook for instance:', name)
     const webhookUrl = `${SUPABASE_URL}/functions/v1/chat-with-openai`
     const configureWebhookResponse = await fetch(`${EVOLUTION_API_URL}/webhook/set/${name}`, {
@@ -54,17 +54,23 @@ serve(async (req) => {
         'apikey': EVOLUTION_API_KEY
       },
       body: JSON.stringify({
-        url: webhookUrl,
-        webhook_by_events: false,
-        events: [
-          "messages.upsert",
-          "messages.update",
-          "messages.delete",
-          "messages.reaction",
-          "messages.read",
-          "messages.media",
-          "messages.set"
-        ]
+        webhook: {
+          enabled: true,
+          url: webhookUrl,
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          byEvents: false,
+          base64: false,
+          events: [
+            "MESSAGES_UPSERT",
+            "MESSAGES_UPDATE",
+            "MESSAGES_DELETE",
+            "MESSAGES_SET",
+            "CONNECTION_UPDATE",
+            "QRCODE_UPDATED"
+          ]
+        }
       })
     })
 
