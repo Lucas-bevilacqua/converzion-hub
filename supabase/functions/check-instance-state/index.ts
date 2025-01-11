@@ -36,23 +36,23 @@ serve(async (req) => {
 
     console.log('Checking subscription for user:', user.id)
 
-    // Check if user has an active subscription
+    // Check if user has an active subscription or trial
     const { data: subscription, error: subscriptionError } = await supabaseClient
       .from('subscriptions')
       .select('*')
       .eq('user_id', user.id)
-      .single()
+      .maybeSingle()
 
     if (subscriptionError) {
       console.error('Error checking subscription:', subscriptionError)
       throw new Error('Error checking subscription')
     }
 
-    if (!subscription || (subscription.status !== 'active' && subscription.status !== 'trial')) {
-      console.log('No active subscription found for user:', user.id)
+    if (!subscription) {
+      console.log('No subscription found for user:', user.id)
       return new Response(
         JSON.stringify({ 
-          error: 'No active subscription found',
+          error: 'No subscription found',
           code: 'subscription_required'
         }),
         { 
@@ -62,19 +62,34 @@ serve(async (req) => {
       )
     }
 
+    if (subscription.status !== 'active' && subscription.status !== 'trial') {
+      console.log('No active subscription found for user:', user.id, 'Status:', subscription.status)
+      return new Response(
+        JSON.stringify({ 
+          error: 'No active subscription found',
+          code: 'subscription_required',
+          status: subscription.status
+        }),
+        { 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 403
+        }
+      )
+    }
+
     // Get the instance ID from the request
-    const { instance_id } = await req.json()
-    if (!instance_id) {
+    const { instanceId } = await req.json()
+    if (!instanceId) {
       throw new Error('No instance ID provided')
     }
 
-    console.log('Checking instance state for:', instance_id)
+    console.log('Checking instance state for:', instanceId)
 
     // Check if the instance belongs to the user
     const { data: instance, error: instanceError } = await supabaseClient
       .from('evolution_instances')
       .select('*')
-      .eq('id', instance_id)
+      .eq('id', instanceId)
       .eq('user_id', user.id)
       .single()
 
@@ -114,7 +129,7 @@ serve(async (req) => {
         connection_status: stateData.state,
         updated_at: new Date().toISOString()
       })
-      .eq('id', instance_id)
+      .eq('id', instanceId)
 
     if (updateError) {
       console.error('Error updating instance:', updateError)
