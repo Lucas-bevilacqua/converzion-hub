@@ -9,7 +9,6 @@ const corsHeaders = {
 console.log('Check Instance State function started')
 
 serve(async (req) => {
-  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
@@ -20,7 +19,6 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
     )
 
-    // Get the authorization header
     const authHeader = req.headers.get('Authorization')
     if (!authHeader) {
       console.error('No authorization header provided')
@@ -36,7 +34,6 @@ serve(async (req) => {
       )
     }
 
-    // Get the user from the token
     const token = authHeader.replace('Bearer ', '')
     const { data: { user }, error: userError } = await supabaseClient.auth.getUser(token)
     
@@ -55,7 +52,7 @@ serve(async (req) => {
       )
     }
 
-    // Check subscription status
+    // Check subscription status - now including trial subscriptions
     const { data: subscription, error: subscriptionError } = await supabaseClient
       .from('subscriptions')
       .select('*')
@@ -77,8 +74,9 @@ serve(async (req) => {
       )
     }
 
+    // Allow both active and trial subscriptions
     if (!subscription || (subscription.status !== 'active' && subscription.status !== 'trial')) {
-      console.log('No active subscription found for user:', user.id)
+      console.log('No active or trial subscription found for user:', user.id)
       return new Response(
         JSON.stringify({ 
           error: 'No subscription found',
@@ -184,7 +182,6 @@ serve(async (req) => {
 
       if (updateError) {
         console.error('Error updating instance:', updateError)
-        // Continue anyway, as we still want to return the state
       }
 
       return new Response(
