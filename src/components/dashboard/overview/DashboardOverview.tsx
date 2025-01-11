@@ -1,9 +1,7 @@
 import { Card } from "@/components/ui/card"
 import { CalendarDays, Laptop2, Power } from "lucide-react"
-import { ChartContainer } from "@/components/ui/chart"
 import type { Subscription } from "@/integrations/supabase/database-types/subscriptions"
 import type { EvolutionInstance } from "@/integrations/supabase/database-types/evolution-instances"
-import { Bar, BarChart as RechartsBarChart, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts"
 
 interface DashboardOverviewProps {
   subscription: Subscription | null;
@@ -23,23 +21,6 @@ const getPlanDisplayName = (planId: string | null) => {
 
 export function DashboardOverview({ subscription, instances }: DashboardOverviewProps) {
   const connectedInstances = instances.filter(instance => instance.connection_status === 'connected')
-  const disconnectedInstances = instances.filter(instance => instance.connection_status === 'disconnected')
-  const availableInstances = instances.length > 0 ? 1 - instances.length : 1
-
-  const chartData = [
-    {
-      name: 'Conectadas',
-      total: connectedInstances.length,
-    },
-    {
-      name: 'Desconectadas',
-      total: disconnectedInstances.length,
-    },
-    {
-      name: 'Disponíveis',
-      total: Math.max(0, availableInstances),
-    },
-  ]
 
   return (
     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -102,41 +83,6 @@ export function DashboardOverview({ subscription, instances }: DashboardOverview
           <p className="text-xs text-muted-foreground">
             Instâncias conectadas
           </p>
-        </div>
-      </Card>
-
-      <Card className="col-span-full p-4">
-        <h3 className="text-lg font-semibold mb-4">Visão Geral das Instâncias</h3>
-        <div className="h-[200px] w-full">
-          <ChartContainer config={{}}>
-            <ResponsiveContainer width="100%" height="100%">
-              <RechartsBarChart data={chartData} margin={{ top: 10, right: 10, left: 10, bottom: 20 }}>
-                <XAxis 
-                  dataKey="name" 
-                  tick={{ fill: 'var(--muted-foreground)' }}
-                  tickLine={{ stroke: 'var(--border)' }}
-                />
-                <YAxis 
-                  tick={{ fill: 'var(--muted-foreground)' }}
-                  tickLine={{ stroke: 'var(--border)' }}
-                  domain={[0, Math.max(...chartData.map(d => d.total), 1)]}
-                />
-                <Tooltip 
-                  contentStyle={{ 
-                    background: 'var(--background)',
-                    border: '1px solid var(--border)',
-                    borderRadius: '6px'
-                  }}
-                  labelStyle={{ color: 'var(--foreground)' }}
-                />
-                <Bar 
-                  dataKey="total" 
-                  fill="var(--primary)"
-                  radius={[4, 4, 0, 0]}
-                />
-              </RechartsBarChart>
-            </ResponsiveContainer>
-          </ChartContainer>
         </div>
       </Card>
     </div>
