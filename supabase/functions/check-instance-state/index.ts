@@ -74,7 +74,7 @@ serve(async (req) => {
       )
     }
 
-    console.log('Subscription status:', subscription?.status)
+    console.log('Subscription data:', subscription)
     
     // Check both active and trial status
     const hasValidSubscription = subscription && 
