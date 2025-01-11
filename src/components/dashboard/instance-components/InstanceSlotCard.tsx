@@ -3,6 +3,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { MessageSquare, QrCode, Settings, LogOut } from "lucide-react"
 import { useQuery } from "@tanstack/react-query"
 import { supabase } from "@/integrations/supabase/client"
+import { useToast } from "@/components/ui/use-toast"
 
 interface InstanceSlotCardProps {
   isUsed: boolean
@@ -19,6 +20,8 @@ export function InstanceSlotCard({
   onDisconnect,
   onConfigurePrompt 
 }: InstanceSlotCardProps) {
+  const { toast } = useToast()
+
   // Query para verificar o estado da instância
   const { data: stateData } = useQuery({
     queryKey: ['instanceState', instance?.id],
@@ -31,10 +34,23 @@ export function InstanceSlotCard({
           body: { instanceId: instance.id }
         })
         
-        if (error) throw error
+        if (error) {
+          // Check if it's a subscription error
+          const errorBody = JSON.parse(error.message)
+          if (errorBody?.code === 'subscription_required') {
+            console.log('No active subscription found')
+            return { state: 'disconnected' }
+          }
+          throw error
+        }
         return data
       } catch (error) {
         console.error('Error checking instance state:', error)
+        toast({
+          title: "Erro ao verificar estado",
+          description: "Não foi possível verificar o estado da instância",
+          variant: "destructive",
+        })
         return null
       }
     },
