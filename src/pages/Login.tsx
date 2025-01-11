@@ -1,42 +1,39 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Auth } from "@supabase/auth-ui-react"
 import { ThemeSupa } from "@supabase/auth-ui-shared"
 import { supabase } from "@/integrations/supabase/client"
-import { useToast } from "@/components/ui/use-toast"
+import { useToast } from "@/hooks/use-toast"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 
 export default function Login() {
   const { toast } = useToast()
   const [error, setError] = useState<string | null>(null)
 
-  // Listen for auth state changes to handle errors
-  supabase.auth.onAuthStateChange((event, session) => {
-    console.log('Auth state changed:', event, session)
-    
-    if (event === 'SIGNED_IN') {
-      console.log('User signed in successfully')
-      setError(null)
-    }
-  })
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log('Auth state changed:', event, session)
+      
+      if (event === 'SIGNED_IN') {
+        console.log('User signed in successfully')
+        setError(null)
+      }
+      
+      if (event === 'USER_UPDATED') {
+        console.log('User updated')
+        setError(null)
+      }
 
-  // Custom error handler for auth errors
-  const handleAuthError = (error: any) => {
-    console.error('Auth error:', error)
-    let message = 'An error occurred during authentication'
-    
-    if (error.error?.message === 'Invalid login credentials') {
-      message = 'Invalid email or password. Please check your credentials and try again.'
-    } else if (error.message) {
-      message = error.message
-    }
-    
-    setError(message)
-    toast({
-      title: "Authentication Error",
-      description: message,
-      variant: "destructive",
+      if (event === 'SIGNED_OUT') {
+        console.log('User signed out')
+        setError(null)
+      }
     })
-  }
+
+    return () => {
+      subscription.unsubscribe()
+    }
+  }, [])
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
@@ -49,9 +46,9 @@ export default function Login() {
         </CardHeader>
         <CardContent>
           {error && (
-            <div className="mb-4 p-3 text-sm text-red-500 bg-red-50 rounded-md">
-              {error}
-            </div>
+            <Alert variant="destructive" className="mb-4">
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
           )}
           <Auth
             supabaseClient={supabase}
@@ -67,7 +64,6 @@ export default function Login() {
               },
             }}
             providers={[]}
-            onError={handleAuthError}
           />
         </CardContent>
       </Card>
