@@ -9,70 +9,89 @@ const corsHeaders = {
 console.log('Check Instance State function started')
 
 serve(async (req) => {
-  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders })
+    return new Response('ok', { headers: corsHeaders })
   }
 
   try {
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
     )
 
+    // Get the authorization header
     const authHeader = req.headers.get('Authorization')
     if (!authHeader) {
       throw new Error('No authorization header')
     }
 
-    const { data: { user }, error: userError } = await supabaseClient.auth.getUser(
-      authHeader.replace('Bearer ', '')
-    )
-
+    // Get the user from the token
+    const token = authHeader.replace('Bearer ', '')
+    const { data: { user }, error: userError } = await supabaseClient.auth.getUser(token)
+    
     if (userError || !user) {
-      console.error('User auth error:', userError)
-      throw userError || new Error('User not found')
+      console.error('Error getting user:', userError)
+      throw new Error('Error getting user')
     }
 
-    // Get instance ID from request body
-    const { instanceId } = await req.json()
-    console.log('Checking state for instance:', instanceId)
+    console.log('Checking subscription for user:', user.id)
 
-    // Get instance details from database
+    // Check if user has an active subscription
+    const { data: subscription, error: subscriptionError } = await supabaseClient
+      .from('subscriptions')
+      .select('*')
+      .eq('user_id', user.id)
+      .single()
+
+    if (subscriptionError) {
+      console.error('Error checking subscription:', subscriptionError)
+      throw new Error('Error checking subscription')
+    }
+
+    if (!subscription || (subscription.status !== 'active' && subscription.status !== 'trial')) {
+      console.log('No active subscription found for user:', user.id)
+      return new Response(
+        JSON.stringify({ 
+          error: 'No active subscription found',
+          code: 'subscription_required'
+        }),
+        { 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 403
+        }
+      )
+    }
+
+    // Get the instance ID from the request
+    const { instance_id } = await req.json()
+    if (!instance_id) {
+      throw new Error('No instance ID provided')
+    }
+
+    console.log('Checking instance state for:', instance_id)
+
+    // Check if the instance belongs to the user
     const { data: instance, error: instanceError } = await supabaseClient
       .from('evolution_instances')
       .select('*')
-      .eq('id', instanceId)
+      .eq('id', instance_id)
+      .eq('user_id', user.id)
       .single()
 
-    if (instanceError) {
-      console.error('Database error:', instanceError)
-      throw instanceError
+    if (instanceError || !instance) {
+      console.error('Error getting instance:', instanceError)
+      throw new Error('Instance not found or unauthorized')
     }
 
-    if (!instance) {
-      console.error('Instance not found in database')
-      throw new Error('Instance not found')
-    }
-
-    // Get Evolution API configuration
+    // Make request to Evolution API to check instance state
     const evolutionApiUrl = Deno.env.get('EVOLUTION_API_URL')
     const evolutionApiKey = Deno.env.get('EVOLUTION_API_KEY')
 
     if (!evolutionApiUrl || !evolutionApiKey) {
-      throw new Error('Evolution API configuration not found')
+      throw new Error('Evolution API configuration missing')
     }
 
-    // Clean up the base URL - remove trailing slashes and ensure proper format
-    const baseUrl = evolutionApiUrl.replace(/\/+$/, '')
-    console.log('Using Evolution API base URL:', baseUrl)
-
-    // First check if instance exists in Evolution API
-    console.log('Checking if instance exists in Evolution API')
-    const checkInstanceUrl = `${baseUrl}/instance/fetchInstances`
-    console.log('Check instances URL:', checkInstanceUrl)
-    
-    const checkResponse = await fetch(checkInstanceUrl, {
+    const response = await fetch(`${evolutionApiUrl}/instance/connectionState/${instance.name}`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -80,89 +99,46 @@ serve(async (req) => {
       }
     })
 
-    if (!checkResponse.ok) {
-      console.error('Error checking instances:', await checkResponse.text())
-      throw new Error('Failed to check instances in Evolution API')
+    if (!response.ok) {
+      console.error('Error from Evolution API:', await response.text())
+      throw new Error('Failed to check instance state')
     }
 
-    const instances = await checkResponse.json()
-    console.log('Available instances:', instances)
-    
-    const instanceExists = instances.some((inst: any) => inst.instanceName === instance.name)
-
-    if (!instanceExists) {
-      console.log('Instance does not exist in Evolution API:', instance.name)
-      // Update instance status in database to disconnected
-      await supabaseClient
-        .from('evolution_instances')
-        .update({
-          connection_status: 'disconnected',
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', instanceId)
-
-      return new Response(
-        JSON.stringify({ state: 'disconnected' }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
-    }
-
-    // If instance exists, check its state
-    const stateUrl = `${baseUrl}/instance/connectionState/${instance.name}`
-    console.log('Checking state at:', stateUrl)
-
-    const stateResponse = await fetch(stateUrl, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-        'apikey': evolutionApiKey
-      }
-    })
-
-    if (!stateResponse.ok) {
-      console.error('Evolution API state check error:', await stateResponse.text())
-      throw new Error('Failed to get instance state')
-    }
-
-    const stateData = await stateResponse.json()
-    console.log('State response:', stateData)
-
-    // Map Evolution API state to our connection status
-    let connectionStatus = 'disconnected'
-    
-    if (stateData.instance?.state === 'open') {
-      connectionStatus = 'connected'
-    }
+    const stateData = await response.json()
+    console.log('Instance state:', stateData)
 
     // Update instance status in database
     const { error: updateError } = await supabaseClient
       .from('evolution_instances')
       .update({
-        connection_status: connectionStatus,
+        connection_status: stateData.state,
         updated_at: new Date().toISOString()
       })
-      .eq('id', instanceId)
+      .eq('id', instance_id)
 
     if (updateError) {
-      console.error('Error updating instance status:', updateError)
-      throw updateError
+      console.error('Error updating instance:', updateError)
+      throw new Error('Failed to update instance status')
     }
 
     return new Response(
-      JSON.stringify({ state: connectionStatus }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      JSON.stringify(stateData),
+      { 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200 
+      }
     )
 
   } catch (error) {
     console.error('Error in check-instance-state:', error)
     return new Response(
-      JSON.stringify({ 
+      JSON.stringify({
         error: error.message,
-        details: error.cause || error.stack
+        details: error instanceof Error ? error.stack : undefined
       }),
       { 
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 500
       }
     )
   }
