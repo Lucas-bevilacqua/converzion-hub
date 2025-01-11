@@ -1,8 +1,9 @@
 import { Card } from "@/components/ui/card"
 import { CalendarDays, Laptop2, Power } from "lucide-react"
-import { BarChart } from "@/components/ui/chart"
+import { ChartContainer } from "@/components/ui/chart"
 import type { Subscription } from "@/integrations/supabase/database-types/subscriptions"
 import type { EvolutionInstance } from "@/integrations/supabase/database-types/evolution-instances"
+import { Bar, BarChart as RechartsBarChart, XAxis, YAxis, Tooltip } from "recharts"
 
 interface DashboardOverviewProps {
   subscription: Subscription | null;
@@ -107,7 +108,14 @@ export function DashboardOverview({ subscription, instances }: DashboardOverview
       <Card className="col-span-full p-4">
         <h3 className="text-lg font-semibold mb-4">Visão Geral das Instâncias</h3>
         <div className="h-[200px] w-full">
-          <BarChart data={chartData} />
+          <ChartContainer config={{}}>
+            <RechartsBarChart data={chartData}>
+              <XAxis dataKey="name" />
+              <YAxis />
+              <Tooltip />
+              <Bar dataKey="total" fill="var(--primary)" />
+            </RechartsBarChart>
+          </ChartContainer>
         </div>
       </Card>
     </div>
