@@ -30,32 +30,46 @@ export function InstanceSlotCard({
       
       console.log('Checking state for instance:', instance.id)
       try {
+        const { data: { session } } = await supabase.auth.getSession()
+        if (!session) {
+          console.log('No active session found')
+          return { state: 'disconnected' }
+        }
+
         const { data, error } = await supabase.functions.invoke('check-instance-state', {
           body: { instanceId: instance.id }
         })
         
         if (error) {
           // Check if it's a subscription error
-          const errorBody = JSON.parse(error.message)
+          const errorBody = error.message && JSON.parse(error.message)
           if (errorBody?.code === 'subscription_required') {
             console.log('No active subscription found')
+            toast({
+              title: "Subscription Required",
+              description: "You need an active subscription to use this feature.",
+              variant: "destructive",
+            })
             return { state: 'disconnected' }
           }
-          throw error
+          
+          console.error('Error checking instance state:', error)
+          toast({
+            title: "Error",
+            description: "Failed to check instance state. Please try again.",
+            variant: "destructive",
+          })
+          return { state: 'error' }
         }
         return data
       } catch (error) {
-        console.error('Error checking instance state:', error)
-        toast({
-          title: "Erro ao verificar estado",
-          description: "Não foi possível verificar o estado da instância",
-          variant: "destructive",
-        })
-        return null
+        console.error('Error in state check:', error)
+        return { state: 'error' }
       }
     },
     enabled: !!instance?.id,
-    refetchInterval: 5000
+    refetchInterval: 5000,
+    retry: false
   })
 
   const isConnected = stateData?.state === 'connected'
