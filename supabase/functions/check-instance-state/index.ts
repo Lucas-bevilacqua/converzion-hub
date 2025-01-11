@@ -52,7 +52,7 @@ serve(async (req) => {
       )
     }
 
-    // Check subscription status - now including trial subscriptions
+    console.log('Checking subscription for user:', user.id)
     const { data: subscription, error: subscriptionError } = await supabaseClient
       .from('subscriptions')
       .select('*')
@@ -74,9 +74,14 @@ serve(async (req) => {
       )
     }
 
-    // Allow both active and trial subscriptions
-    if (!subscription || (subscription.status !== 'active' && subscription.status !== 'trial')) {
-      console.log('No active or trial subscription found for user:', user.id)
+    console.log('Subscription status:', subscription?.status)
+    
+    // Check both active and trial status
+    const hasValidSubscription = subscription && 
+      (subscription.status === 'active' || subscription.status === 'trial')
+
+    if (!hasValidSubscription) {
+      console.log('No valid subscription found for user:', user.id)
       return new Response(
         JSON.stringify({ 
           error: 'No subscription found',
@@ -89,7 +94,6 @@ serve(async (req) => {
       )
     }
 
-    // Get instance ID from request body
     let { instanceId } = await req.json()
     if (!instanceId) {
       return new Response(
@@ -104,7 +108,7 @@ serve(async (req) => {
       )
     }
 
-    // Verify instance ownership
+    console.log('Checking instance:', instanceId)
     const { data: instance, error: instanceError } = await supabaseClient
       .from('evolution_instances')
       .select('*')
@@ -126,7 +130,6 @@ serve(async (req) => {
       )
     }
 
-    // Check instance state with Evolution API
     const evolutionApiUrl = Deno.env.get('EVOLUTION_API_URL')
     const evolutionApiKey = Deno.env.get('EVOLUTION_API_KEY')
 
@@ -145,6 +148,7 @@ serve(async (req) => {
     }
 
     try {
+      console.log('Checking instance state with Evolution API')
       const response = await fetch(`${evolutionApiUrl}/instance/connectionState/${instance.name}`, {
         method: 'GET',
         headers: {
@@ -170,8 +174,8 @@ serve(async (req) => {
       }
 
       const stateData = await response.json()
+      console.log('Instance state:', stateData)
       
-      // Update instance status in database
       const { error: updateError } = await supabaseClient
         .from('evolution_instances')
         .update({
