@@ -1,11 +1,12 @@
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { MessageSquare, QrCode, Settings, LogOut, Trash2 } from "lucide-react"
+import { MessageSquare, QrCode, Settings, LogOut, Trash2, Tool } from "lucide-react"
 import { useQuery } from "@tanstack/react-query"
 import { supabase } from "@/integrations/supabase/client"
 import { useToast } from "@/components/ui/use-toast"
 import { useState } from "react"
 import { QRCodeDialog } from "./QRCodeDialog"
+import { InstanceConfigDialog } from "./InstanceConfigDialog"
 
 interface InstanceSlotCardProps {
   isUsed: boolean
@@ -24,6 +25,7 @@ export function InstanceSlotCard({
 }: InstanceSlotCardProps) {
   const { toast } = useToast()
   const [showQRCode, setShowQRCode] = useState(false)
+  const [showConfigDialog, setShowConfigDialog] = useState(false)
   const [qrCodeData, setQrCodeData] = useState<string | null>(null)
 
   // Query para verificar o estado do número
@@ -66,7 +68,6 @@ export function InstanceSlotCard({
           return { state: 'error' }
         }
 
-        // Verifica se o estado é 'open', que significa conectado
         const isConnected = data?.instance?.state === 'open'
         return { state: isConnected ? 'connected' : 'disconnected' }
       } catch (error) {
@@ -95,7 +96,6 @@ export function InstanceSlotCard({
         description: "Número excluído com sucesso",
       })
 
-      // Atualiza a página para mostrar a lista atualizada
       window.location.reload()
     } catch (error) {
       console.error('Erro ao excluir número:', error)
@@ -177,6 +177,14 @@ export function InstanceSlotCard({
               <Button
                 variant="ghost"
                 size="icon"
+                onClick={() => setShowConfigDialog(true)}
+                title="Configurar Objetivo"
+              >
+                <Tool className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
                 onClick={onConfigurePrompt}
                 title="Configurar Prompt"
               >
@@ -225,6 +233,12 @@ export function InstanceSlotCard({
           qrCode={qrCodeData}
         />
       )}
+
+      <InstanceConfigDialog
+        open={showConfigDialog}
+        onOpenChange={setShowConfigDialog}
+        instanceId={instance?.id}
+      />
     </>
   )
 }

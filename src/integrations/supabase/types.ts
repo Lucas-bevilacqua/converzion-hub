@@ -139,6 +139,44 @@ export type Database = {
           },
         ]
       }
+      instance_configurations: {
+        Row: {
+          created_at: string | null
+          id: string
+          instance_id: string
+          objective: Database["public"]["Enums"]["instance_objective"] | null
+          settings: Json | null
+          tools_config: Json | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          instance_id: string
+          objective?: Database["public"]["Enums"]["instance_objective"] | null
+          settings?: Json | null
+          tools_config?: Json | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          instance_id?: string
+          objective?: Database["public"]["Enums"]["instance_objective"] | null
+          settings?: Json | null
+          tools_config?: Json | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "instance_configurations_instance_id_fkey"
+            columns: ["instance_id"]
+            isOneToOne: true
+            referencedRelation: "evolution_instances"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       instance_metrics: {
         Row: {
           connection_time_minutes: number | null
@@ -301,6 +339,12 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
+      instance_objective:
+        | "sales"
+        | "support"
+        | "scheduling"
+        | "education"
+        | "custom"
       subscription_status: "active" | "canceled" | "past_due" | "trial"
     }
     CompositeTypes: {
