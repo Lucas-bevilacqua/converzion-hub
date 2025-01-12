@@ -132,7 +132,6 @@ serve(async (req) => {
     }
 
     try {
-      // Using the correct URL format for checking instance state
       const stateUrl = `${evolutionApiUrl}/instance/connectionState/${instanceName}`
       console.log('Checking state with URL:', stateUrl)
       
@@ -157,12 +156,15 @@ serve(async (req) => {
       }
 
       const stateData = await response.json()
-      console.log('Instance state:', stateData)
+      console.log('Instance state response:', stateData)
+      
+      // Map the Evolution API response to our expected format
+      const connectionState = stateData.instance?.state === 'open' ? 'connected' : 'disconnected'
       
       const { error: updateError } = await supabaseClient
         .from('evolution_instances')
         .update({
-          connection_status: stateData.state,
+          connection_status: connectionState,
           updated_at: new Date().toISOString()
         })
         .eq('id', instanceId)
@@ -171,8 +173,9 @@ serve(async (req) => {
         console.error('Error updating instance:', updateError)
       }
 
+      // Return the mapped state in our format
       return new Response(
-        JSON.stringify(stateData),
+        JSON.stringify({ state: connectionState }),
         { 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 200 
