@@ -75,7 +75,11 @@ export function InstancesCard() {
   }
 
   const getInstanceLimit = () => {
-    console.log('Verificando limite de instâncias - Status:', subscription?.status, 'Plano:', subscription?.plan_id)
+    console.log('Verificando limite de instâncias:', {
+      status: subscription?.status,
+      plano: subscription?.plan_id,
+      planoCompleto: subscription
+    })
     
     if (!subscription) {
       console.log('Nenhuma assinatura encontrada')
@@ -83,9 +87,10 @@ export function InstancesCard() {
     }
     
     if (subscription.status === 'trial' || subscription.status === 'active') {
-      // Plano Professional tem 3 instâncias, Starter tem 1
-      const limit = subscription.plan_id === 'professional' ? 3 : 1
-      console.log(`Limite de instâncias para o plano ${subscription.plan_id}:`, limit)
+      // Verifica se o plano é professional (que inclui "professional" no ID)
+      const isProfessional = subscription.plan_id?.toLowerCase().includes('professional')
+      const limit = isProfessional ? 3 : 1
+      console.log(`Limite de instâncias para o plano ${subscription.plan_id}:`, limit, 'isProfessional:', isProfessional)
       return limit
     }
     
@@ -102,7 +107,8 @@ export function InstancesCard() {
     limite: instanceLimit,
     usadas: usedSlots,
     disponíveis: availableSlots,
-    conectadas: connectedInstances
+    conectadas: connectedInstances,
+    subscription: subscription
   })
 
   return (
