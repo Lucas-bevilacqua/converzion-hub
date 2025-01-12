@@ -229,6 +229,7 @@ export type Database = {
           instance_id: string
           is_active: boolean | null
           settings: Json | null
+          setup_guide: Json | null
           tool_type: Database["public"]["Enums"]["tool_type"]
           updated_at: string
         }
@@ -238,6 +239,7 @@ export type Database = {
           instance_id: string
           is_active?: boolean | null
           settings?: Json | null
+          setup_guide?: Json | null
           tool_type: Database["public"]["Enums"]["tool_type"]
           updated_at?: string
         }
@@ -247,6 +249,7 @@ export type Database = {
           instance_id?: string
           is_active?: boolean | null
           settings?: Json | null
+          setup_guide?: Json | null
           tool_type?: Database["public"]["Enums"]["tool_type"]
           updated_at?: string
         }
