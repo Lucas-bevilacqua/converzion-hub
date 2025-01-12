@@ -41,7 +41,10 @@ export function InstanceSlotCard({
         }
 
         const { data, error } = await supabase.functions.invoke('check-instance-state', {
-          body: { instanceId: instance.id }
+          body: { 
+            instanceId: instance.id,
+            instanceName: instance.name // Adding instance name for the new URL format
+          }
         })
         
         if (error) {

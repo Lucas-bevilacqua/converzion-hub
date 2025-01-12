@@ -2,7 +2,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Loader2 } from "lucide-react"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { supabase } from "@/integrations/supabase/client"
 import { useToast } from "@/components/ui/use-toast"
@@ -20,9 +20,16 @@ export function InstancePromptDialog({
   instanceId,
   currentPrompt
 }: InstancePromptDialogProps) {
-  const [prompt, setPrompt] = useState(currentPrompt || "")
+  const [prompt, setPrompt] = useState("")
   const { toast } = useToast()
   const queryClient = useQueryClient()
+
+  // Update prompt state when dialog opens or currentPrompt changes
+  useEffect(() => {
+    if (open && currentPrompt !== undefined) {
+      setPrompt(currentPrompt || "")
+    }
+  }, [open, currentPrompt])
 
   const mutation = useMutation({
     mutationFn: async () => {
