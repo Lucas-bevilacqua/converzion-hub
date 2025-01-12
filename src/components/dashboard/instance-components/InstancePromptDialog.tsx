@@ -30,6 +30,7 @@ const formSchema = z.object({
   objective: z.enum(['sales', 'support', 'scheduling', 'education', 'custom'], {
     required_error: "Por favor selecione um objetivo",
   }),
+  prompt: z.string().optional(),
 })
 
 interface InstancePromptDialogProps {
@@ -45,7 +46,6 @@ export function InstancePromptDialog({
   instanceId,
   currentPrompt
 }: InstancePromptDialogProps) {
-  const [prompt, setPrompt] = useState("")
   const { toast } = useToast()
   const queryClient = useQueryClient()
 
@@ -53,6 +53,7 @@ export function InstancePromptDialog({
     resolver: zodResolver(formSchema),
     defaultValues: {
       objective: 'custom',
+      prompt: currentPrompt || "",
     },
   })
 
@@ -77,25 +78,26 @@ export function InstancePromptDialog({
         if (data) {
           form.reset({
             objective: data.objective,
+            prompt: currentPrompt || "",
           })
         }
       }
     }
   })
 
-  // Update prompt state when dialog opens or currentPrompt changes
+  // Update form when dialog opens or currentPrompt changes
   useEffect(() => {
     if (open && currentPrompt !== undefined) {
-      setPrompt(currentPrompt || "")
+      form.setValue('prompt', currentPrompt || "")
     }
-  }, [open, currentPrompt])
+  }, [open, currentPrompt, form])
 
   const promptMutation = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (values: z.infer<typeof formSchema>) => {
       console.log('Updating prompt for instance:', instanceId)
       const { error } = await supabase
         .from('evolution_instances')
-        .update({ system_prompt: prompt })
+        .update({ system_prompt: values.prompt })
         .eq('id', instanceId)
       
       if (error) throw error
@@ -150,13 +152,13 @@ export function InstancePromptDialog({
     }
   })
 
-  const handleSave = async () => {
+  const onSubmit = async (values: z.infer<typeof formSchema>) => {
     try {
-      // Salvar prompt
-      await promptMutation.mutateAsync()
-      
-      // Salvar configurações
-      await configMutation.mutateAsync(form.getValues())
+      // Salvar prompt e configurações
+      await Promise.all([
+        promptMutation.mutateAsync(values),
+        configMutation.mutateAsync(values)
+      ])
       
       // Fechar diálogo apenas se ambas as operações forem bem-sucedidas
       onOpenChange(false)
@@ -171,74 +173,81 @@ export function InstancePromptDialog({
         <DialogHeader>
           <DialogTitle>Configurar Instância</DialogTitle>
         </DialogHeader>
-        <div className="space-y-6">
-          <Form {...form}>
-            <form className="space-y-4">
-              <FormField
-                control={form.control}
-                name="objective"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Objetivo</FormLabel>
-                    <Select 
-                      onValueChange={field.onChange} 
-                      defaultValue={field.value}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecione um objetivo" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="sales">Vendas</SelectItem>
-                        <SelectItem value="support">Suporte</SelectItem>
-                        <SelectItem value="scheduling">Agendamentos</SelectItem>
-                        <SelectItem value="education">Educação</SelectItem>
-                        <SelectItem value="custom">Personalizado</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormDescription>
-                      O objetivo principal desta instância do WhatsApp.
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </form>
-          </Form>
-
-          <div className="space-y-2">
-            <FormLabel>Prompt do Sistema</FormLabel>
-            <Textarea
-              placeholder="Digite o prompt do sistema..."
-              value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
-              rows={6}
-            />
-            <FormDescription>
-              Configure como o assistente deve se comportar nesta instância.
-            </FormDescription>
-          </div>
-
-          <div className="flex gap-2 justify-end">
-            <Button
-              variant="outline"
-              onClick={() => onOpenChange(false)}
-              disabled={promptMutation.isPending || configMutation.isPending}
-            >
-              Cancelar
-            </Button>
-            <Button 
-              onClick={handleSave}
-              disabled={promptMutation.isPending || configMutation.isPending}
-            >
-              {(promptMutation.isPending || configMutation.isPending) && (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+            <FormField
+              control={form.control}
+              name="objective"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Objetivo</FormLabel>
+                  <Select 
+                    onValueChange={field.onChange} 
+                    defaultValue={field.value}
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione um objetivo" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="sales">Vendas</SelectItem>
+                      <SelectItem value="support">Suporte</SelectItem>
+                      <SelectItem value="scheduling">Agendamentos</SelectItem>
+                      <SelectItem value="education">Educação</SelectItem>
+                      <SelectItem value="custom">Personalizado</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormDescription>
+                    O objetivo principal desta instância do WhatsApp.
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
               )}
-              Salvar
-            </Button>
-          </div>
-        </div>
+            />
+
+            <FormField
+              control={form.control}
+              name="prompt"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Prompt do Sistema</FormLabel>
+                  <FormControl>
+                    <Textarea
+                      placeholder="Digite o prompt do sistema..."
+                      {...field}
+                      rows={6}
+                    />
+                  </FormControl>
+                  <FormDescription>
+                    Configure como o assistente deve se comportar nesta instância.
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <div className="flex gap-2 justify-end">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => onOpenChange(false)}
+                disabled={promptMutation.isPending || configMutation.isPending}
+              >
+                Cancelar
+              </Button>
+              <Button 
+                type="submit"
+                disabled={promptMutation.isPending || configMutation.isPending}
+              >
+                {(promptMutation.isPending || configMutation.isPending) && (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                )}
+                Salvar
+              </Button>
+            </div>
+          </form>
+        </Form>
       </DialogContent>
     </Dialog>
   )
