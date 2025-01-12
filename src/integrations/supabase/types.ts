@@ -203,7 +203,7 @@ export type Database = {
           instance_id?: string
           messages_sent?: number | null
           updated_at?: string | null
-          user_id: string
+          user_id?: string
         }
         Relationships: [
           {
@@ -224,31 +224,31 @@ export type Database = {
       }
       instance_webhooks: {
         Row: {
+          created_at: string
           id: string
           instance_id: string
-          webhook_url: string
-          webhook_type: 'n8n' | 'zapier' | 'make'
           is_active: boolean | null
-          created_at: string
           updated_at: string
+          webhook_type: Database["public"]["Enums"]["webhook_type"]
+          webhook_url: string
         }
         Insert: {
+          created_at?: string
           id?: string
           instance_id: string
-          webhook_url: string
-          webhook_type?: 'n8n' | 'zapier' | 'make'
           is_active?: boolean | null
-          created_at?: string
           updated_at?: string
+          webhook_type?: Database["public"]["Enums"]["webhook_type"]
+          webhook_url: string
         }
         Update: {
+          created_at?: string
           id?: string
           instance_id?: string
-          webhook_url?: string
-          webhook_type?: 'n8n' | 'zapier' | 'make'
           is_active?: boolean | null
-          created_at?: string
           updated_at?: string
+          webhook_type?: Database["public"]["Enums"]["webhook_type"]
+          webhook_url?: string
         }
         Relationships: [
           {
@@ -257,7 +257,7 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "evolution_instances"
             referencedColumns: ["id"]
-          }
+          },
         ]
       }
       profiles: {
@@ -278,7 +278,7 @@ export type Database = {
         Update: {
           created_at?: string
           full_name?: string | null
-          id: string
+          id?: string
           is_admin?: boolean | null
           updated_at?: string
         }
@@ -334,6 +334,41 @@ export type Database = {
           },
         ]
       }
+      Users_clientes: {
+        Row: {
+          ConversationId: string | null
+          created_at: string
+          id: number
+          NomeClientes: string | null
+          NomeDaEmpresa: string | null
+          TelefoneClientes: string | null
+        }
+        Insert: {
+          ConversationId?: string | null
+          created_at?: string
+          id?: number
+          NomeClientes?: string | null
+          NomeDaEmpresa?: string | null
+          TelefoneClientes?: string | null
+        }
+        Update: {
+          ConversationId?: string | null
+          created_at?: string
+          id?: number
+          NomeClientes?: string | null
+          NomeDaEmpresa?: string | null
+          TelefoneClientes?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "Users_clientes_NomeDaEmpresa_fkey"
+            columns: ["NomeDaEmpresa"]
+            isOneToOne: false
+            referencedRelation: "evolution_instances"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -366,7 +401,7 @@ export type Tables<
   TableName extends PublicTableNameOrOptions extends { schema: keyof Database }
     ? keyof (Database[PublicTableNameOrOptions["schema"]]["Tables"] &
         Database[PublicTableNameOrOptions["schema"]]["Views"])
-    : never,
+    : never = never,
 > = PublicTableNameOrOptions extends { schema: keyof Database }
   ? (Database[PublicTableNameOrOptions["schema"]]["Tables"] &
       Database[PublicTableNameOrOptions["schema"]]["Views"])[TableName] extends {
@@ -378,10 +413,10 @@ export type Tables<
         PublicSchema["Views"])
     ? (PublicSchema["Tables"] &
         PublicSchema["Views"])[PublicTableNameOrOptions] extends {
-      Row: infer R
-    }
-    ? R
-    : never
+        Row: infer R
+      }
+      ? R
+      : never
     : never
 
 export type TablesInsert<
