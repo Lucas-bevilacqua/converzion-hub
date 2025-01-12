@@ -8,6 +8,10 @@ const corsHeaders = {
 }
 
 serve(async (req) => {
+  console.log('Stripe checkout request received')
+  console.log('Request method:', req.method)
+  console.log('Request headers:', Object.fromEntries(req.headers.entries()))
+
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
   }
@@ -68,7 +72,7 @@ serve(async (req) => {
       customer_email: customer_id ? undefined : user.email,
       client_reference_id: user.id,
       metadata: {
-        planId: planId // Incluímos o planId nos metadados
+        planId: planId
       },
       line_items: [
         {
