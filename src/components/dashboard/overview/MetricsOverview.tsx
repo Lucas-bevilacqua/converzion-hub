@@ -83,12 +83,14 @@ export function MetricsOverview() {
                   name="messages"
                   fill="var(--color-messages)"
                   radius={[4, 4, 0, 0]}
+                  isAnimationActive={false}
                 />
                 <Bar
                   dataKey="connection_time_minutes"
                   name="time"
                   fill="var(--color-time)"
                   radius={[4, 4, 0, 0]}
+                  isAnimationActive={false}
                 />
               </BarChart>
             </ResponsiveContainer>
