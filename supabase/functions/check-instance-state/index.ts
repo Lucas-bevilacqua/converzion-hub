@@ -84,8 +84,12 @@ serve(async (req) => {
       console.log('No valid subscription found for user:', user.id)
       return new Response(
         JSON.stringify({ 
-          error: 'No subscription found',
-          code: 'subscription_required'
+          error: 'No active or trial subscription found',
+          code: 'subscription_required',
+          details: { 
+            subscription_status: subscription?.status || 'none',
+            user_id: user.id
+          }
         }),
         { 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
