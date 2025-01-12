@@ -222,6 +222,44 @@ export type Database = {
           },
         ]
       }
+      instance_tools: {
+        Row: {
+          created_at: string
+          id: string
+          instance_id: string
+          is_active: boolean | null
+          settings: Json | null
+          tool_type: Database["public"]["Enums"]["tool_type"]
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          instance_id: string
+          is_active?: boolean | null
+          settings?: Json | null
+          tool_type: Database["public"]["Enums"]["tool_type"]
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          instance_id?: string
+          is_active?: boolean | null
+          settings?: Json | null
+          tool_type?: Database["public"]["Enums"]["tool_type"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "instance_tools_instance_id_fkey"
+            columns: ["instance_id"]
+            isOneToOne: false
+            referencedRelation: "evolution_instances"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       instance_webhooks: {
         Row: {
           created_at: string
@@ -384,6 +422,7 @@ export type Database = {
         | "education"
         | "custom"
       subscription_status: "active" | "canceled" | "past_due" | "trial"
+      tool_type: "calendar" | "crm" | "payment" | "custom"
       webhook_type: "n8n" | "zapier" | "make"
     }
     CompositeTypes: {

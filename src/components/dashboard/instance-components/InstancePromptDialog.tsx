@@ -26,6 +26,8 @@ import {
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import * as z from "zod"
+import { InstanceToolsSection } from "./InstanceToolsSection"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
 const formSchema = z.object({
   objective: z.enum(['sales', 'support', 'scheduling', 'education', 'custom'], {
@@ -285,104 +287,115 @@ export function InstancePromptDialog({
         <DialogHeader>
           <DialogTitle>Configurar Instância</DialogTitle>
         </DialogHeader>
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-            <FormField
-              control={form.control}
-              name="objective"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Objetivo</FormLabel>
-                  <Select 
-                    onValueChange={field.onChange} 
-                    defaultValue={field.value}
+        <Tabs defaultValue="prompt">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="prompt">Prompt</TabsTrigger>
+            <TabsTrigger value="tools">Ferramentas</TabsTrigger>
+          </TabsList>
+          <TabsContent value="prompt">
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+                <FormField
+                  control={form.control}
+                  name="objective"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Objetivo</FormLabel>
+                      <Select 
+                        onValueChange={field.onChange} 
+                        defaultValue={field.value}
+                        disabled={isSaving}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecione um objetivo" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="sales">Vendas</SelectItem>
+                          <SelectItem value="support">Suporte</SelectItem>
+                          <SelectItem value="scheduling">Agendamentos</SelectItem>
+                          <SelectItem value="education">Educação</SelectItem>
+                          <SelectItem value="custom">Personalizado</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormDescription>
+                        O objetivo principal desta instância do WhatsApp.
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="prompt"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Prompt do Sistema</FormLabel>
+                      <FormControl>
+                        <Textarea
+                          placeholder="Digite o prompt do sistema..."
+                          {...field}
+                          rows={6}
+                          disabled={isSaving}
+                        />
+                      </FormControl>
+                      <FormDescription>
+                        Configure como o assistente deve se comportar nesta instância.
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="webhookUrl"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>URL do Webhook (n8n)</FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="https://seu-n8n.com/webhook/..."
+                          {...field}
+                          disabled={isSaving}
+                        />
+                      </FormControl>
+                      <FormDescription>
+                        Configure um webhook do n8n para integrar com outras ferramentas.
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <div className="flex gap-2 justify-end">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => onOpenChange(false)}
                     disabled={isSaving}
                   >
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecione um objetivo" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="sales">Vendas</SelectItem>
-                      <SelectItem value="support">Suporte</SelectItem>
-                      <SelectItem value="scheduling">Agendamentos</SelectItem>
-                      <SelectItem value="education">Educação</SelectItem>
-                      <SelectItem value="custom">Personalizado</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <FormDescription>
-                    O objetivo principal desta instância do WhatsApp.
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="prompt"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Prompt do Sistema</FormLabel>
-                  <FormControl>
-                    <Textarea
-                      placeholder="Digite o prompt do sistema..."
-                      {...field}
-                      rows={6}
-                      disabled={isSaving}
-                    />
-                  </FormControl>
-                  <FormDescription>
-                    Configure como o assistente deve se comportar nesta instância.
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="webhookUrl"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>URL do Webhook (n8n)</FormLabel>
-                  <FormControl>
-                    <Input
-                      placeholder="https://seu-n8n.com/webhook/..."
-                      {...field}
-                      disabled={isSaving}
-                    />
-                  </FormControl>
-                  <FormDescription>
-                    Configure um webhook do n8n para integrar com outras ferramentas.
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <div className="flex gap-2 justify-end">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => onOpenChange(false)}
-                disabled={isSaving}
-              >
-                Cancelar
-              </Button>
-              <Button 
-                type="submit"
-                disabled={isSaving}
-              >
-                {isSaving && (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                )}
-                Salvar
-              </Button>
-            </div>
-          </form>
-        </Form>
+                    Cancelar
+                  </Button>
+                  <Button 
+                    type="submit"
+                    disabled={isSaving}
+                  >
+                    {isSaving && (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    )}
+                    Salvar
+                  </Button>
+                </div>
+              </form>
+            </Form>
+          </TabsContent>
+          <TabsContent value="tools">
+            {instanceId && <InstanceToolsSection instanceId={instanceId} />}
+          </TabsContent>
+        </Tabs>
       </DialogContent>
     </Dialog>
   )
