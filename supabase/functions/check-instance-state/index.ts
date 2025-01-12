@@ -4,17 +4,48 @@ import { parseISO, isAfter } from 'https://esm.sh/date-fns@3.3.1'
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
 
 Deno.serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders })
+    return new Response(null, { 
+      headers: corsHeaders,
+      status: 204
+    })
   }
 
   try {
     const { instanceId, instanceName } = await req.json()
-    const authHeader = req.headers.get('Authorization')!
+    console.log('Received request for instance:', { instanceId, instanceName })
+
+    if (!instanceId || !instanceName) {
+      console.error('Missing required parameters:', { instanceId, instanceName })
+      return new Response(
+        JSON.stringify({
+          error: 'Missing required parameters',
+          details: { instanceId, instanceName }
+        }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      )
+    }
+
+    const authHeader = req.headers.get('Authorization')
+    if (!authHeader) {
+      console.error('No authorization header found')
+      return new Response(
+        JSON.stringify({ error: 'No authorization header' }),
+        {
+          status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      )
+    }
+
     const token = authHeader.replace('Bearer ', '')
 
     // Create Supabase client
@@ -64,8 +95,11 @@ Deno.serve(async (req) => {
     }
 
     const currentTime = new Date()
-    console.log('Current time:', currentTime.toISOString())
-    console.log('Subscription:', subscription)
+    console.log('Checking subscription status:', {
+      status: subscription?.status,
+      trial_ends_at: subscription?.trial_ends_at,
+      currentTime: currentTime.toISOString()
+    })
 
     // Check if user has an active subscription or valid trial
     const hasActiveSubscription = subscription?.status === 'active'
@@ -74,7 +108,10 @@ Deno.serve(async (req) => {
       !isAfter(currentTime, parseISO(subscription.trial_ends_at))
 
     if (!hasActiveSubscription && !hasValidTrial) {
-      console.log('No active subscription found. Trial ends at:', subscription?.trial_ends_at)
+      console.log('No active subscription found:', {
+        subscription_status: subscription?.status,
+        trial_ends_at: subscription?.trial_ends_at
+      })
       return new Response(
         JSON.stringify({
           error: 'No active or trial subscription found',
@@ -83,7 +120,6 @@ Deno.serve(async (req) => {
             subscription_status: subscription?.status || 'none',
             current_time: currentTime.toISOString(),
             trial_ends_at: subscription?.trial_ends_at,
-            user_id: user.id,
           },
         }),
         {
@@ -119,7 +155,6 @@ Deno.serve(async (req) => {
     const evolutionApiUrl = Deno.env.get('EVOLUTION_API_URL')!
     const evolutionApiKey = Deno.env.get('EVOLUTION_API_KEY')!
     
-    // Ensure URL is properly constructed
     const connectionStateUrl = new URL(`/instance/connectionState/${instanceName}`, evolutionApiUrl).toString()
     console.log('Checking connection state at URL:', connectionStateUrl)
 
@@ -131,9 +166,12 @@ Deno.serve(async (req) => {
     })
 
     if (!response.ok) {
-      console.error('Error from Evolution API:', response.status, response.statusText)
-      const errorData = await response.text()
-      console.error('Error data:', errorData)
+      console.error('Error from Evolution API:', {
+        status: response.status,
+        statusText: response.statusText
+      })
+      const errorText = await response.text()
+      console.error('Error details:', errorText)
       
       return new Response(
         JSON.stringify({
@@ -141,7 +179,7 @@ Deno.serve(async (req) => {
           details: {
             status: response.status,
             statusText: response.statusText,
-            error: errorData,
+            error: errorText,
           },
         }),
         {
