@@ -1,14 +1,10 @@
-import { createClient } from '@supabase/supabase-js'
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.47.12'
 import { parseISO, isAfter } from 'https://esm.sh/date-fns@3.3.1'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
-
-const supabaseUrl = Deno.env.get('SUPABASE_URL')!
-const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-const supabase = createClient(supabaseUrl, supabaseKey)
 
 Deno.serve(async (req) => {
   // Handle CORS preflight requests
@@ -17,9 +13,14 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { instance_id } = await req.json()
+    const { instanceId, instanceName } = await req.json()
     const authHeader = req.headers.get('Authorization')!
     const token = authHeader.replace('Bearer ', '')
+
+    // Create Supabase client
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    const supabase = createClient(supabaseUrl, supabaseKey)
 
     // Verify the JWT and get the user
     const {
@@ -96,7 +97,7 @@ Deno.serve(async (req) => {
     const { data: instance, error: instanceError } = await supabase
       .from('evolution_instances')
       .select('*')
-      .eq('id', instance_id)
+      .eq('id', instanceId)
       .eq('user_id', user.id)
       .maybeSingle()
 
