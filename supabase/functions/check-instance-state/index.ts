@@ -63,11 +63,12 @@ serve(async (req) => {
       )
     }
 
-    const hasValidSubscription = subscription && 
-      (subscription.status === 'active' || 
-       (subscription.status === 'trial' && 
-        subscription.trial_ends_at && 
-        new Date(subscription.trial_ends_at) > new Date()))
+    console.log('Found subscription:', subscription)
+
+    const hasValidSubscription = subscription && (
+      subscription.status === 'active' || 
+      subscription.status === 'trial'
+    )
 
     if (!hasValidSubscription) {
       console.log('No valid subscription found for user:', user.id, 'Status:', subscription?.status)
