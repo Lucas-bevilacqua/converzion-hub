@@ -8,6 +8,7 @@ export async function handleCheckoutCompleted(
 ) {
   console.log('Processing checkout.session.completed event')
   const session = event.data.object as Stripe.Checkout.Session
+  const metadata = session.metadata || {}
 
   if (!session?.subscription || !session?.customer) {
     console.error('Missing subscription or customer in session')
@@ -27,7 +28,8 @@ export async function handleCheckoutCompleted(
   console.log('Subscription retrieved:', {
     id: subscription.id,
     priceId: subscription.items.data[0].price.id,
-    customerId: session.customer
+    customerId: session.customer,
+    planId: metadata.planId
   })
 
   if (!session.client_reference_id) {
@@ -61,7 +63,7 @@ export async function handleCheckoutCompleted(
     stripe_customer_id: session.customer,
     stripe_subscription_id: session.subscription,
     status: subscription.status === 'active' ? 'active' : 'past_due',
-    plan_id: subscription.items.data[0].price.id,
+    plan_id: metadata.planId || (subscription.items.data[0].price.id === 'price_1QbuUvKkjJ7tububiklS9tAc' ? 'professional' : 'starter'),
     current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
     trial_ends_at: null, // Remove trial when upgrading
     trial_started_at: null // Remove trial when upgrading

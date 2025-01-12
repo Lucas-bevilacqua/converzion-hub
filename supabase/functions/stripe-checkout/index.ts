@@ -41,11 +41,12 @@ serve(async (req) => {
     })
 
     // Get request body
-    const { priceId } = await req.json()
+    const { priceId, planId } = await req.json()
     if (!priceId) {
       throw new Error('No price ID provided')
     }
     console.log('Price ID:', priceId)
+    console.log('Plan ID:', planId)
 
     console.log('Checking for existing customer...')
     const customers = await stripe.customers.list({
@@ -65,7 +66,10 @@ serve(async (req) => {
     const session = await stripe.checkout.sessions.create({
       customer: customer_id,
       customer_email: customer_id ? undefined : user.email,
-      client_reference_id: user.id, // Important: Pass the user ID here
+      client_reference_id: user.id,
+      metadata: {
+        planId: planId // Incluímos o planId nos metadados
+      },
       line_items: [
         {
           price: priceId,

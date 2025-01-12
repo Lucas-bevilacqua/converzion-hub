@@ -8,8 +8,14 @@ export const useUpgradeSubscription = () => {
     try {
       console.log('Iniciando processo de checkout para o plano com priceId:', priceId)
       
+      // Mapeia o priceId para o planId correto
+      const planId = priceId === 'price_1QbuUvKkjJ7tububiklS9tAc' ? 'professional' : 'starter'
+      
       const { data, error } = await supabase.functions.invoke('stripe-checkout', {
-        body: { priceId },
+        body: { 
+          priceId,
+          planId // Passamos o planId junto com o priceId
+        },
       })
 
       if (error) {
