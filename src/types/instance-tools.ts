@@ -5,7 +5,10 @@ export interface InstanceTool {
   instance_id: string;
   tool_type: ToolType;
   is_active: boolean;
-  settings: Record<string, any>;
+  settings: {
+    webhook_url?: string;
+    [key: string]: any;
+  };
   created_at: string;
   updated_at: string;
 }
