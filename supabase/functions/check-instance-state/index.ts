@@ -10,7 +10,6 @@ const corsHeaders = {
 console.log('Check Instance State function started')
 
 serve(async (req) => {
-  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
@@ -179,7 +178,7 @@ serve(async (req) => {
         const errorText = await response.text()
         console.error('Error from Evolution API:', errorText)
         return new Response(
-          JSON.stringify({ error: 'Failed to check instance state' }),
+          JSON.stringify({ error: 'Failed to check instance state', details: errorText }),
           { 
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
             status: response.status
@@ -217,7 +216,7 @@ serve(async (req) => {
     } catch (error) {
       console.error('Error checking instance state with Evolution API:', error)
       return new Response(
-        JSON.stringify({ error: 'Failed to check instance state' }),
+        JSON.stringify({ error: 'Failed to check instance state', details: error.message }),
         { 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 500
@@ -228,7 +227,7 @@ serve(async (req) => {
   } catch (error) {
     console.error('Unexpected error in check-instance-state:', error)
     return new Response(
-      JSON.stringify({ error: 'Internal server error' }),
+      JSON.stringify({ error: 'Internal server error', details: error.message }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 500
