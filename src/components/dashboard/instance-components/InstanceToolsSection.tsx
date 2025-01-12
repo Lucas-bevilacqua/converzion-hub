@@ -3,16 +3,24 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { Calendar, CreditCard, Users, Check, X, ExternalLink } from "lucide-react";
+import { Calendar, CreditCard, Users, Check, X, ExternalLink, Key } from "lucide-react";
 import { InstanceTool, ToolType } from "@/types/instance-tools";
 import { useToast } from "@/components/ui/use-toast";
+import { Button } from "@/components/ui/button";
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 
 interface InstanceToolsSectionProps {
   instanceId: string;
@@ -47,6 +55,8 @@ const TOOL_SETUP_GUIDES = {
       "5. Cole o ID do calendário aqui para ativar a integração"
     ],
     docsUrl: "https://support.google.com/calendar/answer/37083",
+    autoSetupAvailable: true,
+    setupUrl: "https://calendar.google.com/calendar/embedhelper"
   },
   payment: {
     title: "Como configurar Pagamentos",
@@ -58,6 +68,8 @@ const TOOL_SETUP_GUIDES = {
       "5. Configure a chave aqui para ativar pagamentos"
     ],
     docsUrl: "https://stripe.com/docs/keys",
+    autoSetupAvailable: true,
+    setupUrl: "https://dashboard.stripe.com/apikeys"
   },
   crm: {
     title: "Como configurar o CRM",
@@ -69,12 +81,17 @@ const TOOL_SETUP_GUIDES = {
       "5. Configure a chave aqui para sincronizar contatos"
     ],
     docsUrl: "https://knowledge.hubspot.com/pt/integrations/how-do-i-get-my-hubspot-api-key",
+    autoSetupAvailable: true,
+    setupUrl: "https://app.hubspot.com/api-key"
   },
 };
 
 export function InstanceToolsSection({ instanceId }: InstanceToolsSectionProps) {
   const { toast } = useToast();
   const [isUpdating, setIsUpdating] = useState(false);
+  const [selectedTool, setSelectedTool] = useState<ToolType | null>(null);
+  const [credentialDialog, setCredentialDialog] = useState(false);
+  const [credentials, setCredentials] = useState("");
   const queryClient = useQueryClient();
 
   const { data: tools, isLoading } = useQuery({
@@ -98,20 +115,24 @@ export function InstanceToolsSection({ instanceId }: InstanceToolsSectionProps) 
   const updateToolMutation = useMutation({
     mutationFn: async ({ 
       toolType, 
-      isActive
+      isActive,
+      credentials
     }: { 
       toolType: ToolType; 
       isActive: boolean;
+      credentials?: string;
     }) => {
-      console.log('Updating tool:', { toolType, isActive });
+      console.log('Updating tool:', { toolType, isActive, hasCredentials: !!credentials });
       
       const existingTool = tools?.find(t => t.tool_type === toolType);
+      const settings = credentials ? { api_key: credentials } : {};
 
       if (existingTool) {
         const { error } = await supabase
           .from('instance_tools')
           .update({ 
             is_active: isActive,
+            settings: credentials ? settings : existingTool.settings,
             updated_at: new Date().toISOString()
           })
           .eq('id', existingTool.id);
@@ -124,6 +145,7 @@ export function InstanceToolsSection({ instanceId }: InstanceToolsSectionProps) 
             instance_id: instanceId,
             tool_type: toolType,
             is_active: isActive,
+            settings: settings,
             setup_guide: TOOL_SETUP_GUIDES[toolType]
           });
 
@@ -134,8 +156,10 @@ export function InstanceToolsSection({ instanceId }: InstanceToolsSectionProps) 
       queryClient.invalidateQueries({ queryKey: ['instance-tools'] });
       toast({
         title: "Sucesso",
-        description: "Status da ferramenta atualizado. Siga o guia de configuração para completar a integração.",
+        description: "Status da ferramenta atualizado.",
       });
+      setCredentialDialog(false);
+      setCredentials("");
     },
     onError: (error) => {
       console.error('Error updating tool:', error);
@@ -150,13 +174,28 @@ export function InstanceToolsSection({ instanceId }: InstanceToolsSectionProps) 
   const handleToggleTool = async (toolType: ToolType, currentState: boolean) => {
     try {
       setIsUpdating(true);
-      await updateToolMutation.mutateAsync({ 
-        toolType, 
-        isActive: !currentState
-      });
+      if (!currentState) {
+        setSelectedTool(toolType);
+        setCredentialDialog(true);
+      } else {
+        await updateToolMutation.mutateAsync({ 
+          toolType, 
+          isActive: !currentState
+        });
+      }
     } finally {
       setIsUpdating(false);
     }
+  };
+
+  const handleCredentialSubmit = async () => {
+    if (!selectedTool) return;
+    
+    await updateToolMutation.mutateAsync({
+      toolType: selectedTool,
+      isActive: true,
+      credentials
+    });
   };
 
   const getToolState = (toolType: ToolType) => {
@@ -177,8 +216,8 @@ export function InstanceToolsSection({ instanceId }: InstanceToolsSectionProps) 
   return (
     <div className="space-y-6">
       <div className="text-sm text-muted-foreground">
-        Ative as ferramentas que deseja integrar ao seu WhatsApp. Siga o guia de configuração
-        de cada ferramenta para completar a integração.
+        Ative as ferramentas que deseja integrar ao seu WhatsApp. Para cada ferramenta,
+        você precisará fornecer as credenciais necessárias para a integração funcionar.
       </div>
       <div className="space-y-4">
         {availableTools.map((toolType) => {
@@ -242,16 +281,16 @@ export function InstanceToolsSection({ instanceId }: InstanceToolsSectionProps) 
                   <p className="text-sm text-muted-foreground">
                     {TOOL_DESCRIPTIONS[toolType]}
                   </p>
-                  {isActive && (
-                    <div className="space-y-3">
-                      <h4 className="font-medium">{guide.title}</h4>
-                      <ul className="list-none space-y-2">
-                        {guide.steps.map((step, index) => (
-                          <li key={index} className="text-sm text-muted-foreground">
-                            {step}
-                          </li>
-                        ))}
-                      </ul>
+                  <div className="space-y-3">
+                    <h4 className="font-medium">{guide.title}</h4>
+                    <ul className="list-none space-y-2">
+                      {guide.steps.map((step, index) => (
+                        <li key={index} className="text-sm text-muted-foreground">
+                          {step}
+                        </li>
+                      ))}
+                    </ul>
+                    <div className="flex gap-2">
                       <Button
                         variant="outline"
                         size="sm"
@@ -261,14 +300,58 @@ export function InstanceToolsSection({ instanceId }: InstanceToolsSectionProps) 
                         <ExternalLink className="h-4 w-4 mr-2" />
                         Ver documentação completa
                       </Button>
+                      {guide.autoSetupAvailable && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="mt-2"
+                          onClick={() => window.open(guide.setupUrl, '_blank')}
+                        >
+                          <Key className="h-4 w-4 mr-2" />
+                          Obter credenciais
+                        </Button>
+                      )}
                     </div>
-                  )}
+                  </div>
                 </div>
               </CollapsibleContent>
             </Collapsible>
           );
         })}
       </div>
+
+      <Dialog open={credentialDialog} onOpenChange={setCredentialDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Configurar {selectedTool && TOOL_LABELS[selectedTool]}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Chave de API</Label>
+              <Input
+                type="password"
+                placeholder="Cole sua chave de API aqui"
+                value={credentials}
+                onChange={(e) => setCredentials(e.target.value)}
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setCredentialDialog(false);
+                  setCredentials("");
+                }}
+              >
+                Cancelar
+              </Button>
+              <Button onClick={handleCredentialSubmit} disabled={!credentials}>
+                Salvar
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
