@@ -104,7 +104,7 @@ export function InstanceSlotCard({
     }
   }
 
-  const isConnected = stateData?.state === 'connected'
+  const isConnected = stateData?.state === 'connected' || instance?.connection_status === 'connected'
 
   const handleConnect = async () => {
     if (!instance?.id) return
@@ -165,6 +165,9 @@ export function InstanceSlotCard({
               <div>
                 <p className="font-medium">{instance.name}</p>
                 <p className="text-sm text-muted-foreground">{instance.phone_number}</p>
+                <p className="text-sm text-muted-foreground">
+                  Status: {isConnected ? 'Conectado' : 'Desconectado'}
+                </p>
               </div>
             </div>
             <div className="flex gap-2">
