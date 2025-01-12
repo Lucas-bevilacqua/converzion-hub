@@ -71,7 +71,11 @@ serve(async (req) => {
     // Check if subscription is active or trial
     const hasValidSubscription = subscription && (
       subscription.status === 'active' || 
-      subscription.status === 'trial'
+      (
+        subscription.status === 'trial' && 
+        subscription.trial_ends_at && 
+        new Date(subscription.trial_ends_at) > new Date()
+      )
     )
 
     if (!hasValidSubscription) {
@@ -93,10 +97,10 @@ serve(async (req) => {
     }
 
     // Get instance details from request
-    const { instanceId, instanceName } = await req.json()
-    if (!instanceId || !instanceName) {
+    const { instanceId } = await req.json()
+    if (!instanceId) {
       return new Response(
-        JSON.stringify({ error: 'Instance ID and name are required' }),
+        JSON.stringify({ error: 'Instance ID is required' }),
         { 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 400
@@ -139,7 +143,7 @@ serve(async (req) => {
     }
 
     try {
-      const stateUrl = `${evolutionApiUrl}/instance/connectionState/${instanceName}`
+      const stateUrl = `${evolutionApiUrl}/instance/connectionState/${instance.name}`
       console.log('Checking state with URL:', stateUrl)
       
       const response = await fetch(stateUrl, {
