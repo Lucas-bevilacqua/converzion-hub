@@ -65,9 +65,7 @@ serve(async (req) => {
     }
 
     console.log('Found subscription:', subscription)
-    console.log('Trial ends at:', subscription?.trial_ends_at)
-    console.log('Current status:', subscription?.status)
-
+    
     // Check if subscription is active or trial
     const hasValidSubscription = subscription && (
       subscription.status === 'active' || 
@@ -78,17 +76,22 @@ serve(async (req) => {
       )
     )
 
+    console.log('Subscription validation:', {
+      status: subscription?.status,
+      trial_ends_at: subscription?.trial_ends_at,
+      hasValidSubscription
+    })
+
     if (!hasValidSubscription) {
-      console.log('No valid subscription found. Status:', subscription?.status)
-      console.log('Trial ends at:', subscription?.trial_ends_at)
+      console.log('No valid subscription found')
       return new Response(
         JSON.stringify({ 
           error: 'No active or trial subscription found',
           code: 'subscription_required',
           details: { 
             subscription_status: subscription?.status || 'none',
-            user_id: user.id,
-            trial_ends_at: subscription?.trial_ends_at
+            trial_ends_at: subscription?.trial_ends_at,
+            user_id: user.id
           }
         }),
         { 
