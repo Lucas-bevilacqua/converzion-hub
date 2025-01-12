@@ -4,6 +4,8 @@ import { useAuth } from "@/contexts/auth/AuthContext";
 import { useToast } from "@/components/ui/use-toast";
 import { Check } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { useState } from "react";
+import { EnterpriseContactDialog } from "./EnterpriseContactDialog";
 
 const plans = [
   {
