@@ -10,6 +10,7 @@ const corsHeaders = {
 console.log('Check Instance State function started')
 
 serve(async (req) => {
+  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
@@ -103,8 +104,21 @@ serve(async (req) => {
       )
     }
 
-    // Get instance details from request
-    const { instanceId } = await req.json()
+    let requestBody;
+    try {
+      requestBody = await req.json()
+    } catch (error) {
+      console.error('Error parsing request body:', error)
+      return new Response(
+        JSON.stringify({ error: 'Invalid request body' }),
+        { 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 400
+        }
+      )
+    }
+
+    const { instanceId } = requestBody
     if (!instanceId) {
       return new Response(
         JSON.stringify({ error: 'Instance ID is required' }),
