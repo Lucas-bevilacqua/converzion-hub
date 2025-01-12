@@ -24,6 +24,8 @@ serve(async (req) => {
       throw new Error('HubSpot API key not configured')
     }
 
+    console.log('Creating HubSpot contact with data:', { name, email, phone, source })
+
     const response = await fetch('https://api.hubapi.com/crm/v3/objects/contacts', {
       method: 'POST',
       headers: {
@@ -36,15 +38,23 @@ serve(async (req) => {
           lastname: name.split(' ').slice(1).join(' '),
           email: email,
           phone: phone,
-          lead_source: source,
+          // Using a standard HubSpot property for lead source
+          hs_lead_status: 'NEW',
+          lifecyclestage: 'lead',
+          // Store the source in a note instead
+          hs_note_body: `Lead source: ${source}`
         },
       }),
     })
 
     if (!response.ok) {
       const error = await response.text()
+      console.error('HubSpot API error response:', error)
       throw new Error(`HubSpot API error: ${error}`)
     }
+
+    const result = await response.json()
+    console.log('HubSpot contact created successfully:', result)
 
     return new Response(
       JSON.stringify({ success: true }),
