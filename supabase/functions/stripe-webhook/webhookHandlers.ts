@@ -24,7 +24,11 @@ export async function handleCheckoutCompleted(
     throw new Error('No subscription found')
   }
 
-  console.log('Subscription retrieved:', subscription.id)
+  console.log('Subscription retrieved:', {
+    id: subscription.id,
+    priceId: subscription.items.data[0].price.id,
+    customerId: session.customer
+  })
 
   if (!session.client_reference_id) {
     console.error('No client_reference_id in session')
@@ -56,10 +60,14 @@ export async function handleCheckoutCompleted(
     user_id: userData.id,
     stripe_customer_id: session.customer,
     stripe_subscription_id: session.subscription,
-    status: 'active',
+    status: subscription.status === 'active' ? 'active' : 'past_due',
     plan_id: subscription.items.data[0].price.id,
     current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
+    trial_ends_at: null, // Remove trial when upgrading
+    trial_started_at: null // Remove trial when upgrading
   }
+
+  console.log('Updating subscription with data:', subscriptionData)
 
   let error
   if (existingSubscription) {
@@ -109,12 +117,21 @@ export async function handleSubscriptionUpdated(
     return
   }
 
+  console.log('Updating subscription:', {
+    id: subscriptionData.id,
+    newPlanId: subscription.items.data[0].price.id,
+    newStatus: subscription.status
+  })
+
   const { error: updateError } = await supabaseClient
     .from('subscriptions')
     .update({
       status: subscription.status === 'active' ? 'active' : 
               subscription.status === 'past_due' ? 'past_due' : 'canceled',
+      plan_id: subscription.items.data[0].price.id,
       current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
+      trial_ends_at: null, // Remove trial when updating subscription
+      trial_started_at: null // Remove trial when updating subscription
     })
     .eq('id', subscriptionData.id)
 
@@ -135,7 +152,11 @@ export async function handleSubscriptionDeleted(
 
   const { error } = await supabaseClient
     .from('subscriptions')
-    .update({ status: 'canceled' })
+    .update({ 
+      status: 'canceled',
+      trial_ends_at: null,
+      trial_started_at: null
+    })
     .eq('stripe_subscription_id', subscription.id)
 
   if (error) {
