@@ -19,8 +19,16 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface InstanceToolsSectionProps {
   instanceId: string;
@@ -42,6 +50,21 @@ const TOOL_DESCRIPTIONS = {
   calendar: "Conecte seu sistema de agendamentos para que seus clientes possam marcar horários automaticamente pelo WhatsApp",
   payment: "Integre seu sistema de pagamentos para receber pagamentos diretamente pelo WhatsApp",
   crm: "Conecte seu CRM para registrar automaticamente informações dos seus clientes",
+};
+
+const TOOL_PROVIDERS = {
+  calendar: [
+    { id: 'google', name: 'Google Calendar', setupUrl: 'https://calendar.google.com/calendar/embedhelper' },
+    { id: 'outlook', name: 'Outlook Calendar', setupUrl: 'https://outlook.office.com/calendar/view/month' },
+  ],
+  payment: [
+    { id: 'stripe', name: 'Stripe', setupUrl: 'https://dashboard.stripe.com/apikeys' },
+    { id: 'mercadopago', name: 'Mercado Pago', setupUrl: 'https://www.mercadopago.com.br/developers/panel/credentials' },
+  ],
+  crm: [
+    { id: 'hubspot', name: 'HubSpot', setupUrl: 'https://app.hubspot.com/api-key' },
+    { id: 'pipedrive', name: 'Pipedrive', setupUrl: 'https://app.pipedrive.com/settings/api' },
+  ],
 };
 
 const TOOL_SETUP_GUIDES = {
@@ -92,6 +115,7 @@ export function InstanceToolsSection({ instanceId }: InstanceToolsSectionProps) 
   const [selectedTool, setSelectedTool] = useState<ToolType | null>(null);
   const [credentialDialog, setCredentialDialog] = useState(false);
   const [credentials, setCredentials] = useState("");
+  const [selectedProvider, setSelectedProvider] = useState("");
   const queryClient = useQueryClient();
 
   const { data: tools, isLoading } = useQuery({
@@ -116,16 +140,21 @@ export function InstanceToolsSection({ instanceId }: InstanceToolsSectionProps) 
     mutationFn: async ({ 
       toolType, 
       isActive,
-      credentials
+      credentials,
+      provider
     }: { 
       toolType: ToolType; 
       isActive: boolean;
       credentials?: string;
+      provider?: string;
     }) => {
-      console.log('Updating tool:', { toolType, isActive, hasCredentials: !!credentials });
+      console.log('Updating tool:', { toolType, isActive, hasCredentials: !!credentials, provider });
       
       const existingTool = tools?.find(t => t.tool_type === toolType);
-      const settings = credentials ? { api_key: credentials } : {};
+      const settings = credentials ? { 
+        api_key: credentials,
+        provider: provider 
+      } : {};
 
       if (existingTool) {
         const { error } = await supabase
@@ -160,6 +189,7 @@ export function InstanceToolsSection({ instanceId }: InstanceToolsSectionProps) 
       });
       setCredentialDialog(false);
       setCredentials("");
+      setSelectedProvider("");
     },
     onError: (error) => {
       console.error('Error updating tool:', error);
@@ -194,7 +224,8 @@ export function InstanceToolsSection({ instanceId }: InstanceToolsSectionProps) 
     await updateToolMutation.mutateAsync({
       toolType: selectedTool,
       isActive: true,
-      credentials
+      credentials,
+      provider: selectedProvider
     });
   };
 
@@ -305,7 +336,10 @@ export function InstanceToolsSection({ instanceId }: InstanceToolsSectionProps) 
                           variant="outline"
                           size="sm"
                           className="mt-2"
-                          onClick={() => window.open(guide.setupUrl, '_blank')}
+                          onClick={() => {
+                            setSelectedTool(toolType);
+                            setCredentialDialog(true);
+                          }}
                         >
                           <Key className="h-4 w-4 mr-2" />
                           Obter credenciais
@@ -321,31 +355,72 @@ export function InstanceToolsSection({ instanceId }: InstanceToolsSectionProps) 
       </div>
 
       <Dialog open={credentialDialog} onOpenChange={setCredentialDialog}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Configurar {selectedTool && TOOL_LABELS[selectedTool]}</DialogTitle>
+            <DialogDescription>
+              Selecione o provedor e configure as credenciais para ativar a integração.
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label>Chave de API</Label>
-              <Input
-                type="password"
-                placeholder="Cole sua chave de API aqui"
-                value={credentials}
-                onChange={(e) => setCredentials(e.target.value)}
-              />
+              <Label>Provedor</Label>
+              <Select
+                value={selectedProvider}
+                onValueChange={setSelectedProvider}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione um provedor" />
+                </SelectTrigger>
+                <SelectContent>
+                  {selectedTool && TOOL_PROVIDERS[selectedTool].map((provider) => (
+                    <SelectItem key={provider.id} value={provider.id}>
+                      {provider.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
+            {selectedProvider && (
+              <div className="space-y-2">
+                <Label>Chave de API</Label>
+                <Input
+                  type="password"
+                  placeholder="Cole sua chave de API aqui"
+                  value={credentials}
+                  onChange={(e) => setCredentials(e.target.value)}
+                />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full mt-2"
+                  onClick={() => {
+                    const provider = selectedTool && TOOL_PROVIDERS[selectedTool].find(p => p.id === selectedProvider);
+                    if (provider) {
+                      window.open(provider.setupUrl, '_blank');
+                    }
+                  }}
+                >
+                  <ExternalLink className="h-4 w-4 mr-2" />
+                  Obter chave de API
+                </Button>
+              </div>
+            )}
             <div className="flex justify-end gap-2">
               <Button
                 variant="outline"
                 onClick={() => {
                   setCredentialDialog(false);
                   setCredentials("");
+                  setSelectedProvider("");
                 }}
               >
                 Cancelar
               </Button>
-              <Button onClick={handleCredentialSubmit} disabled={!credentials}>
+              <Button 
+                onClick={handleCredentialSubmit} 
+                disabled={!credentials || !selectedProvider}
+              >
                 Salvar
               </Button>
             </div>
