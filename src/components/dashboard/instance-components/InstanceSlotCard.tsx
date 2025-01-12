@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { MessageSquare, QrCode, Settings, LogOut } from "lucide-react"
+import { MessageSquare, QrCode, Settings, LogOut, Trash2 } from "lucide-react"
 import { useQuery } from "@tanstack/react-query"
 import { supabase } from "@/integrations/supabase/client"
 import { useToast } from "@/components/ui/use-toast"
@@ -74,6 +74,34 @@ export function InstanceSlotCard({
     retry: false
   })
 
+  const handleDelete = async () => {
+    if (!instance?.id) return
+    
+    try {
+      const { error } = await supabase
+        .from('evolution_instances')
+        .delete()
+        .eq('id', instance.id)
+
+      if (error) throw error
+
+      toast({
+        title: "Success",
+        description: "Instance deleted successfully",
+      })
+
+      // Refresh the page to update the instances list
+      window.location.reload()
+    } catch (error) {
+      console.error('Error deleting instance:', error)
+      toast({
+        title: "Error",
+        description: "Failed to delete instance. Please try again.",
+        variant: "destructive",
+      })
+    }
+  }
+
   const isConnected = stateData?.state === 'connected'
 
   const handleConnect = async () => {
@@ -137,14 +165,25 @@ export function InstanceSlotCard({
                 <p className="text-sm text-muted-foreground">{instance.phone_number}</p>
               </div>
             </div>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={onConfigurePrompt}
-              title="Configurar Prompt"
-            >
-              <Settings className="h-4 w-4" />
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={onConfigurePrompt}
+                title="Configurar Prompt"
+              >
+                <Settings className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={handleDelete}
+                title="Deletar Instância"
+                className="text-destructive hover:text-destructive"
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
 
           <div className="flex items-center gap-2">

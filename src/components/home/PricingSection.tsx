@@ -56,12 +56,13 @@ export const PricingSection = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { toast } = useToast();
+  const [showEnterpriseDialog, setShowEnterpriseDialog] = useState(false);
 
   const handleStartTrial = async (plan: typeof plans[0]) => {
     console.log("Iniciando trial para o plano:", plan.name);
     
     if (plan.price === "Personalizado") {
-      navigate("/contact");
+      setShowEnterpriseDialog(true);
       return;
     }
 
@@ -183,6 +184,11 @@ export const PricingSection = () => {
           ))}
         </div>
       </div>
+
+      <EnterpriseContactDialog 
+        open={showEnterpriseDialog} 
+        onOpenChange={setShowEnterpriseDialog}
+      />
     </section>
   );
 };
