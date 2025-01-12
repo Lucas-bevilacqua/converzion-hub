@@ -1,5 +1,4 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -18,6 +17,7 @@ serve(async (req) => {
     const { instanceId } = await req.json()
     
     if (!instanceId) {
+      console.error('Missing instanceId in request')
       return new Response(
         JSON.stringify({ error: 'Instance ID is required' }),
         { headers: corsHeaders, status: 400 }
@@ -35,6 +35,8 @@ serve(async (req) => {
         { headers: corsHeaders, status: 500 }
       )
     }
+
+    console.log(`Checking state for instance: ${instanceId}`)
 
     // Check instance state in Evolution API
     const response = await fetch(`${evolutionApiUrl}/instance/connectionState/${instanceId}`, {
