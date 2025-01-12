@@ -30,7 +30,7 @@ const formSchema = z.object({
   objective: z.enum(['sales', 'support', 'scheduling', 'education', 'custom'], {
     required_error: "Por favor selecione um objetivo",
   }),
-  prompt: z.string().optional(),
+  prompt: z.string().min(1, "O prompt é obrigatório"),
 })
 
 interface InstancePromptDialogProps {
@@ -94,6 +94,8 @@ export function InstancePromptDialog({
 
   const promptMutation = useMutation({
     mutationFn: async (values: z.infer<typeof formSchema>) => {
+      if (!instanceId) throw new Error('Instance ID is required')
+      
       console.log('Updating prompt for instance:', instanceId)
       const { error } = await supabase
         .from('evolution_instances')
@@ -154,6 +156,7 @@ export function InstancePromptDialog({
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     try {
+      console.log('Submitting form with values:', values)
       // Salvar prompt e configurações
       await Promise.all([
         promptMutation.mutateAsync(values),
