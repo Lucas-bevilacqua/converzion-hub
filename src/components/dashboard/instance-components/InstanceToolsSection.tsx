@@ -30,9 +30,9 @@ const TOOL_LABELS = {
 };
 
 const TOOL_DESCRIPTIONS = {
-  calendar: "Permite que seus clientes agendem horários automaticamente",
-  payment: "Permite que seus clientes realizem pagamentos pelo WhatsApp",
-  crm: "Registra automaticamente informações dos seus clientes",
+  calendar: "Conecte seu sistema de agendamentos para que seus clientes possam marcar horários automaticamente pelo WhatsApp",
+  payment: "Integre seu sistema de pagamentos para receber pagamentos diretamente pelo WhatsApp",
+  crm: "Conecte seu CRM para registrar automaticamente informações dos seus clientes",
 };
 
 export function InstanceToolsSection({ instanceId }: InstanceToolsSectionProps) {
@@ -96,7 +96,7 @@ export function InstanceToolsSection({ instanceId }: InstanceToolsSectionProps) 
       queryClient.invalidateQueries({ queryKey: ['instance-tools'] });
       toast({
         title: "Sucesso",
-        description: "Status da ferramenta atualizado.",
+        description: "Status da ferramenta atualizado. Nossa equipe entrará em contato para configurar a integração.",
       });
     },
     onError: (error) => {
@@ -139,8 +139,8 @@ export function InstanceToolsSection({ instanceId }: InstanceToolsSectionProps) 
   return (
     <div className="space-y-6">
       <div className="text-sm text-muted-foreground">
-        Ative ou desative as ferramentas disponíveis para esta instância do WhatsApp.
-        Seus clientes poderão usar as ferramentas ativas automaticamente.
+        Ative as ferramentas que deseja integrar ao seu WhatsApp. Nossa equipe entrará em contato
+        para ajudar com a configuração de cada ferramenta ativada.
       </div>
       <div className="space-y-4">
         {availableTools.map((toolType) => {
