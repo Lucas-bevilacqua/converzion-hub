@@ -43,13 +43,12 @@ export function InstanceSlotCard({
         const { data, error } = await supabase.functions.invoke('check-instance-state', {
           body: { 
             instanceId: instance.id,
-            instanceName: instance.name // Adding instance name for the new URL format
+            instanceName: instance.name
           }
         })
         
         if (error) {
           console.error('Error checking instance state:', error)
-          // Check if it's a subscription error
           if (error.message && error.message.includes('subscription_required')) {
             toast({
               title: "Subscription Required",
@@ -213,11 +212,13 @@ export function InstanceSlotCard({
         </CardContent>
       </Card>
 
-      <QRCodeDialog
-        open={showQRCode}
-        onOpenChange={setShowQRCode}
-        qrCode={qrCodeData}
-      />
+      {!isConnected && (
+        <QRCodeDialog
+          open={showQRCode}
+          onOpenChange={setShowQRCode}
+          qrCode={qrCodeData}
+        />
+      )}
     </>
   )
 }

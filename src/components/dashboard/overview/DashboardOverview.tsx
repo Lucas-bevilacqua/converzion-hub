@@ -20,10 +20,8 @@ const getPlanDisplayName = (planId: string | null) => {
 }
 
 export function DashboardOverview({ subscription, instances }: DashboardOverviewProps) {
-  const connectedInstances = instances.filter(instance => instance.connection_status === 'connected')
-
   return (
-    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
       <Card className="p-4">
         <div className="flex items-center gap-2">
           <Power className="h-4 w-4 text-primary" />
@@ -67,21 +65,6 @@ export function DashboardOverview({ subscription, instances }: DashboardOverview
           </div>
           <p className="text-xs text-muted-foreground">
             Instâncias em uso
-          </p>
-        </div>
-      </Card>
-
-      <Card className="p-4">
-        <div className="flex items-center gap-2">
-          <Power className="h-4 w-4 text-primary" />
-          <span className="text-sm font-medium">Conexões</span>
-        </div>
-        <div className="mt-3">
-          <div className="text-2xl font-bold">
-            {connectedInstances.length}/{instances.length}
-          </div>
-          <p className="text-xs text-muted-foreground">
-            Instâncias conectadas
           </p>
         </div>
       </Card>
