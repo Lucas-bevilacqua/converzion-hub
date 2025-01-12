@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
-import { parseISO, isAfter } from 'date-fns'
+import { parseISO, isAfter } from 'https://esm.sh/date-fns@3.3.1'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
