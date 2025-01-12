@@ -131,19 +131,29 @@ export function InstancePromptDialog({
 
       console.log('Updating instance configuration:', {
         instanceId,
-        objective: values.objective
+        objective: values.objective,
+        currentConfig
       })
 
-      const { data, error } = await supabase
-        .from('instance_configurations')
-        .upsert({
-          instance_id: instanceId,
-          objective: values.objective,
-        })
-        .select()
-        .single()
+      // Se já existe uma configuração, atualiza. Se não, cria uma nova.
+      const operation = currentConfig 
+        ? supabase
+            .from('instance_configurations')
+            .update({ objective: values.objective })
+            .eq('instance_id', instanceId)
+        : supabase
+            .from('instance_configurations')
+            .insert({
+              instance_id: instanceId,
+              objective: values.objective,
+            });
 
-      if (error) throw error
+      const { data, error } = await operation.select().single();
+
+      if (error) {
+        console.error('Error in config mutation:', error)
+        throw error
+      }
       return data
     },
     onSuccess: () => {
