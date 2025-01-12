@@ -118,8 +118,12 @@ Deno.serve(async (req) => {
     // Make API request to Evolution API
     const evolutionApiUrl = Deno.env.get('EVOLUTION_API_URL')!
     const evolutionApiKey = Deno.env.get('EVOLUTION_API_KEY')!
+    
+    // Ensure URL is properly constructed
+    const connectionStateUrl = new URL(`/instance/connectionState/${instanceName}`, evolutionApiUrl).toString()
+    console.log('Checking connection state at URL:', connectionStateUrl)
 
-    const response = await fetch(`${evolutionApiUrl}/instance/connectionState/${instance.name}`, {
+    const response = await fetch(connectionStateUrl, {
       headers: {
         'Content-Type': 'application/json',
         'apikey': evolutionApiKey,
