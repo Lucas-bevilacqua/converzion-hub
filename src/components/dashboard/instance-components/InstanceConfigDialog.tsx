@@ -66,17 +66,19 @@ export function InstanceConfigDialog({
         .from('instance_configurations')
         .select('*')
         .eq('instance_id', instanceId)
-        .single()
+        .maybeSingle()
       
       if (error) throw error
       return data
     },
     enabled: !!instanceId,
-    onSuccess: (data) => {
-      if (data) {
-        form.reset({
-          objective: data.objective,
-        })
+    meta: {
+      onSuccess: (data: any) => {
+        if (data) {
+          form.reset({
+            objective: data.objective,
+          })
+        }
       }
     }
   })

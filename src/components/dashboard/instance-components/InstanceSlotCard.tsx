@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { MessageSquare, QrCode, Settings, LogOut, Trash2, Tool } from "lucide-react"
+import { MessageSquare, QrCode, Settings, LogOut, Trash2, Wrench } from "lucide-react"
 import { useQuery } from "@tanstack/react-query"
 import { supabase } from "@/integrations/supabase/client"
 import { useToast } from "@/components/ui/use-toast"
@@ -180,7 +180,7 @@ export function InstanceSlotCard({
                 onClick={() => setShowConfigDialog(true)}
                 title="Configurar Objetivo"
               >
-                <Tool className="h-4 w-4" />
+                <Wrench className="h-4 w-4" />
               </Button>
               <Button
                 variant="ghost"
