@@ -2,8 +2,8 @@ import { Card } from "@/components/ui/card"
 import { useQuery } from "@tanstack/react-query"
 import { supabase } from "@/integrations/supabase/client"
 import { useAuth } from "@/contexts/auth/AuthContext"
-import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
-import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip } from "recharts"
+import { ChartContainer } from "@/components/ui/chart"
+import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer } from "recharts"
 import { Loader2 } from "lucide-react"
 
 export function MetricsOverview() {
@@ -78,7 +78,6 @@ export function MetricsOverview() {
                   tickLine={false}
                   axisLine={false}
                 />
-                <Tooltip content={<ChartTooltipContent />} />
                 <Bar
                   dataKey="messages_sent"
                   name="messages"
