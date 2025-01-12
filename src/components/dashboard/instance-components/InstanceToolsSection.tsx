@@ -160,7 +160,7 @@ export function InstanceToolsSection({ instanceId }: InstanceToolsSectionProps) 
                     </Label>
                     <div className="flex items-center gap-2 mt-1">
                       {isActive ? (
-                        <Badge variant="success" className="flex items-center gap-1">
+                        <Badge variant="secondary" className="flex items-center gap-1 bg-green-100 text-green-800">
                           <Check className="h-3 w-3" />
                           Ativo
                         </Badge>
