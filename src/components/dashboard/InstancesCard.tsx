@@ -87,10 +87,11 @@ export function InstancesCard() {
     }
     
     if (subscription.status === 'trial' || subscription.status === 'active') {
-      // Verifica se o plano é professional (que inclui "professional" no ID)
-      const isProfessional = subscription.plan_id?.toLowerCase().includes('professional')
+      // Verifica se o plano é professional (price_1QbuVvKkjJ7tubuXXXXXXXXX)
+      const professionalPriceId = 'price_1QbuVvKkjJ7tubuXXXXXXXXX' // Substitua pelo ID correto do plano professional
+      const isProfessional = subscription.plan_id === professionalPriceId
       const limit = isProfessional ? 3 : 1
-      console.log(`Limite de instâncias para o plano ${subscription.plan_id}:`, limit, 'isProfessional:', isProfessional)
+      console.log(`Limite de instâncias para o plano ${subscription.plan_id}:`, limit, 'isProfessional:', isProfessional, 'professionalPriceId:', professionalPriceId)
       return limit
     }
     
