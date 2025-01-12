@@ -63,11 +63,15 @@ serve(async (req) => {
       )
     }
 
+    // Check if subscription is active or in trial period
     const hasValidSubscription = subscription && 
-      (subscription.status === 'active' || subscription.status === 'trial')
+      (subscription.status === 'active' || 
+       (subscription.status === 'trial' && 
+        subscription.trial_ends_at && 
+        new Date(subscription.trial_ends_at) > new Date()))
 
     if (!hasValidSubscription) {
-      console.log('No valid subscription found for user:', user.id)
+      console.log('No valid subscription found for user:', user.id, 'Status:', subscription?.status)
       return new Response(
         JSON.stringify({ 
           error: 'No active or trial subscription found',
