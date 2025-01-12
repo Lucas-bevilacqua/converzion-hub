@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { isAfter } from 'https://esm.sh/date-fns@2'
+import { isAfter, parseISO } from 'https://esm.sh/date-fns@2'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -72,13 +72,14 @@ serve(async (req) => {
       (
         subscription.status === 'trial' && 
         subscription.trial_ends_at && 
-        !isAfter(new Date(), new Date(subscription.trial_ends_at))
+        !isAfter(new Date(), parseISO(subscription.trial_ends_at))
       )
     )
 
     console.log('Subscription validation:', {
       status: subscription?.status,
       trial_ends_at: subscription?.trial_ends_at,
+      current_time: new Date().toISOString(),
       hasValidSubscription
     })
 
@@ -91,6 +92,7 @@ serve(async (req) => {
           details: { 
             subscription_status: subscription?.status || 'none',
             trial_ends_at: subscription?.trial_ends_at,
+            current_time: new Date().toISOString(),
             user_id: user.id
           }
         }),
