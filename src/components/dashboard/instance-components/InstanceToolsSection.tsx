@@ -3,15 +3,16 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { Calendar, CreditCard, Users, Check, X } from "lucide-react";
+import { Calendar, CreditCard, Users, Check, X, ExternalLink } from "lucide-react";
 import { InstanceTool, ToolType } from "@/types/instance-tools";
 import { useToast } from "@/components/ui/use-toast";
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
-} from "@/components/ui/collapsible"
+} from "@/components/ui/collapsible";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 
 interface InstanceToolsSectionProps {
   instanceId: string;
@@ -33,6 +34,42 @@ const TOOL_DESCRIPTIONS = {
   calendar: "Conecte seu sistema de agendamentos para que seus clientes possam marcar horários automaticamente pelo WhatsApp",
   payment: "Integre seu sistema de pagamentos para receber pagamentos diretamente pelo WhatsApp",
   crm: "Conecte seu CRM para registrar automaticamente informações dos seus clientes",
+};
+
+const TOOL_SETUP_GUIDES = {
+  calendar: {
+    title: "Como configurar o Calendário",
+    steps: [
+      "1. Acesse sua conta do Google Calendar",
+      "2. Vá em Configurações > Calendários",
+      "3. Selecione o calendário que deseja integrar",
+      "4. Em 'Integrar calendário', copie o ID do calendário",
+      "5. Cole o ID do calendário aqui para ativar a integração"
+    ],
+    docsUrl: "https://support.google.com/calendar/answer/37083",
+  },
+  payment: {
+    title: "Como configurar Pagamentos",
+    steps: [
+      "1. Crie uma conta no Stripe (se ainda não tiver)",
+      "2. Acesse o painel do Stripe",
+      "3. Vá em Desenvolvedores > Chaves da API",
+      "4. Copie sua chave secreta do Stripe",
+      "5. Configure a chave aqui para ativar pagamentos"
+    ],
+    docsUrl: "https://stripe.com/docs/keys",
+  },
+  crm: {
+    title: "Como configurar o CRM",
+    steps: [
+      "1. Acesse seu CRM (HubSpot, Pipedrive, etc)",
+      "2. Vá nas configurações de API/Integrações",
+      "3. Gere uma nova chave de API",
+      "4. Copie a chave de API gerada",
+      "5. Configure a chave aqui para sincronizar contatos"
+    ],
+    docsUrl: "https://knowledge.hubspot.com/pt/integrations/how-do-i-get-my-hubspot-api-key",
+  },
 };
 
 export function InstanceToolsSection({ instanceId }: InstanceToolsSectionProps) {
@@ -86,7 +123,8 @@ export function InstanceToolsSection({ instanceId }: InstanceToolsSectionProps) 
           .insert({
             instance_id: instanceId,
             tool_type: toolType,
-            is_active: isActive
+            is_active: isActive,
+            setup_guide: TOOL_SETUP_GUIDES[toolType]
           });
 
         if (error) throw error;
@@ -96,7 +134,7 @@ export function InstanceToolsSection({ instanceId }: InstanceToolsSectionProps) 
       queryClient.invalidateQueries({ queryKey: ['instance-tools'] });
       toast({
         title: "Sucesso",
-        description: "Status da ferramenta atualizado. Nossa equipe entrará em contato para configurar a integração.",
+        description: "Status da ferramenta atualizado. Siga o guia de configuração para completar a integração.",
       });
     },
     onError: (error) => {
@@ -139,13 +177,14 @@ export function InstanceToolsSection({ instanceId }: InstanceToolsSectionProps) 
   return (
     <div className="space-y-6">
       <div className="text-sm text-muted-foreground">
-        Ative as ferramentas que deseja integrar ao seu WhatsApp. Nossa equipe entrará em contato
-        para ajudar com a configuração de cada ferramenta ativada.
+        Ative as ferramentas que deseja integrar ao seu WhatsApp. Siga o guia de configuração
+        de cada ferramenta para completar a integração.
       </div>
       <div className="space-y-4">
         {availableTools.map((toolType) => {
           const Icon = TOOL_ICONS[toolType];
           const isActive = getToolState(toolType);
+          const guide = TOOL_SETUP_GUIDES[toolType];
 
           return (
             <Collapsible key={toolType}>
@@ -199,9 +238,32 @@ export function InstanceToolsSection({ instanceId }: InstanceToolsSectionProps) 
                 </div>
               </div>
               <CollapsibleContent className="px-4 py-3 mt-2 bg-muted rounded-lg">
-                <p className="text-sm text-muted-foreground">
-                  {TOOL_DESCRIPTIONS[toolType]}
-                </p>
+                <div className="space-y-4">
+                  <p className="text-sm text-muted-foreground">
+                    {TOOL_DESCRIPTIONS[toolType]}
+                  </p>
+                  {isActive && (
+                    <div className="space-y-3">
+                      <h4 className="font-medium">{guide.title}</h4>
+                      <ul className="list-none space-y-2">
+                        {guide.steps.map((step, index) => (
+                          <li key={index} className="text-sm text-muted-foreground">
+                            {step}
+                          </li>
+                        ))}
+                      </ul>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="mt-2"
+                        onClick={() => window.open(guide.docsUrl, '_blank')}
+                      >
+                        <ExternalLink className="h-4 w-4 mr-2" />
+                        Ver documentação completa
+                      </Button>
+                    </div>
+                  )}
+                </div>
               </CollapsibleContent>
             </Collapsible>
           );
