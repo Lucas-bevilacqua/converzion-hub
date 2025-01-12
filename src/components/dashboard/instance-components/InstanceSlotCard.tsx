@@ -32,11 +32,11 @@ export function InstanceSlotCard({
     queryFn: async () => {
       if (!instance?.id) return null
       
-      console.log('Checking state for instance:', instance.id)
+      console.log('Verificando estado da instância:', instance.id)
       try {
         const { data: { session } } = await supabase.auth.getSession()
         if (!session) {
-          console.log('No active session found')
+          console.log('Nenhuma sessão ativa encontrada')
           return { state: 'disconnected' }
         }
 
@@ -48,26 +48,29 @@ export function InstanceSlotCard({
         })
         
         if (error) {
-          console.error('Error checking instance state:', error)
+          console.error('Erro ao verificar estado da instância:', error)
           if (error.message && error.message.includes('subscription_required')) {
             toast({
-              title: "Subscription Required",
-              description: "You need an active subscription to use this feature.",
+              title: "Assinatura Necessária",
+              description: "Você precisa de uma assinatura ativa para usar este recurso.",
               variant: "destructive",
             })
             return { state: 'disconnected' }
           }
           
           toast({
-            title: "Error",
-            description: "Failed to check instance state. Please try again.",
+            title: "Erro",
+            description: "Falha ao verificar estado da instância. Tente novamente.",
             variant: "destructive",
           })
           return { state: 'error' }
         }
-        return data
+
+        // Verifica se o estado é 'open', que significa conectado na Evolution API
+        const isConnected = data?.instance?.state === 'open'
+        return { state: isConnected ? 'connected' : 'disconnected' }
       } catch (error) {
-        console.error('Error in state check:', error)
+        console.error('Erro na verificação de estado:', error)
         return { state: 'error' }
       }
     },
@@ -110,31 +113,31 @@ export function InstanceSlotCard({
     if (!instance?.id) return
     
     try {
-      console.log('Connecting instance:', instance.id)
+      console.log('Conectando instância:', instance.id)
       const { data, error } = await supabase.functions.invoke('connect-evolution-instance', {
         body: { instanceId: instance.id }
       })
 
       if (error) {
-        console.error('Error connecting instance:', error)
+        console.error('Erro ao conectar instância:', error)
         toast({
-          title: "Error",
-          description: "Failed to connect instance. Please try again.",
+          title: "Erro",
+          description: "Falha ao conectar instância. Tente novamente.",
           variant: "destructive",
         })
         return
       }
 
       if (data?.qrCode) {
-        console.log('QR Code received:', data.qrCode)
+        console.log('QR Code recebido:', data.qrCode)
         setQrCodeData(data.qrCode)
         setShowQRCode(true)
       }
     } catch (error) {
-      console.error('Error in connect handler:', error)
+      console.error('Erro ao conectar:', error)
       toast({
-        title: "Error",
-        description: "An unexpected error occurred. Please try again.",
+        title: "Erro",
+        description: "Ocorreu um erro inesperado. Tente novamente.",
         variant: "destructive",
       })
     }
