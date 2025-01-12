@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { Calendar, CreditCard, Users, Settings2, Loader2 } from "lucide-react";
+import { Calendar, CreditCard, Users, Check, X } from "lucide-react";
 import { InstanceTool, ToolType } from "@/types/instance-tools";
 import { useToast } from "@/components/ui/use-toast";
 import {
@@ -11,6 +11,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible"
+import { Badge } from "@/components/ui/badge";
 
 interface InstanceToolsSectionProps {
   instanceId: string;
@@ -20,21 +21,18 @@ const TOOL_ICONS = {
   calendar: Calendar,
   payment: CreditCard,
   crm: Users,
-  custom: Settings2,
 };
 
 const TOOL_LABELS = {
   calendar: "Calendário",
   payment: "Pagamentos",
   crm: "CRM",
-  custom: "Personalizado",
 };
 
 const TOOL_DESCRIPTIONS = {
   calendar: "Permite que seus clientes agendem horários automaticamente",
   payment: "Permite que seus clientes realizem pagamentos pelo WhatsApp",
   crm: "Registra automaticamente informações dos seus clientes",
-  custom: "Integrações personalizadas para seu negócio",
 };
 
 export function InstanceToolsSection({ instanceId }: InstanceToolsSectionProps) {
@@ -128,12 +126,12 @@ export function InstanceToolsSection({ instanceId }: InstanceToolsSectionProps) 
     return tool?.is_active || false;
   };
 
-  const availableTools: ToolType[] = ['calendar', 'payment', 'crm', 'custom'];
+  const availableTools: ToolType[] = ['calendar', 'payment', 'crm'];
 
   if (isLoading) {
     return (
       <div className="flex justify-center p-4">
-        <Loader2 className="h-6 w-6 animate-spin" />
+        <div className="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full" />
       </div>
     );
   }
@@ -142,6 +140,7 @@ export function InstanceToolsSection({ instanceId }: InstanceToolsSectionProps) 
     <div className="space-y-6">
       <div className="text-sm text-muted-foreground">
         Ative ou desative as ferramentas disponíveis para esta instância do WhatsApp.
+        Seus clientes poderão usar as ferramentas ativas automaticamente.
       </div>
       <div className="space-y-4">
         {availableTools.map((toolType) => {
@@ -150,31 +149,59 @@ export function InstanceToolsSection({ instanceId }: InstanceToolsSectionProps) 
 
           return (
             <Collapsible key={toolType}>
-              <div className="flex items-center justify-between p-2 hover:bg-accent rounded-lg">
-                <div className="flex items-center gap-2">
-                  <Icon className="h-4 w-4 text-muted-foreground" />
-                  <Label htmlFor={`tool-${toolType}`} className="text-sm font-medium">
-                    {TOOL_LABELS[toolType]}
-                  </Label>
+              <div className="flex items-center justify-between p-4 bg-background border rounded-lg">
+                <div className="flex items-center gap-4">
+                  <div className="p-2 bg-primary/10 rounded-lg">
+                    <Icon className="h-5 w-5 text-primary" />
+                  </div>
+                  <div>
+                    <Label className="text-base font-medium">
+                      {TOOL_LABELS[toolType]}
+                    </Label>
+                    <div className="flex items-center gap-2 mt-1">
+                      {isActive ? (
+                        <Badge variant="success" className="flex items-center gap-1">
+                          <Check className="h-3 w-3" />
+                          Ativo
+                        </Badge>
+                      ) : (
+                        <Badge variant="secondary" className="flex items-center gap-1">
+                          <X className="h-3 w-3" />
+                          Inativo
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-4">
                   <Switch
-                    id={`tool-${toolType}`}
                     checked={isActive}
                     onCheckedChange={() => handleToggleTool(toolType, isActive)}
                     disabled={isUpdating}
                   />
                   <CollapsibleTrigger className="hover:bg-accent rounded p-1">
-                    <Settings2 className="h-4 w-4" />
+                    <svg
+                      width="15"
+                      height="15"
+                      viewBox="0 0 15 15"
+                      fill="none"
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="h-4 w-4 transition-transform duration-200"
+                    >
+                      <path
+                        d="M3.13523 6.15803C3.3241 5.95657 3.64052 5.94637 3.84197 6.13523L7.5 9.56464L11.158 6.13523C11.3595 5.94637 11.6759 5.95657 11.8648 6.15803C12.0536 6.35949 12.0434 6.67591 11.842 6.86477L7.84197 10.6148C7.64964 10.7951 7.35036 10.7951 7.15803 10.6148L3.15803 6.86477C2.95657 6.67591 2.94637 6.35949 3.13523 6.15803Z"
+                        fill="currentColor"
+                        fillRule="evenodd"
+                        clipRule="evenodd"
+                      />
+                    </svg>
                   </CollapsibleTrigger>
                 </div>
               </div>
-              <CollapsibleContent className="px-2 py-4">
-                <div className="space-y-4">
-                  <div className="text-sm text-muted-foreground">
-                    {TOOL_DESCRIPTIONS[toolType]}
-                  </div>
-                </div>
+              <CollapsibleContent className="px-4 py-3 mt-2 bg-muted rounded-lg">
+                <p className="text-sm text-muted-foreground">
+                  {TOOL_DESCRIPTIONS[toolType]}
+                </p>
               </CollapsibleContent>
             </Collapsible>
           );
