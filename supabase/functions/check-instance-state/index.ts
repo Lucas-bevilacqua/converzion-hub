@@ -80,13 +80,15 @@ serve(async (req) => {
 
     if (!hasValidSubscription) {
       console.log('No valid subscription found. Status:', subscription?.status)
+      console.log('Trial ends at:', subscription?.trial_ends_at)
       return new Response(
         JSON.stringify({ 
           error: 'No active or trial subscription found',
           code: 'subscription_required',
           details: { 
             subscription_status: subscription?.status || 'none',
-            user_id: user.id
+            user_id: user.id,
+            trial_ends_at: subscription?.trial_ends_at
           }
         }),
         { 
