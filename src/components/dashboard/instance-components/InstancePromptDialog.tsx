@@ -48,6 +48,7 @@ export function InstancePromptDialog({
 }: InstancePromptDialogProps) {
   const { toast } = useToast()
   const queryClient = useQueryClient()
+  const [isSaving, setIsSaving] = useState(false)
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -58,7 +59,7 @@ export function InstancePromptDialog({
   })
 
   // Buscar configuração atual
-  const { data: currentConfig } = useQuery({
+  const { data: currentConfig, isLoading: isLoadingConfig } = useQuery({
     queryKey: ['instanceConfig', instanceId],
     queryFn: async () => {
       if (!instanceId) return null
@@ -175,8 +176,10 @@ export function InstancePromptDialog({
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     try {
+      setIsSaving(true)
       console.log('Submitting form with values:', values)
-      // Salvar prompt e configurações
+      
+      // Salvar prompt e configurações em paralelo
       await Promise.all([
         promptMutation.mutateAsync(values),
         configMutation.mutateAsync(values)
@@ -186,7 +189,21 @@ export function InstancePromptDialog({
       onOpenChange(false)
     } catch (error) {
       console.error('Error saving:', error)
+    } finally {
+      setIsSaving(false)
     }
+  }
+
+  if (isLoadingConfig) {
+    return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="sm:max-w-[600px]">
+          <div className="flex items-center justify-center p-8">
+            <Loader2 className="h-8 w-8 animate-spin" />
+          </div>
+        </DialogContent>
+      </Dialog>
+    )
   }
 
   return (
@@ -206,6 +223,7 @@ export function InstancePromptDialog({
                   <Select 
                     onValueChange={field.onChange} 
                     defaultValue={field.value}
+                    disabled={isSaving}
                   >
                     <FormControl>
                       <SelectTrigger>
@@ -239,6 +257,7 @@ export function InstancePromptDialog({
                       placeholder="Digite o prompt do sistema..."
                       {...field}
                       rows={6}
+                      disabled={isSaving}
                     />
                   </FormControl>
                   <FormDescription>
@@ -254,15 +273,15 @@ export function InstancePromptDialog({
                 type="button"
                 variant="outline"
                 onClick={() => onOpenChange(false)}
-                disabled={promptMutation.isPending || configMutation.isPending}
+                disabled={isSaving}
               >
                 Cancelar
               </Button>
               <Button 
                 type="submit"
-                disabled={promptMutation.isPending || configMutation.isPending}
+                disabled={isSaving}
               >
-                {(promptMutation.isPending || configMutation.isPending) && (
+                {isSaving && (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 )}
                 Salvar
