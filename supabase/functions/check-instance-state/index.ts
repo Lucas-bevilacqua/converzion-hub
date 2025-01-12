@@ -63,7 +63,6 @@ serve(async (req) => {
       )
     }
 
-    // Check if subscription is active or in trial period
     const hasValidSubscription = subscription && 
       (subscription.status === 'active' || 
        (subscription.status === 'trial' && 
@@ -88,10 +87,10 @@ serve(async (req) => {
       )
     }
 
-    let { instanceId } = await req.json()
-    if (!instanceId) {
+    const { instanceId, instanceName } = await req.json()
+    if (!instanceId || !instanceName) {
       return new Response(
-        JSON.stringify({ error: 'No instance ID provided' }),
+        JSON.stringify({ error: 'Instance ID and name are required' }),
         { 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 400
@@ -99,7 +98,7 @@ serve(async (req) => {
       )
     }
 
-    console.log('Checking instance:', instanceId)
+    console.log('Checking instance:', instanceId, 'Name:', instanceName)
     const { data: instance, error: instanceError } = await supabaseClient
       .from('evolution_instances')
       .select('*')
@@ -133,8 +132,11 @@ serve(async (req) => {
     }
 
     try {
-      console.log('Checking instance state with Evolution API')
-      const response = await fetch(`${evolutionApiUrl}/instance/connectionState/${instance.name}`, {
+      // Using the correct URL format for checking instance state
+      const stateUrl = `${evolutionApiUrl}/instance/connectionState/${instanceName}`
+      console.log('Checking state with URL:', stateUrl)
+      
+      const response = await fetch(stateUrl, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
