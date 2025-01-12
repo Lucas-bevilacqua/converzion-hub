@@ -63,34 +63,38 @@ export function InstancePromptDialog({
     queryFn: async () => {
       if (!instanceId) return null
       
+      console.log('Fetching instance configuration:', instanceId)
       const { data, error } = await supabase
         .from('instance_configurations')
         .select('*')
         .eq('instance_id', instanceId)
         .maybeSingle()
       
-      if (error) throw error
+      if (error) {
+        console.error('Error fetching instance configuration:', error)
+        throw error
+      }
+      
+      console.log('Instance configuration found:', data)
       return data
     },
     enabled: !!instanceId,
-    meta: {
-      onSuccess: (data: any) => {
-        if (data) {
-          form.reset({
-            objective: data.objective,
-            prompt: currentPrompt || "",
-          })
-        }
-      }
-    }
   })
 
-  // Update form when dialog opens or currentPrompt changes
+  // Update form when dialog opens or currentPrompt/config changes
   useEffect(() => {
-    if (open && currentPrompt !== undefined) {
-      form.setValue('prompt', currentPrompt || "")
+    if (open) {
+      console.log('Updating form with current values:', {
+        prompt: currentPrompt,
+        objective: currentConfig?.objective
+      })
+      
+      form.reset({
+        objective: currentConfig?.objective || 'custom',
+        prompt: currentPrompt || "",
+      })
     }
-  }, [open, currentPrompt, form])
+  }, [open, currentPrompt, currentConfig, form])
 
   const promptMutation = useMutation({
     mutationFn: async (values: z.infer<typeof formSchema>) => {
@@ -125,6 +129,11 @@ export function InstancePromptDialog({
     mutationFn: async (values: z.infer<typeof formSchema>) => {
       if (!instanceId) throw new Error('Instance ID is required')
 
+      console.log('Updating instance configuration:', {
+        instanceId,
+        objective: values.objective
+      })
+
       const { data, error } = await supabase
         .from('instance_configurations')
         .upsert({
@@ -138,11 +147,11 @@ export function InstancePromptDialog({
       return data
     },
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['instanceConfig'] })
       toast({
         title: "Configuração salva",
         description: "As configurações da instância foram atualizadas com sucesso.",
       })
-      queryClient.invalidateQueries({ queryKey: ['instanceConfig'] })
     },
     onError: (error) => {
       console.error('Error saving config:', error)
