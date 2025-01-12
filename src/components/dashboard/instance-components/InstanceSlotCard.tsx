@@ -1,12 +1,12 @@
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { MessageSquare, QrCode, Settings, LogOut, Trash2, Wrench } from "lucide-react"
+import { MessageSquare, QrCode, Settings, LogOut, Trash2 } from "lucide-react"
 import { useQuery } from "@tanstack/react-query"
 import { supabase } from "@/integrations/supabase/client"
 import { useToast } from "@/components/ui/use-toast"
 import { useState } from "react"
 import { QRCodeDialog } from "./QRCodeDialog"
-import { InstanceConfigDialog } from "./InstanceConfigDialog"
+import { InstancePromptDialog } from "./InstancePromptDialog"
 
 interface InstanceSlotCardProps {
   isUsed: boolean
@@ -25,7 +25,7 @@ export function InstanceSlotCard({
 }: InstanceSlotCardProps) {
   const { toast } = useToast()
   const [showQRCode, setShowQRCode] = useState(false)
-  const [showConfigDialog, setShowConfigDialog] = useState(false)
+  const [showPromptDialog, setShowPromptDialog] = useState(false)
   const [qrCodeData, setQrCodeData] = useState<string | null>(null)
 
   // Query para verificar o estado do número
@@ -177,16 +177,8 @@ export function InstanceSlotCard({
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={() => setShowConfigDialog(true)}
-                title="Configurar Objetivo"
-              >
-                <Wrench className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={onConfigurePrompt}
-                title="Configurar Prompt"
+                onClick={() => setShowPromptDialog(true)}
+                title="Configurar Instância"
               >
                 <Settings className="h-4 w-4" />
               </Button>
@@ -234,10 +226,11 @@ export function InstanceSlotCard({
         />
       )}
 
-      <InstanceConfigDialog
-        open={showConfigDialog}
-        onOpenChange={setShowConfigDialog}
+      <InstancePromptDialog
+        open={showPromptDialog}
+        onOpenChange={setShowPromptDialog}
         instanceId={instance?.id}
+        currentPrompt={instance?.system_prompt}
       />
     </>
   )
