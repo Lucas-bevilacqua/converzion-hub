@@ -1,236 +1,171 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { isAfter, parseISO } from 'https://esm.sh/date-fns@2'
+import { createClient } from '@supabase/supabase-js'
+import { parseISO, isAfter } from 'date-fns'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-console.log('Check Instance State function started')
+const supabaseUrl = Deno.env.get('SUPABASE_URL')!
+const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+const supabase = createClient(supabaseUrl, supabaseKey)
 
-serve(async (req) => {
+Deno.serve(async (req) => {
+  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
+    return new Response(null, { headers: corsHeaders })
   }
 
   try {
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-    )
-
-    const authHeader = req.headers.get('Authorization')
-    if (!authHeader) {
-      console.error('No authorization header provided')
-      return new Response(
-        JSON.stringify({ error: 'No authorization header' }),
-        { 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 401 
-        }
-      )
-    }
-
+    const { instance_id } = await req.json()
+    const authHeader = req.headers.get('Authorization')!
     const token = authHeader.replace('Bearer ', '')
-    const { data: { user }, error: userError } = await supabaseClient.auth.getUser(token)
-    
+
+    // Verify the JWT and get the user
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser(token)
+
     if (userError || !user) {
       console.error('Error getting user:', userError)
       return new Response(
-        JSON.stringify({ error: 'Unauthorized' }),
-        { 
+        JSON.stringify({
+          error: 'Unauthorized',
+          details: userError,
+        }),
+        {
+          status: 401,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 401 
         }
       )
     }
 
-    console.log('Checking subscription for user:', user.id)
-    const { data: subscription, error: subscriptionError } = await supabaseClient
+    // Get user's subscription
+    const { data: subscription, error: subscriptionError } = await supabase
       .from('subscriptions')
       .select('*')
       .eq('user_id', user.id)
       .maybeSingle()
 
     if (subscriptionError) {
-      console.error('Error checking subscription:', subscriptionError)
+      console.error('Error fetching subscription:', subscriptionError)
       return new Response(
-        JSON.stringify({ error: 'Error checking subscription' }),
-        { 
+        JSON.stringify({
+          error: 'Error fetching subscription',
+          details: subscriptionError,
+        }),
+        {
+          status: 500,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 500 
         }
       )
     }
 
-    console.log('Found subscription:', subscription)
-    
-    // Check if subscription is active or trial is valid
-    const hasValidSubscription = subscription && (
-      subscription.status === 'active' || 
-      (
-        subscription.status === 'trial' && 
-        subscription.trial_ends_at && 
-        !isAfter(new Date(), parseISO(subscription.trial_ends_at))
-      )
-    )
+    const currentTime = new Date()
+    console.log('Current time:', currentTime.toISOString())
+    console.log('Subscription:', subscription)
 
-    console.log('Subscription validation:', {
-      status: subscription?.status,
-      trial_ends_at: subscription?.trial_ends_at,
-      current_time: new Date().toISOString(),
-      hasValidSubscription
-    })
+    // Check if user has an active subscription or valid trial
+    const hasActiveSubscription = subscription?.status === 'active'
+    const hasValidTrial = subscription?.status === 'trial' && 
+      subscription.trial_ends_at && 
+      !isAfter(currentTime, parseISO(subscription.trial_ends_at))
 
-    if (!hasValidSubscription) {
-      console.log('No valid subscription found')
+    if (!hasActiveSubscription && !hasValidTrial) {
+      console.log('No active subscription found. Trial ends at:', subscription?.trial_ends_at)
       return new Response(
-        JSON.stringify({ 
+        JSON.stringify({
           error: 'No active or trial subscription found',
           code: 'subscription_required',
-          details: { 
+          details: {
             subscription_status: subscription?.status || 'none',
+            current_time: currentTime.toISOString(),
             trial_ends_at: subscription?.trial_ends_at,
-            current_time: new Date().toISOString(),
-            user_id: user.id
-          }
+            user_id: user.id,
+          },
         }),
-        { 
+        {
+          status: 403,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 403
         }
       )
     }
 
-    let requestBody;
-    try {
-      requestBody = await req.json()
-    } catch (error) {
-      console.error('Error parsing request body:', error)
-      return new Response(
-        JSON.stringify({ error: 'Invalid request body' }),
-        { 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 400
-        }
-      )
-    }
-
-    const { instanceId } = requestBody
-    if (!instanceId) {
-      return new Response(
-        JSON.stringify({ error: 'Instance ID is required' }),
-        { 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 400
-        }
-      )
-    }
-
-    // Verify instance belongs to user
-    const { data: instance, error: instanceError } = await supabaseClient
+    // Get instance details
+    const { data: instance, error: instanceError } = await supabase
       .from('evolution_instances')
       .select('*')
-      .eq('id', instanceId)
+      .eq('id', instance_id)
       .eq('user_id', user.id)
-      .single()
+      .maybeSingle()
 
     if (instanceError || !instance) {
-      console.error('Error getting instance:', instanceError)
+      console.error('Error fetching instance:', instanceError)
       return new Response(
-        JSON.stringify({ error: 'Instance not found or unauthorized' }),
-        { 
+        JSON.stringify({
+          error: 'Instance not found or unauthorized',
+          details: instanceError,
+        }),
+        {
+          status: 404,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 404
         }
       )
     }
 
-    // Get Evolution API configuration
-    const evolutionApiUrl = Deno.env.get('EVOLUTION_API_URL')
-    const evolutionApiKey = Deno.env.get('EVOLUTION_API_KEY')
+    // Make API request to Evolution API
+    const evolutionApiUrl = Deno.env.get('EVOLUTION_API_URL')!
+    const evolutionApiKey = Deno.env.get('EVOLUTION_API_KEY')!
 
-    if (!evolutionApiUrl || !evolutionApiKey) {
-      console.error('Evolution API configuration missing')
-      return new Response(
-        JSON.stringify({ error: 'Evolution API configuration missing' }),
-        { 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 500
-        }
-      )
-    }
+    const response = await fetch(`${evolutionApiUrl}/instance/connectionState/${instance.name}`, {
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': evolutionApiKey,
+      },
+    })
 
-    try {
-      const stateUrl = `${evolutionApiUrl}/instance/connectionState/${instance.name}`
-      console.log('Checking state with URL:', stateUrl)
+    if (!response.ok) {
+      console.error('Error from Evolution API:', response.status, response.statusText)
+      const errorData = await response.text()
+      console.error('Error data:', errorData)
       
-      const response = await fetch(stateUrl, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'apikey': evolutionApiKey
+      return new Response(
+        JSON.stringify({
+          error: 'Failed to check instance state',
+          details: {
+            status: response.status,
+            statusText: response.statusText,
+            error: errorData,
+          },
+        }),
+        {
+          status: response.status,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         }
-      })
+      )
+    }
 
-      if (!response.ok) {
-        const errorText = await response.text()
-        console.error('Error from Evolution API:', errorText)
-        return new Response(
-          JSON.stringify({ error: 'Failed to check instance state', details: errorText }),
-          { 
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            status: response.status
-          }
-        )
+    const data = await response.json()
+    console.log('Evolution API response:', data)
+
+    return new Response(
+      JSON.stringify(data),
+      {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       }
-
-      const stateData = await response.json()
-      console.log('Instance state response:', stateData)
-      
-      // Map Evolution API state to our format
-      const connectionState = stateData.instance?.state === 'open' ? 'connected' : 'disconnected'
-      
-      // Update instance state in database
-      const { error: updateError } = await supabaseClient
-        .from('evolution_instances')
-        .update({
-          connection_status: connectionState,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', instanceId)
-
-      if (updateError) {
-        console.error('Error updating instance:', updateError)
-      }
-
-      return new Response(
-        JSON.stringify({ state: connectionState }),
-        { 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 200 
-        }
-      )
-
-    } catch (error) {
-      console.error('Error checking instance state with Evolution API:', error)
-      return new Response(
-        JSON.stringify({ error: 'Failed to check instance state', details: error.message }),
-        { 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 500
-        }
-      )
-    }
+    )
 
   } catch (error) {
-    console.error('Unexpected error in check-instance-state:', error)
+    console.error('Unexpected error:', error)
     return new Response(
-      JSON.stringify({ error: 'Internal server error', details: error.message }),
-      { 
+      JSON.stringify({
+        error: 'Internal server error',
+        details: error.message,
+      }),
+      {
+        status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 500
       }
     )
   }
