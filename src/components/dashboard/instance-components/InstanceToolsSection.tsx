@@ -1,10 +1,8 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
 import { Calendar, CreditCard, Users, Settings2, Loader2 } from "lucide-react";
 import { InstanceTool, ToolType } from "@/types/instance-tools";
 import { useToast } from "@/components/ui/use-toast";
@@ -33,16 +31,15 @@ const TOOL_LABELS = {
 };
 
 const TOOL_DESCRIPTIONS = {
-  calendar: "Integre com Google Calendar, Calendly ou outros serviços de agenda",
-  payment: "Processe pagamentos via Stripe, PayPal ou outros gateways",
-  crm: "Conecte com HubSpot, Pipedrive ou outros CRMs",
-  custom: "Configure integrações personalizadas",
+  calendar: "Permite que seus clientes agendem horários automaticamente",
+  payment: "Permite que seus clientes realizem pagamentos pelo WhatsApp",
+  crm: "Registra automaticamente informações dos seus clientes",
+  custom: "Integrações personalizadas para seu negócio",
 };
 
 export function InstanceToolsSection({ instanceId }: InstanceToolsSectionProps) {
   const { toast } = useToast();
   const [isUpdating, setIsUpdating] = useState(false);
-  const [webhookUrls, setWebhookUrls] = useState<Record<string, string>>({});
   const queryClient = useQueryClient();
 
   const { data: tools, isLoading } = useQuery({
@@ -59,13 +56,6 @@ export function InstanceToolsSection({ instanceId }: InstanceToolsSectionProps) 
         throw error;
       }
 
-      // Initialize webhook URLs from tools data
-      const urls: Record<string, string> = {};
-      data?.forEach(tool => {
-        urls[tool.tool_type] = tool.settings?.webhook_url || '';
-      });
-      setWebhookUrls(urls);
-
       return data as InstanceTool[];
     },
   });
@@ -73,24 +63,20 @@ export function InstanceToolsSection({ instanceId }: InstanceToolsSectionProps) 
   const updateToolMutation = useMutation({
     mutationFn: async ({ 
       toolType, 
-      isActive, 
-      webhookUrl 
+      isActive
     }: { 
       toolType: ToolType; 
-      isActive: boolean; 
-      webhookUrl: string;
+      isActive: boolean;
     }) => {
-      console.log('Updating tool:', { toolType, isActive, webhookUrl });
+      console.log('Updating tool:', { toolType, isActive });
       
       const existingTool = tools?.find(t => t.tool_type === toolType);
-      const settings = { webhook_url: webhookUrl };
 
       if (existingTool) {
         const { error } = await supabase
           .from('instance_tools')
           .update({ 
             is_active: isActive,
-            settings,
             updated_at: new Date().toISOString()
           })
           .eq('id', existingTool.id);
@@ -102,8 +88,7 @@ export function InstanceToolsSection({ instanceId }: InstanceToolsSectionProps) 
           .insert({
             instance_id: instanceId,
             tool_type: toolType,
-            is_active: isActive,
-            settings
+            is_active: isActive
           });
 
         if (error) throw error;
@@ -113,14 +98,14 @@ export function InstanceToolsSection({ instanceId }: InstanceToolsSectionProps) 
       queryClient.invalidateQueries({ queryKey: ['instance-tools'] });
       toast({
         title: "Sucesso",
-        description: "Configurações da ferramenta atualizadas.",
+        description: "Status da ferramenta atualizado.",
       });
     },
     onError: (error) => {
       console.error('Error updating tool:', error);
       toast({
         title: "Erro",
-        description: "Não foi possível atualizar as configurações.",
+        description: "Não foi possível atualizar o status da ferramenta.",
         variant: "destructive",
       });
     },
@@ -131,26 +116,7 @@ export function InstanceToolsSection({ instanceId }: InstanceToolsSectionProps) 
       setIsUpdating(true);
       await updateToolMutation.mutateAsync({ 
         toolType, 
-        isActive: !currentState,
-        webhookUrl: webhookUrls[toolType] || ''
-      });
-    } finally {
-      setIsUpdating(false);
-    }
-  };
-
-  const handleWebhookUrlChange = (toolType: ToolType, url: string) => {
-    setWebhookUrls(prev => ({ ...prev, [toolType]: url }));
-  };
-
-  const handleSaveWebhook = async (toolType: ToolType) => {
-    try {
-      setIsUpdating(true);
-      const tool = tools?.find(t => t.tool_type === toolType);
-      await updateToolMutation.mutateAsync({ 
-        toolType, 
-        isActive: tool?.is_active || false,
-        webhookUrl: webhookUrls[toolType] || ''
+        isActive: !currentState
       });
     } finally {
       setIsUpdating(false);
@@ -175,7 +141,7 @@ export function InstanceToolsSection({ instanceId }: InstanceToolsSectionProps) 
   return (
     <div className="space-y-6">
       <div className="text-sm text-muted-foreground">
-        Configure as integrações com n8n para cada ferramenta. Você precisará criar um workflow no n8n e colar a URL do webhook aqui.
+        Ative ou desative as ferramentas disponíveis para esta instância do WhatsApp.
       </div>
       <div className="space-y-4">
         {availableTools.map((toolType) => {
@@ -207,22 +173,6 @@ export function InstanceToolsSection({ instanceId }: InstanceToolsSectionProps) 
                 <div className="space-y-4">
                   <div className="text-sm text-muted-foreground">
                     {TOOL_DESCRIPTIONS[toolType]}
-                  </div>
-                  <div className="flex gap-2">
-                    <Input
-                      placeholder="URL do webhook do n8n"
-                      value={webhookUrls[toolType] || ''}
-                      onChange={(e) => handleWebhookUrlChange(toolType, e.target.value)}
-                      className="flex-1"
-                    />
-                    <Button 
-                      onClick={() => handleSaveWebhook(toolType)}
-                      disabled={isUpdating}
-                      size="sm"
-                    >
-                      {isUpdating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                      Salvar
-                    </Button>
                   </div>
                 </div>
               </CollapsibleContent>
