@@ -49,8 +49,23 @@ Deno.serve(async (req) => {
     const token = authHeader.replace('Bearer ', '')
 
     // Create Supabase client
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+
+    if (!supabaseUrl || !supabaseKey) {
+      console.error('Missing Supabase configuration')
+      return new Response(
+        JSON.stringify({ 
+          error: 'Server configuration error',
+          details: 'Missing Supabase configuration'
+        }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      )
+    }
+
     const supabase = createClient(supabaseUrl, supabaseKey)
 
     // Verify the JWT and get the user
@@ -152,52 +167,80 @@ Deno.serve(async (req) => {
     }
 
     // Make API request to Evolution API
-    const evolutionApiUrl = Deno.env.get('EVOLUTION_API_URL')!
-    const evolutionApiKey = Deno.env.get('EVOLUTION_API_KEY')!
-    
-    const connectionStateUrl = new URL(`/instance/connectionState/${instanceName}`, evolutionApiUrl).toString()
-    console.log('Checking connection state at URL:', connectionStateUrl)
+    const evolutionApiUrl = Deno.env.get('EVOLUTION_API_URL')
+    const evolutionApiKey = Deno.env.get('EVOLUTION_API_KEY')
 
-    const response = await fetch(connectionStateUrl, {
-      headers: {
-        'Content-Type': 'application/json',
-        'apikey': evolutionApiKey,
-      },
-    })
-
-    if (!response.ok) {
-      console.error('Error from Evolution API:', {
-        status: response.status,
-        statusText: response.statusText
-      })
-      const errorText = await response.text()
-      console.error('Error details:', errorText)
-      
+    if (!evolutionApiUrl || !evolutionApiKey) {
+      console.error('Missing Evolution API configuration')
       return new Response(
-        JSON.stringify({
-          error: 'Failed to check instance state',
-          details: {
-            status: response.status,
-            statusText: response.statusText,
-            error: errorText,
-          },
+        JSON.stringify({ 
+          error: 'Server configuration error',
+          details: 'Missing Evolution API configuration'
         }),
         {
-          status: response.status,
+          status: 500,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         }
       )
     }
+    
+    const connectionStateUrl = new URL(`/instance/connectionState/${instanceName}`, evolutionApiUrl).toString()
+    console.log('Checking connection state at URL:', connectionStateUrl)
 
-    const data = await response.json()
-    console.log('Evolution API response:', data)
+    try {
+      const response = await fetch(connectionStateUrl, {
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': evolutionApiKey,
+        },
+      })
 
-    return new Response(
-      JSON.stringify(data),
-      {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      if (!response.ok) {
+        console.error('Error from Evolution API:', {
+          status: response.status,
+          statusText: response.statusText
+        })
+        const errorText = await response.text()
+        console.error('Error details:', errorText)
+        
+        // Se a Evolution API estiver inacessível, retornamos o último estado conhecido
+        return new Response(
+          JSON.stringify({
+            instance: {
+              state: instance.connection_status || 'disconnected',
+              lastKnownState: true
+            }
+          }),
+          {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        )
       }
-    )
+
+      const data = await response.json()
+      console.log('Evolution API response:', data)
+
+      return new Response(
+        JSON.stringify(data),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      )
+    } catch (error) {
+      console.error('Error calling Evolution API:', error)
+      // Em caso de erro na chamada, retornamos o último estado conhecido
+      return new Response(
+        JSON.stringify({
+          instance: {
+            state: instance.connection_status || 'disconnected',
+            lastKnownState: true
+          }
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      )
+    }
 
   } catch (error) {
     console.error('Unexpected error:', error)
