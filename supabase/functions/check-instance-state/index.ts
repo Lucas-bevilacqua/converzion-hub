@@ -23,10 +23,7 @@ serve(async (req) => {
     if (!authHeader) {
       console.error('No authorization header provided')
       return new Response(
-        JSON.stringify({ 
-          error: 'No authorization header',
-          code: 'unauthorized'
-        }),
+        JSON.stringify({ error: 'No authorization header' }),
         { 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 401 
@@ -40,11 +37,7 @@ serve(async (req) => {
     if (userError || !user) {
       console.error('Error getting user:', userError)
       return new Response(
-        JSON.stringify({ 
-          error: 'Unauthorized', 
-          code: 'unauthorized',
-          details: userError 
-        }),
+        JSON.stringify({ error: 'Unauthorized' }),
         { 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 401 
@@ -62,21 +55,14 @@ serve(async (req) => {
     if (subscriptionError) {
       console.error('Error checking subscription:', subscriptionError)
       return new Response(
-        JSON.stringify({ 
-          error: 'Error checking subscription',
-          code: 'subscription_error',
-          details: subscriptionError 
-        }),
+        JSON.stringify({ error: 'Error checking subscription' }),
         { 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 500
+          status: 500 
         }
       )
     }
 
-    console.log('Subscription data:', subscription)
-    
-    // Check both active and trial status
     const hasValidSubscription = subscription && 
       (subscription.status === 'active' || subscription.status === 'trial')
 
@@ -101,10 +87,7 @@ serve(async (req) => {
     let { instanceId } = await req.json()
     if (!instanceId) {
       return new Response(
-        JSON.stringify({ 
-          error: 'No instance ID provided',
-          code: 'invalid_request'
-        }),
+        JSON.stringify({ error: 'No instance ID provided' }),
         { 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 400
@@ -123,10 +106,7 @@ serve(async (req) => {
     if (instanceError || !instance) {
       console.error('Error getting instance:', instanceError)
       return new Response(
-        JSON.stringify({ 
-          error: 'Instance not found or unauthorized',
-          code: 'instance_error'
-        }),
+        JSON.stringify({ error: 'Instance not found or unauthorized' }),
         { 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 404
@@ -140,10 +120,7 @@ serve(async (req) => {
     if (!evolutionApiUrl || !evolutionApiKey) {
       console.error('Evolution API configuration missing')
       return new Response(
-        JSON.stringify({ 
-          error: 'Evolution API configuration missing',
-          code: 'config_error'
-        }),
+        JSON.stringify({ error: 'Evolution API configuration missing' }),
         { 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 500
@@ -165,11 +142,7 @@ serve(async (req) => {
         const errorText = await response.text()
         console.error('Error from Evolution API:', errorText)
         return new Response(
-          JSON.stringify({ 
-            error: 'Failed to check instance state',
-            code: 'evolution_api_error',
-            details: errorText 
-          }),
+          JSON.stringify({ error: 'Failed to check instance state' }),
           { 
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
             status: response.status
@@ -203,11 +176,7 @@ serve(async (req) => {
     } catch (error) {
       console.error('Error checking instance state with Evolution API:', error)
       return new Response(
-        JSON.stringify({ 
-          error: 'Failed to check instance state',
-          code: 'evolution_api_error',
-          details: error instanceof Error ? error.message : 'Unknown error'
-        }),
+        JSON.stringify({ error: 'Failed to check instance state' }),
         { 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 500
@@ -218,11 +187,7 @@ serve(async (req) => {
   } catch (error) {
     console.error('Unexpected error in check-instance-state:', error)
     return new Response(
-      JSON.stringify({
-        error: 'Internal server error',
-        code: 'internal_error',
-        details: error instanceof Error ? error.message : 'Unknown error'
-      }),
+      JSON.stringify({ error: 'Internal server error' }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 500

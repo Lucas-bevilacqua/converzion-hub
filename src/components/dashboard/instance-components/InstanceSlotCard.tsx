@@ -45,10 +45,9 @@ export function InstanceSlotCard({
         })
         
         if (error) {
+          console.error('Error checking instance state:', error)
           // Check if it's a subscription error
-          const errorBody = error.message && JSON.parse(error.message)
-          if (errorBody?.code === 'subscription_required') {
-            console.log('No active subscription found')
+          if (error.message && error.message.includes('subscription_required')) {
             toast({
               title: "Subscription Required",
               description: "You need an active subscription to use this feature.",
@@ -57,7 +56,6 @@ export function InstanceSlotCard({
             return { state: 'disconnected' }
           }
           
-          console.error('Error checking instance state:', error)
           toast({
             title: "Error",
             description: "Failed to check instance state. Please try again.",
