@@ -1,7 +1,6 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
-import { Input } from "@/components/ui/input"
 import { Loader2 } from "lucide-react"
 import { useState, useEffect } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
@@ -34,7 +33,6 @@ const formSchema = z.object({
     required_error: "Por favor selecione um objetivo",
   }),
   prompt: z.string().min(1, "O prompt é obrigatório"),
-  webhookUrl: z.string().url("URL inválida").optional().or(z.literal('')),
 });
 
 interface InstancePromptDialogProps {
@@ -59,7 +57,6 @@ export function InstancePromptDialog({
     defaultValues: {
       objective: 'custom',
       prompt: currentPrompt || "",
-      webhookUrl: "",
     },
   })
 
@@ -80,24 +77,9 @@ export function InstancePromptDialog({
         console.error('Error fetching instance configuration:', configError)
         throw configError
       }
-
-      // Buscar webhook se existir
-      const { data: webhookData, error: webhookError } = await supabase
-        .from('instance_webhooks')
-        .select('*')
-        .eq('instance_id', instanceId)
-        .eq('webhook_type', 'n8n')
-        .maybeSingle()
-
-      if (webhookError) {
-        console.error('Error fetching webhook:', webhookError)
-      }
       
-      console.log('Instance configuration found:', { config: configData, webhook: webhookData })
-      return {
-        ...configData,
-        webhookUrl: webhookData?.webhook_url || ""
-      }
+      console.log('Instance configuration found:', { config: configData })
+      return configData
     },
     enabled: !!instanceId,
   })
@@ -108,13 +90,11 @@ export function InstancePromptDialog({
       console.log('Updating form with current values:', {
         prompt: currentPrompt,
         objective: currentConfig?.objective,
-        webhookUrl: currentConfig?.webhookUrl
       })
       
       form.reset({
         objective: currentConfig?.objective || 'custom',
         prompt: currentPrompt || "",
-        webhookUrl: currentConfig?.webhookUrl || "",
       })
     }
   }, [open, currentPrompt, currentConfig, form])
@@ -196,69 +176,15 @@ export function InstancePromptDialog({
     }
   })
 
-  const webhookMutation = useMutation({
-    mutationFn: async (values: z.infer<typeof formSchema>) => {
-      if (!instanceId) throw new Error('Instance ID is required')
-      if (!values.webhookUrl) return null
-
-      console.log('Updating webhook:', {
-        instanceId,
-        webhookUrl: values.webhookUrl
-      })
-
-      const { data: existingWebhook } = await supabase
-        .from('instance_webhooks')
-        .select('*')
-        .eq('instance_id', instanceId)
-        .eq('webhook_type', 'n8n')
-        .maybeSingle()
-
-      if (existingWebhook) {
-        const { error } = await supabase
-          .from('instance_webhooks')
-          .update({ webhook_url: values.webhookUrl })
-          .eq('id', existingWebhook.id)
-
-        if (error) throw error
-      } else {
-        const { error } = await supabase
-          .from('instance_webhooks')
-          .insert({
-            instance_id: instanceId,
-            webhook_url: values.webhookUrl,
-            webhook_type: 'n8n'
-          })
-
-        if (error) throw error
-      }
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['instanceConfig'] })
-      toast({
-        title: "Webhook salvo",
-        description: "O webhook foi configurado com sucesso.",
-      })
-    },
-    onError: (error) => {
-      console.error('Error saving webhook:', error)
-      toast({
-        title: "Erro",
-        description: "Ocorreu um erro ao salvar o webhook.",
-        variant: "destructive",
-      })
-    }
-  })
-
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     try {
       setIsSaving(true)
       console.log('Submitting form with values:', values)
       
-      // Salvar prompt, configurações e webhook em paralelo
+      // Salvar prompt e configurações em paralelo
       await Promise.all([
         promptMutation.mutateAsync(values),
         configMutation.mutateAsync(values),
-        webhookMutation.mutateAsync(values)
       ])
       
       onOpenChange(false)
@@ -343,27 +269,6 @@ export function InstancePromptDialog({
                       </FormControl>
                       <FormDescription>
                         Configure como o assistente deve se comportar nesta instância.
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="webhookUrl"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>URL do Webhook (n8n)</FormLabel>
-                      <FormControl>
-                        <Input
-                          placeholder="https://seu-n8n.com/webhook/..."
-                          {...field}
-                          disabled={isSaving}
-                        />
-                      </FormControl>
-                      <FormDescription>
-                        Configure um webhook do n8n para integrar com outras ferramentas.
                       </FormDescription>
                       <FormMessage />
                     </FormItem>
