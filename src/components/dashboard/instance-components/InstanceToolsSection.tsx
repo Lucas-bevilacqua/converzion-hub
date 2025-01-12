@@ -276,7 +276,6 @@ export function InstanceToolsSection({ instanceId }: InstanceToolsSectionProps) 
                       ) : (
                         <Badge variant="secondary" className="flex items-center gap-1">
                           <X className="h-3 w-3" />
-                          Inativo
                         </Badge>
                       )}
                     </div>
