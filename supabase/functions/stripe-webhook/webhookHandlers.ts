@@ -58,6 +58,7 @@ export async function handleCheckoutCompleted(
     .eq('user_id', userData.id)
     .maybeSingle()
 
+  // Mantém os dados do trial se existirem
   const subscriptionData = {
     user_id: userData.id,
     stripe_customer_id: session.customer,
@@ -65,22 +66,23 @@ export async function handleCheckoutCompleted(
     status: subscription.status === 'active' ? 'active' : 'past_due',
     plan_id: metadata.planId || (subscription.items.data[0].price.id === 'price_1QbuUvKkjJ7tububiklS9tAc' ? 'professional' : 'starter'),
     current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
-    trial_ends_at: null, // Remove trial when upgrading
-    trial_started_at: null // Remove trial when upgrading
+    // Mantém os dados do trial se existirem
+    trial_ends_at: existingSubscription?.trial_ends_at || null,
+    trial_started_at: existingSubscription?.trial_started_at || null
   }
 
   console.log('Updating subscription with data:', subscriptionData)
 
   let error
   if (existingSubscription) {
-    // If exists, update it
+    // Se existe, atualiza mantendo os dados do trial
     const { error: updateError } = await supabaseClient
       .from('subscriptions')
       .update(subscriptionData)
       .eq('id', existingSubscription.id)
     error = updateError
   } else {
-    // If doesn't exist, create it
+    // Se não existe, cria novo
     const { error: insertError } = await supabaseClient
       .from('subscriptions')
       .insert(subscriptionData)
@@ -102,7 +104,7 @@ export async function handleSubscriptionUpdated(
   console.log('Processing customer.subscription.updated event')
   const subscription = event.data.object as Stripe.Subscription
 
-  // Find the subscription in our database
+  // Encontra a assinatura no banco
   const { data: subscriptionData, error: findError } = await supabaseClient
     .from('subscriptions')
     .select('*')
@@ -125,6 +127,7 @@ export async function handleSubscriptionUpdated(
     newStatus: subscription.status
   })
 
+  // Mantém os dados do trial ao atualizar
   const { error: updateError } = await supabaseClient
     .from('subscriptions')
     .update({
@@ -132,8 +135,9 @@ export async function handleSubscriptionUpdated(
               subscription.status === 'past_due' ? 'past_due' : 'canceled',
       plan_id: subscription.items.data[0].price.id,
       current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
-      trial_ends_at: null, // Remove trial when updating subscription
-      trial_started_at: null // Remove trial when updating subscription
+      // Mantém os dados do trial existentes
+      trial_ends_at: subscriptionData.trial_ends_at,
+      trial_started_at: subscriptionData.trial_started_at
     })
     .eq('id', subscriptionData.id)
 
@@ -152,12 +156,24 @@ export async function handleSubscriptionDeleted(
   console.log('Processing customer.subscription.deleted event')
   const subscription = event.data.object as Stripe.Subscription
 
+  // Ao cancelar, mantém os dados do trial se ainda estiver válido
+  const { data: existingSubscription } = await supabaseClient
+    .from('subscriptions')
+    .select('trial_ends_at, trial_started_at')
+    .eq('stripe_subscription_id', subscription.id)
+    .single()
+
+  const now = new Date()
+  const trialEndsAt = existingSubscription?.trial_ends_at ? new Date(existingSubscription.trial_ends_at) : null
+  const trialStillValid = trialEndsAt && trialEndsAt > now
+
   const { error } = await supabaseClient
     .from('subscriptions')
     .update({ 
-      status: 'canceled',
-      trial_ends_at: null,
-      trial_started_at: null
+      status: trialStillValid ? 'trial' : 'canceled',
+      // Mantém o trial apenas se ainda estiver válido
+      trial_ends_at: trialStillValid ? existingSubscription.trial_ends_at : null,
+      trial_started_at: trialStillValid ? existingSubscription.trial_started_at : null
     })
     .eq('stripe_subscription_id', subscription.id)
 
