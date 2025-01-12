@@ -65,6 +65,7 @@ serve(async (req) => {
     }
 
     console.log('Found subscription:', subscription)
+    console.log('Trial ends at:', subscription?.trial_ends_at)
 
     // Check if subscription is active or trial
     const hasValidSubscription = subscription && (
