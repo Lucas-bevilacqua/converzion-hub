@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { isAfter } from 'https://esm.sh/date-fns@2'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -9,7 +10,6 @@ const corsHeaders = {
 console.log('Check Instance State function started')
 
 serve(async (req) => {
-  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
@@ -20,7 +20,6 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
     )
 
-    // Validate auth header
     const authHeader = req.headers.get('Authorization')
     if (!authHeader) {
       console.error('No authorization header provided')
@@ -33,7 +32,6 @@ serve(async (req) => {
       )
     }
 
-    // Get user from token
     const token = authHeader.replace('Bearer ', '')
     const { data: { user }, error: userError } = await supabaseClient.auth.getUser(token)
     
@@ -74,7 +72,7 @@ serve(async (req) => {
       (
         subscription.status === 'trial' && 
         subscription.trial_ends_at && 
-        new Date(subscription.trial_ends_at) > new Date()
+        isAfter(new Date(subscription.trial_ends_at), new Date())
       )
     )
 
