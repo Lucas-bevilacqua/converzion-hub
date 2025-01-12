@@ -122,10 +122,10 @@ export function InstancesCard() {
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <MessageSquare className="h-5 w-5" />
-          Instâncias WhatsApp
+          Números do WhatsApp
         </CardTitle>
         <CardDescription>
-          Gerencie suas instâncias do WhatsApp ({connectedInstances}/{usedSlots} em uso)
+          Gerencie seus números do WhatsApp ({connectedInstances}/{usedSlots} em uso)
         </CardDescription>
       </CardHeader>
       <CardContent>

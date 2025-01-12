@@ -9,14 +9,8 @@ interface DashboardOverviewProps {
 }
 
 const getPlanDisplayName = (planId: string | null) => {
-  switch (planId) {
-    case 'starter':
-      return 'Starter'
-    case 'professional':
-      return 'Professional'
-    default:
-      return 'Plano Atual'
-  }
+  if (!planId) return 'Sem plano'
+  return planId.includes('professional') ? 'Profissional' : 'Inicial'
 }
 
 export function DashboardOverview({ subscription, instances }: DashboardOverviewProps) {
@@ -57,14 +51,14 @@ export function DashboardOverview({ subscription, instances }: DashboardOverview
       <Card className="p-4">
         <div className="flex items-center gap-2">
           <Laptop2 className="h-4 w-4 text-primary" />
-          <span className="text-sm font-medium">Instâncias</span>
+          <span className="text-sm font-medium">WhatsApp</span>
         </div>
         <div className="mt-3">
           <div className="text-2xl font-bold">
-            {instances.length}/{subscription?.plan_id === 'professional' ? '3' : '1'}
+            {instances.length}/{subscription?.plan_id?.includes('professional') ? '3' : '1'}
           </div>
           <p className="text-xs text-muted-foreground">
-            Instâncias em uso
+            Números conectados
           </p>
         </div>
       </Card>

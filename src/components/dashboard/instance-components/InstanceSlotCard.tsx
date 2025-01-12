@@ -26,13 +26,13 @@ export function InstanceSlotCard({
   const [showQRCode, setShowQRCode] = useState(false)
   const [qrCodeData, setQrCodeData] = useState<string | null>(null)
 
-  // Query para verificar o estado da instância
+  // Query para verificar o estado do número
   const { data: stateData } = useQuery({
     queryKey: ['instanceState', instance?.id],
     queryFn: async () => {
       if (!instance?.id) return null
       
-      console.log('Verificando estado da instância:', instance.id)
+      console.log('Verificando estado do número:', instance.id)
       try {
         const { data: { session } } = await supabase.auth.getSession()
         if (!session) {
@@ -48,7 +48,7 @@ export function InstanceSlotCard({
         })
         
         if (error) {
-          console.error('Erro ao verificar estado da instância:', error)
+          console.error('Erro ao verificar estado do número:', error)
           if (error.message && error.message.includes('subscription_required')) {
             toast({
               title: "Assinatura Necessária",
@@ -60,13 +60,13 @@ export function InstanceSlotCard({
           
           toast({
             title: "Erro",
-            description: "Falha ao verificar estado da instância. Tente novamente.",
+            description: "Falha ao verificar estado do número. Tente novamente.",
             variant: "destructive",
           })
           return { state: 'error' }
         }
 
-        // Verifica se o estado é 'open', que significa conectado na Evolution API
+        // Verifica se o estado é 'open', que significa conectado
         const isConnected = data?.instance?.state === 'open'
         return { state: isConnected ? 'connected' : 'disconnected' }
       } catch (error) {
@@ -91,17 +91,17 @@ export function InstanceSlotCard({
       if (error) throw error
 
       toast({
-        title: "Success",
-        description: "Instance deleted successfully",
+        title: "Sucesso",
+        description: "Número excluído com sucesso",
       })
 
-      // Refresh the page to update the instances list
+      // Atualiza a página para mostrar a lista atualizada
       window.location.reload()
     } catch (error) {
-      console.error('Error deleting instance:', error)
+      console.error('Erro ao excluir número:', error)
       toast({
-        title: "Error",
-        description: "Failed to delete instance. Please try again.",
+        title: "Erro",
+        description: "Falha ao excluir número. Tente novamente.",
         variant: "destructive",
       })
     }
@@ -113,16 +113,16 @@ export function InstanceSlotCard({
     if (!instance?.id) return
     
     try {
-      console.log('Conectando instância:', instance.id)
+      console.log('Conectando número:', instance.id)
       const { data, error } = await supabase.functions.invoke('connect-evolution-instance', {
         body: { instanceId: instance.id }
       })
 
       if (error) {
-        console.error('Erro ao conectar instância:', error)
+        console.error('Erro ao conectar número:', error)
         toast({
           title: "Erro",
-          description: "Falha ao conectar instância. Tente novamente.",
+          description: "Falha ao conectar número. Tente novamente.",
           variant: "destructive",
         })
         return
@@ -150,7 +150,7 @@ export function InstanceSlotCard({
           <div className="p-2 bg-primary/10 rounded-lg">
             <MessageSquare className="h-5 w-5 text-primary" />
           </div>
-          <p className="text-sm font-medium">Adicionar Instância</p>
+          <p className="text-sm font-medium">Adicionar Número</p>
         </CardContent>
       </Card>
     )
@@ -186,7 +186,7 @@ export function InstanceSlotCard({
                 variant="ghost"
                 size="icon"
                 onClick={handleDelete}
-                title="Deletar Instância"
+                title="Excluir Número"
                 className="text-destructive hover:text-destructive"
               >
                 <Trash2 className="h-4 w-4" />
