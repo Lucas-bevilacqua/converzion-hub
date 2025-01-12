@@ -26,7 +26,8 @@ serve(async (req) => {
 
     console.log('Creating HubSpot contact with data:', { name, email, phone, source })
 
-    const response = await fetch('https://api.hubapi.com/crm/v3/objects/contacts', {
+    // First create the contact
+    const createContactResponse = await fetch('https://api.hubapi.com/crm/v3/objects/contacts', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -38,23 +39,44 @@ serve(async (req) => {
           lastname: name.split(' ').slice(1).join(' '),
           email: email,
           phone: phone,
-          // Using a standard HubSpot property for lead source
           hs_lead_status: 'NEW',
-          lifecyclestage: 'lead',
-          // Store the source in a note instead
-          hs_note_body: `Lead source: ${source}`
+          lifecyclestage: 'lead'
         },
       }),
     })
 
-    if (!response.ok) {
-      const error = await response.text()
+    if (!createContactResponse.ok) {
+      const error = await createContactResponse.text()
       console.error('HubSpot API error response:', error)
       throw new Error(`HubSpot API error: ${error}`)
     }
 
-    const result = await response.json()
-    console.log('HubSpot contact created successfully:', result)
+    const contact = await createContactResponse.json()
+    console.log('HubSpot contact created successfully:', contact)
+
+    // Then create a note for the contact with the source information
+    const createNoteResponse = await fetch('https://api.hubapi.com/crm/v3/objects/notes', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${hubspotApiKey}`,
+      },
+      body: JSON.stringify({
+        properties: {
+          hs_timestamp: Date.now(),
+          hs_note: `Lead source: ${source}`,
+          hs_association_ids: [contact.id],
+          hs_association_types: ["contact_to_note"]
+        },
+      }),
+    })
+
+    if (!createNoteResponse.ok) {
+      console.error('Failed to create note, but contact was created:', await createNoteResponse.text())
+      // Don't throw error here as the contact was successfully created
+    } else {
+      console.log('Note created successfully')
+    }
 
     return new Response(
       JSON.stringify({ success: true }),
