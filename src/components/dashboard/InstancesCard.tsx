@@ -1,5 +1,5 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { MessageSquare, Loader2, LogOut } from "lucide-react"
+import { MessageSquare, Loader2 } from "lucide-react"
 import { useAuth } from "@/contexts/auth/AuthContext"
 import { useState } from "react"
 import { useToast } from "@/components/ui/use-toast"
@@ -91,6 +91,7 @@ export function InstancesCard() {
   const instanceLimit = getInstanceLimit()
   const usedSlots = instances?.length || 0
   const availableSlots = Math.max(0, instanceLimit - usedSlots)
+  const connectedInstances = instances?.filter(instance => instance.connection_status === 'connected').length || 0
 
   return (
     <Card>
@@ -100,7 +101,7 @@ export function InstancesCard() {
           Instâncias WhatsApp
         </CardTitle>
         <CardDescription>
-          Gerencie suas instâncias do WhatsApp ({usedSlots}/{instanceLimit} em uso)
+          Gerencie suas instâncias do WhatsApp ({connectedInstances}/{usedSlots} em uso)
         </CardDescription>
       </CardHeader>
       <CardContent>
