@@ -65,6 +65,7 @@ serve(async (req) => {
 
     console.log('Found subscription:', subscription)
 
+    // Simplified subscription validation - just check if status is active or trial
     const hasValidSubscription = subscription && (
       subscription.status === 'active' || 
       subscription.status === 'trial'
