@@ -26,7 +26,7 @@ serve(async (req) => {
     const cleanBaseUrl = EVOLUTION_API_URL.replace(/\/+$/, '')
     
     // URL do webhook que receberá os eventos
-    const webhookUrl = `https://adm.whatsremind.com/webhook/44522e6c-1297-496e-bb96-b867e67dd0bd`
+    const webhookUrl = `https://adm.whatsremind.com/webhook/evolutin`
     
     console.log('Configurando webhook na URL:', `${cleanBaseUrl}/webhook/set/${instanceName}`)
     
