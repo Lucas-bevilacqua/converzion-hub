@@ -224,6 +224,7 @@ export type Database = {
       }
       instance_tools: {
         Row: {
+          api_credentials: Json | null
           created_at: string
           id: string
           instance_id: string
@@ -232,8 +233,11 @@ export type Database = {
           setup_guide: Json | null
           tool_type: Database["public"]["Enums"]["tool_type"]
           updated_at: string
+          webhook_secret: string | null
+          webhook_url: string | null
         }
         Insert: {
+          api_credentials?: Json | null
           created_at?: string
           id?: string
           instance_id: string
@@ -242,8 +246,11 @@ export type Database = {
           setup_guide?: Json | null
           tool_type: Database["public"]["Enums"]["tool_type"]
           updated_at?: string
+          webhook_secret?: string | null
+          webhook_url?: string | null
         }
         Update: {
+          api_credentials?: Json | null
           created_at?: string
           id?: string
           instance_id?: string
@@ -252,6 +259,8 @@ export type Database = {
           setup_guide?: Json | null
           tool_type?: Database["public"]["Enums"]["tool_type"]
           updated_at?: string
+          webhook_secret?: string | null
+          webhook_url?: string | null
         }
         Relationships: [
           {
@@ -425,7 +434,7 @@ export type Database = {
         | "education"
         | "custom"
       subscription_status: "active" | "canceled" | "past_due" | "trial"
-      tool_type: "calendar" | "crm" | "payment" | "custom"
+      tool_type: "calendar" | "crm" | "payment" | "custom" | "n8n"
       webhook_type: "n8n" | "zapier" | "make"
     }
     CompositeTypes: {

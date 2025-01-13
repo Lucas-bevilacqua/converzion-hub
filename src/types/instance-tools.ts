@@ -1,4 +1,4 @@
-export type ToolType = 'calendar' | 'crm' | 'payment' | 'custom';
+export type ToolType = 'calendar' | 'crm' | 'payment' | 'custom' | 'n8n';
 
 export interface InstanceTool {
   id: string;
@@ -7,8 +7,11 @@ export interface InstanceTool {
   is_active: boolean;
   settings: {
     webhook_url?: string;
+    api_credentials?: Record<string, any>;
     [key: string]: any;
   };
   created_at: string;
   updated_at: string;
+  webhook_url?: string;
+  webhook_secret?: string;
 }

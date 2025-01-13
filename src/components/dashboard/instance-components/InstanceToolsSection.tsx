@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { Calendar, Users, Check, X, ExternalLink, Key } from "lucide-react";
+import { Calendar, Users, Check, X, ExternalLink, Key, Webhook } from "lucide-react";
 import { InstanceTool, ToolType } from "@/types/instance-tools";
 import { useToast } from "@/components/ui/use-toast";
 import { Button } from "@/components/ui/button";
@@ -18,7 +18,6 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
   DialogDescription,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -37,16 +36,19 @@ interface InstanceToolsSectionProps {
 const TOOL_ICONS = {
   calendar: Calendar,
   crm: Users,
+  n8n: Webhook,
 };
 
 const TOOL_LABELS = {
   calendar: "Calendário",
   crm: "CRM",
+  n8n: "n8n (Automação)",
 };
 
 const TOOL_DESCRIPTIONS = {
   calendar: "Conecte seu sistema de agendamentos para que seus clientes possam marcar horários automaticamente pelo WhatsApp",
   crm: "Conecte seu CRM para registrar automaticamente informações dos seus clientes",
+  n8n: "Conecte o n8n para criar automações personalizadas com seu WhatsApp",
 };
 
 const TOOL_PROVIDERS = {
@@ -58,6 +60,9 @@ const TOOL_PROVIDERS = {
   crm: [
     { id: 'hubspot', name: 'HubSpot', setupUrl: 'https://app.hubspot.com/api-key' },
     { id: 'pipedrive', name: 'Pipedrive', setupUrl: 'https://app.pipedrive.com/settings/api' },
+  ],
+  n8n: [
+    { id: 'n8n', name: 'n8n', setupUrl: 'https://docs.n8n.io/hosting/installation/docker/' },
   ],
 };
 
@@ -72,7 +77,6 @@ const TOOL_SETUP_GUIDES = {
     ],
     docsUrl: "https://support.google.com/calendar/answer/37083",
     autoSetupAvailable: true,
-    setupUrl: "https://calendar.google.com/calendar/embedhelper"
   },
   crm: {
     title: "Como configurar o CRM",
@@ -85,7 +89,18 @@ const TOOL_SETUP_GUIDES = {
     ],
     docsUrl: "https://knowledge.hubspot.com/pt/integrations/how-do-i-get-my-hubspot-api-key",
     autoSetupAvailable: true,
-    setupUrl: "https://app.hubspot.com/api-key"
+  },
+  n8n: {
+    title: "Como configurar o n8n",
+    steps: [
+      "1. Acesse seu painel do n8n",
+      "2. Crie um novo workflow",
+      "3. Adicione um trigger de webhook",
+      "4. Copie a URL do webhook",
+      "5. Cole a URL aqui para ativar a integração"
+    ],
+    docsUrl: "https://docs.n8n.io/integrations/builtin/trigger-nodes/webhook/",
+    autoSetupAvailable: true,
   },
 };
 
