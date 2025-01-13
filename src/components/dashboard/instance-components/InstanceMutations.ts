@@ -10,7 +10,7 @@ export const useInstanceMutations = () => {
 
   const createMutation = useMutation({
     mutationFn: async (newInstance: { name: string; phone_number: string }) => {
-      console.log('Creating new instance:', newInstance);
+      console.log('Criando nova instância:', newInstance);
       
       // Primeiro cria a instância
       const { data: instanceData, error: instanceError } = await supabase.functions.invoke('create-evolution-instance', {
@@ -29,19 +29,30 @@ export const useInstanceMutations = () => {
       console.log('Instância criada com sucesso:', instanceData);
 
       // Configura o webhook após criar a instância
-      console.log('Configurando webhook para a instância:', newInstance.name);
-      const { data: webhookResponse, error: webhookError } = await supabase.functions.invoke('configure-evolution-webhook', {
-        body: { 
-          instanceName: newInstance.name
-        }
-      });
+      try {
+        console.log('Configurando webhook para a instância:', newInstance.name);
+        const { data: webhookResponse, error: webhookError } = await supabase.functions.invoke('configure-evolution-webhook', {
+          body: { 
+            instanceName: newInstance.name
+          }
+        });
 
-      if (webhookError) {
+        if (webhookError) {
+          console.error('Erro ao configurar webhook:', webhookError);
+          throw webhookError;
+        }
+
+        console.log('Webhook configurado com sucesso:', webhookResponse);
+      } catch (webhookError) {
         console.error('Erro ao configurar webhook:', webhookError);
-        throw webhookError;
+        // Não vamos lançar o erro aqui para não impedir a criação da instância
+        toast({
+          title: "Aviso",
+          description: "Instância criada, mas houve um erro ao configurar o webhook. Tente reconectar a instância.",
+          variant: "destructive",
+        });
       }
 
-      console.log('Webhook configurado com sucesso:', webhookResponse);
       return instanceData;
     },
     onSuccess: () => {

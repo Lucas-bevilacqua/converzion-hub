@@ -28,6 +28,7 @@ serve(async (req) => {
     const webhookUrl = `${Deno.env.get('SUPABASE_URL')}/functions/evolution-webhook`
     
     console.log('Configurando webhook na URL:', `${cleanBaseUrl}/webhook/set/${instanceName}`)
+    console.log('Webhook URL:', webhookUrl)
     
     // Configura o webhook na Evolution API usando a rota correta
     const response = await fetch(`${cleanBaseUrl}/webhook/set/${instanceName}`, {
