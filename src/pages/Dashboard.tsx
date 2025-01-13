@@ -3,13 +3,13 @@ import { useAuth } from "@/contexts/auth/AuthContext"
 import { useQuery } from "@tanstack/react-query"
 import { supabase } from "@/integrations/supabase/client"
 import { SubscriptionCard } from "@/components/dashboard/SubscriptionCard"
-import { InstancesCard } from "@/components/dashboard/InstancesCard"
 import { DashboardOverview } from "@/components/dashboard/overview/DashboardOverview"
 import { Loader2, Menu } from "lucide-react"
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar"
 import { DashboardSidebar } from "@/components/dashboard/DashboardSidebar"
 import { useIsMobile } from "@/hooks/use-mobile"
 import { TrialAlert } from "@/components/dashboard/overview/TrialAlert"
+import { InstancesCard } from "@/components/dashboard/InstancesCard"
 
 export default function Dashboard() {
   const { user } = useAuth()
@@ -98,7 +98,6 @@ export default function Dashboard() {
               subscription={subscription} 
               instances={instances || []} 
             />
-            <InstancesCard />
           </div>
         )
       case "instances":
