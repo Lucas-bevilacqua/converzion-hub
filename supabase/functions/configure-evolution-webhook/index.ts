@@ -16,7 +16,6 @@ serve(async (req) => {
 
     const EVOLUTION_API_URL = Deno.env.get('EVOLUTION_API_URL')
     const EVOLUTION_API_KEY = Deno.env.get('EVOLUTION_API_KEY')
-    const SUPABASE_URL = Deno.env.get('SUPABASE_URL')
 
     if (!EVOLUTION_API_URL || !EVOLUTION_API_KEY) {
       throw new Error('Configuração da Evolution API não encontrada')
@@ -26,7 +25,7 @@ serve(async (req) => {
     const cleanBaseUrl = EVOLUTION_API_URL.replace(/\/+$/, '')
     
     // URL do webhook que receberá os eventos
-    const webhookUrl = `https://adm.whatsremind.com/webhook/evolutin`
+    const webhookUrl = `${Deno.env.get('SUPABASE_URL')}/functions/evolution-webhook`
     
     console.log('Configurando webhook na URL:', `${cleanBaseUrl}/webhook/set/${instanceName}`)
     
