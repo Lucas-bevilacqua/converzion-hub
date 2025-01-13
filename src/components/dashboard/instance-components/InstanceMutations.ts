@@ -11,7 +11,9 @@ export const useInstanceMutations = () => {
   const createMutation = useMutation({
     mutationFn: async (newInstance: { name: string; phone_number: string }) => {
       console.log('Creating new instance:', newInstance);
-      const { data: response, error } = await supabase.functions.invoke('create-evolution-instance', {
+      
+      // Primeiro cria a instância
+      const { data: instanceData, error: instanceError } = await supabase.functions.invoke('create-evolution-instance', {
         body: { 
           name: newInstance.name,
           phone_number: newInstance.phone_number,
@@ -19,7 +21,12 @@ export const useInstanceMutations = () => {
         }
       });
       
-      if (error) throw error;
+      if (instanceError) {
+        console.error('Erro ao criar instância:', instanceError);
+        throw instanceError;
+      }
+
+      console.log('Instância criada com sucesso:', instanceData);
 
       // Configura o webhook após criar a instância
       console.log('Configurando webhook para a instância:', newInstance.name);
@@ -35,7 +42,7 @@ export const useInstanceMutations = () => {
       }
 
       console.log('Webhook configurado com sucesso:', webhookResponse);
-      return response;
+      return instanceData;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['instances'] });
