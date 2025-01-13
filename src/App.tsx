@@ -10,6 +10,11 @@ import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Dashboard from "./pages/Dashboard";
 import Admin from "./pages/Admin";
+import Documentation from "./pages/Documentation";
+import Contact from "./pages/Contact";
+import Features from "./pages/Features";
+import Privacy from "./pages/Privacy";
+import Terms from "./pages/Terms";
 
 const queryClient = new QueryClient();
 
@@ -58,6 +63,11 @@ const AppRoutes = () => {
       <Route path="/register" element={<PublicRoute><Register /></PublicRoute>} />
       <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
       <Route path="/admin" element={<ProtectedRoute><Admin /></ProtectedRoute>} />
+      <Route path="/docs" element={<Documentation />} />
+      <Route path="/contact" element={<Contact />} />
+      <Route path="/features" element={<Features />} />
+      <Route path="/privacy" element={<Privacy />} />
+      <Route path="/terms" element={<Terms />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
