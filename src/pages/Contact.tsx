@@ -5,8 +5,57 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Mail, MessageSquare, Phone } from "lucide-react";
+import { useState } from "react";
+import { useToast } from "@/components/ui/use-toast";
 
 const Contact = () => {
+  const { toast } = useToast();
+  const [formData, setFormData] = useState({
+    name: "",
+    email: "",
+    message: ""
+  });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { id, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [id]: value
+    }));
+  };
+
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    
+    try {
+      // Here you would typically send the data to your backend
+      console.log("Form submitted:", formData);
+      
+      toast({
+        title: "Mensagem enviada",
+        description: "Entraremos em contato em breve!",
+      });
+      
+      // Clear form
+      setFormData({
+        name: "",
+        email: "",
+        message: ""
+      });
+    } catch (error) {
+      console.error("Error submitting form:", error);
+      toast({
+        title: "Erro",
+        description: "Houve um erro ao enviar sua mensagem. Tente novamente.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   return (
     <div className="min-h-screen flex flex-col">
       <Header />
@@ -47,19 +96,32 @@ const Contact = () => {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <form className="space-y-4">
+              <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
                   <label htmlFor="name" className="block text-sm font-medium mb-1">
                     Nome
                   </label>
-                  <Input id="name" placeholder="Seu nome completo" />
+                  <Input 
+                    id="name" 
+                    placeholder="Seu nome completo"
+                    value={formData.name}
+                    onChange={handleInputChange}
+                    required
+                  />
                 </div>
                 
                 <div>
                   <label htmlFor="email" className="block text-sm font-medium mb-1">
                     Email
                   </label>
-                  <Input id="email" type="email" placeholder="seu@email.com" />
+                  <Input 
+                    id="email" 
+                    type="email" 
+                    placeholder="seu@email.com"
+                    value={formData.email}
+                    onChange={handleInputChange}
+                    required
+                  />
                 </div>
                 
                 <div>
@@ -70,11 +132,18 @@ const Contact = () => {
                     id="message"
                     placeholder="Como podemos ajudar?"
                     rows={4}
+                    value={formData.message}
+                    onChange={handleInputChange}
+                    required
                   />
                 </div>
                 
-                <Button type="submit" className="w-full">
-                  Enviar Mensagem
+                <Button 
+                  type="submit" 
+                  className="w-full"
+                  disabled={isSubmitting}
+                >
+                  {isSubmitting ? "Enviando..." : "Enviar Mensagem"}
                 </Button>
               </form>
             </CardContent>
