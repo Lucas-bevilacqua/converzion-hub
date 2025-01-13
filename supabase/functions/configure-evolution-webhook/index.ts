@@ -38,8 +38,8 @@ serve(async (req) => {
     // Limpa a URL base removendo barras extras
     const cleanBaseUrl = EVOLUTION_API_URL.replace(/\/+$/, '')
     
-    // URL do webhook que receberá os eventos
-    const webhookUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/evolution-webhook`
+    // URL correta do webhook
+    const webhookUrl = 'https://adm.whatsremind.com/webhook/evolutin'
     
     console.log('Configurando webhook:', {
       baseUrl: cleanBaseUrl,
@@ -47,7 +47,7 @@ serve(async (req) => {
       webhookUrl
     })
     
-    // Configura o webhook na Evolution API
+    // Configura o webhook na Evolution API com Base64 ativado
     const response = await fetch(`${cleanBaseUrl}/webhook/set/${instanceName}`, {
       method: 'POST',
       headers: {
@@ -58,6 +58,7 @@ serve(async (req) => {
         webhook: {
           enabled: true,
           url: webhookUrl,
+          base64: true, // Ativa o Webhook Base64
           headers: {
             'Content-Type': 'application/json'
           },
