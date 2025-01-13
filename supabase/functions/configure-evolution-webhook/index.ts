@@ -1,45 +1,38 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import { corsHeaders } from "../connect-evolution-instance/cors.ts"
 
-const EVOLUTION_API_KEY = Deno.env.get('EVOLUTION_API_KEY')
-const EVOLUTION_API_URL = Deno.env.get('EVOLUTION_API_URL')
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+}
 
-console.log("Função de configuração de webhook iniciada")
+console.log('Configure Evolution Webhook function started')
 
 serve(async (req) => {
+  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
+    console.log('Handling OPTIONS request')
+    return new Response(null, { 
+      headers: { ...corsHeaders }
+    })
   }
 
   try {
-    const { instanceName } = await req.json()
-
-    if (!instanceName) {
-      console.error('Nome da instância não fornecido')
-      return new Response(
-        JSON.stringify({ error: 'Nome da instância é obrigatório' }),
-        {
-          status: 400,
-          headers: {
-            ...corsHeaders,
-            'Content-Type': 'application/json'
-          }
-        }
-      )
+    console.log('Processing webhook configuration request')
+    const { instanceName, instanceId } = await req.json()
+    
+    if (!instanceName || !instanceId) {
+      console.error('Parâmetros inválidos:', { instanceName, instanceId })
+      throw new Error('Nome da instância e ID são obrigatórios')
     }
 
-    if (!EVOLUTION_API_KEY || !EVOLUTION_API_URL) {
-      console.error('Variáveis de ambiente não configuradas')
-      return new Response(
-        JSON.stringify({ error: 'Configuração do servidor incompleta' }),
-        {
-          status: 500,
-          headers: {
-            ...corsHeaders,
-            'Content-Type': 'application/json'
-          }
-        }
-      )
+    console.log('Configurando webhook para:', { instanceName, instanceId })
+
+    const EVOLUTION_API_URL = Deno.env.get('EVOLUTION_API_URL')
+    const EVOLUTION_API_KEY = Deno.env.get('EVOLUTION_API_KEY')
+
+    if (!EVOLUTION_API_URL || !EVOLUTION_API_KEY) {
+      console.error('Configuração da Evolution API não encontrada')
+      throw new Error('Configuração da Evolution API não encontrada')
     }
 
     // Limpa a URL base removendo barras extras
@@ -50,10 +43,11 @@ serve(async (req) => {
     
     console.log('Configurando webhook:', {
       baseUrl: cleanBaseUrl,
+      instanceName,
       webhookUrl
     })
     
-    // Configura o webhook na Evolution API com Base64 ativado e tools
+    // Configura o webhook na Evolution API com Base64 ativado
     const response = await fetch(`${cleanBaseUrl}/webhook/set/${instanceName}`, {
       method: 'POST',
       headers: {
@@ -69,56 +63,17 @@ serve(async (req) => {
             'Content-Type': 'application/json'
           },
           events: [
-            'messages.upsert',
-            'messages.update',
-            'qr.update',
-            'connection.update',
-            'contacts.upsert',
-            'contacts.update',
-            'groups.upsert',
-            'groups.update'
+            "MESSAGES_UPSERT",
+            "CONNECTION_UPDATE"
           ]
-        },
-        tools: {
-          calendar: {
-            enabled: true,
-            webhookUrl: 'https://adm.whatsremind.com/webhook/calendar',
-            description: 'Integração com sistema de agendamento',
-            settings: {
-              base64: true,
-              headers: {
-                'Content-Type': 'application/json'
-              }
-            }
-          },
-          crm: {
-            enabled: true,
-            webhookUrl: 'https://adm.whatsremind.com/webhook/crm',
-            description: 'Integração com CRM para gestão de contatos',
-            settings: {
-              base64: true,
-              headers: {
-                'Content-Type': 'application/json'
-              }
-            }
-          }
         }
       })
     })
 
     if (!response.ok) {
-      const errorData = await response.text()
-      console.error('Erro ao configurar webhook:', errorData)
-      return new Response(
-        JSON.stringify({ error: 'Falha ao configurar webhook', details: errorData }),
-        {
-          status: response.status,
-          headers: {
-            ...corsHeaders,
-            'Content-Type': 'application/json'
-          }
-        }
-      )
+      const error = await response.text()
+      console.error('Erro ao configurar webhook na Evolution API:', error)
+      throw new Error(`Erro na Evolution API: ${error}`)
     }
 
     const result = await response.json()
@@ -126,24 +81,15 @@ serve(async (req) => {
 
     return new Response(
       JSON.stringify(result),
-      {
-        headers: {
-          ...corsHeaders,
-          'Content-Type': 'application/json'
-        }
-      }
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
-
   } catch (error) {
-    console.error('Erro ao processar requisição:', error)
+    console.error('Erro ao configurar webhook:', error)
     return new Response(
-      JSON.stringify({ error: 'Erro interno do servidor', details: error.message }),
-      {
-        status: 500,
-        headers: {
-          ...corsHeaders,
-          'Content-Type': 'application/json'
-        }
+      JSON.stringify({ error: error.message }),
+      { 
+        status: 400, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       }
     )
   }
