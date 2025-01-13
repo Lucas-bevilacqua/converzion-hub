@@ -5,14 +5,24 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+console.log('Configure Evolution Webhook function started')
+
 serve(async (req) => {
+  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders })
+    console.log('Handling OPTIONS request')
+    return new Response(null, { 
+      headers: { ...corsHeaders }
+    })
   }
 
   try {
+    console.log('Processing request:', req.method)
     const { instanceName } = await req.json()
-    console.log('Configurando webhook para a instância:', instanceName)
+    
+    if (!instanceName) {
+      throw new Error('Nome da instância é obrigatório')
+    }
 
     const EVOLUTION_API_URL = Deno.env.get('EVOLUTION_API_URL')
     const EVOLUTION_API_KEY = Deno.env.get('EVOLUTION_API_KEY')
@@ -25,10 +35,11 @@ serve(async (req) => {
     const cleanBaseUrl = EVOLUTION_API_URL.replace(/\/+$/, '')
     
     // URL do webhook que receberá os eventos
-    const webhookUrl = `${Deno.env.get('SUPABASE_URL')}/functions/evolution-webhook`
+    const webhookUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/evolution-webhook`
     
-    console.log('Configurando webhook na URL:', `${cleanBaseUrl}/webhook/set/${instanceName}`)
-    console.log('Webhook URL:', webhookUrl)
+    console.log('Configurando webhook para instância:', instanceName)
+    console.log('URL base da Evolution API:', cleanBaseUrl)
+    console.log('URL do webhook:', webhookUrl)
     
     // Configura o webhook na Evolution API usando a rota correta
     const response = await fetch(`${cleanBaseUrl}/webhook/set/${instanceName}`, {
@@ -73,7 +84,7 @@ serve(async (req) => {
       JSON.stringify({ error: error.message }),
       { 
         status: 400, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       }
     )
   }
