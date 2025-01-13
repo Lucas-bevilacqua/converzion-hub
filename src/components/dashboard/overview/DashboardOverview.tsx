@@ -66,7 +66,13 @@ export function DashboardOverview({ subscription, instances }: DashboardOverview
         </Card>
       </div>
 
-      <MetricsOverview />
+      <div className="relative z-0">
+        <MetricsOverview />
+      </div>
+
+      <div className="relative z-10">
+        <InstancesCard />
+      </div>
     </div>
   )
 }
