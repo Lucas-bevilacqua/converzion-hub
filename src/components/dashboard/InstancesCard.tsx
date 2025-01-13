@@ -6,6 +6,7 @@ import { useState } from "react"
 import { InstanceSlotCard } from "./instance-components/InstanceSlotCard"
 import { NewInstanceForm } from "./instance-components/NewInstanceForm"
 import { useToast } from "@/components/ui/use-toast"
+import { useInstanceMutations } from "./instance-components/InstanceMutations"
 import type { EvolutionInstance } from "@/integrations/supabase/database-types/evolution-instances"
 
 export function InstancesCard() {
@@ -16,7 +17,8 @@ export function InstancesCard() {
     name: "",
     phone_number: "",
   })
-  const [isCreating, setIsCreating] = useState(false)
+
+  const { createMutation, disconnectMutation } = useInstanceMutations()
 
   const { data: subscription } = useQuery({
     queryKey: ['subscription', user?.id],
@@ -60,23 +62,8 @@ export function InstancesCard() {
     if (!user) return
 
     try {
-      setIsCreating(true)
       console.log('Criando nova instância:', newInstance)
-
-      const { data: instanceData, error: instanceError } = await supabase.functions.invoke(
-        'create-evolution-instance',
-        {
-          body: {
-            name: newInstance.name,
-            phone_number: newInstance.phone_number,
-            userId: user.id
-          }
-        }
-      )
-
-      if (instanceError) throw instanceError
-
-      console.log('Instância criada com sucesso:', instanceData)
+      await createMutation.mutateAsync(newInstance)
       
       await refetchInstances()
       setShowNewInstanceForm(false)
@@ -93,19 +80,13 @@ export function InstancesCard() {
         description: "Falha ao adicionar número. Tente novamente.",
         variant: "destructive",
       })
-    } finally {
-      setIsCreating(false)
     }
   }
 
   const handleDisconnectInstance = async (instanceId: string) => {
     try {
       console.log('Desconectando instância:', instanceId)
-      const { error } = await supabase.functions.invoke('disconnect-evolution-instance', {
-        body: { instanceId }
-      })
-
-      if (error) throw error
+      await disconnectMutation.mutateAsync(instanceId)
 
       toast({
         title: "Sucesso",
@@ -151,7 +132,7 @@ export function InstancesCard() {
               setShowNewInstanceForm(false)
               setNewInstance({ name: "", phone_number: "" })
             }}
-            isLoading={isCreating}
+            isLoading={createMutation.isPending}
           />
         ) : (
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
