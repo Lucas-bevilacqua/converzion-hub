@@ -214,7 +214,7 @@ export function InstanceToolsSection({ instanceId }: InstanceToolsSectionProps) 
     return tool?.is_active || false;
   };
 
-  const availableTools: ToolType[] = ['calendar', 'payment', 'crm'];
+  const availableTools: ToolType[] = ['calendar', 'crm'];
 
   if (isLoading) {
     return (
