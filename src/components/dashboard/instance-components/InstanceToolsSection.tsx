@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { Calendar, CreditCard, Users, Check, X, ExternalLink, Key } from "lucide-react";
+import { Calendar, Users, Check, X, ExternalLink, Key } from "lucide-react";
 import { InstanceTool, ToolType } from "@/types/instance-tools";
 import { useToast } from "@/components/ui/use-toast";
 import { Button } from "@/components/ui/button";
@@ -36,19 +36,16 @@ interface InstanceToolsSectionProps {
 
 const TOOL_ICONS = {
   calendar: Calendar,
-  payment: CreditCard,
   crm: Users,
 };
 
 const TOOL_LABELS = {
   calendar: "Calendário",
-  payment: "Pagamentos",
   crm: "CRM",
 };
 
 const TOOL_DESCRIPTIONS = {
   calendar: "Conecte seu sistema de agendamentos para que seus clientes possam marcar horários automaticamente pelo WhatsApp",
-  payment: "Integre seu sistema de pagamentos para receber pagamentos diretamente pelo WhatsApp",
   crm: "Conecte seu CRM para registrar automaticamente informações dos seus clientes",
 };
 
@@ -56,10 +53,7 @@ const TOOL_PROVIDERS = {
   calendar: [
     { id: 'google', name: 'Google Calendar', setupUrl: 'https://calendar.google.com/calendar/embedhelper' },
     { id: 'outlook', name: 'Outlook Calendar', setupUrl: 'https://outlook.office.com/calendar/view/month' },
-  ],
-  payment: [
-    { id: 'stripe', name: 'Stripe', setupUrl: 'https://dashboard.stripe.com/apikeys' },
-    { id: 'mercadopago', name: 'Mercado Pago', setupUrl: 'https://www.mercadopago.com.br/developers/panel/credentials' },
+    { id: 'calendly', name: 'Calendly', setupUrl: 'https://calendly.com/app/settings/integrations' },
   ],
   crm: [
     { id: 'hubspot', name: 'HubSpot', setupUrl: 'https://app.hubspot.com/api-key' },
@@ -71,28 +65,14 @@ const TOOL_SETUP_GUIDES = {
   calendar: {
     title: "Como configurar o Calendário",
     steps: [
-      "1. Acesse sua conta do Google Calendar",
-      "2. Vá em Configurações > Calendários",
-      "3. Selecione o calendário que deseja integrar",
-      "4. Em 'Integrar calendário', copie o ID do calendário",
-      "5. Cole o ID do calendário aqui para ativar a integração"
+      "1. Acesse sua conta do serviço de calendário escolhido",
+      "2. Vá em Configurações > Integrações",
+      "3. Gere uma chave de API ou token de acesso",
+      "4. Cole a chave aqui para ativar a integração"
     ],
     docsUrl: "https://support.google.com/calendar/answer/37083",
     autoSetupAvailable: true,
     setupUrl: "https://calendar.google.com/calendar/embedhelper"
-  },
-  payment: {
-    title: "Como configurar Pagamentos",
-    steps: [
-      "1. Crie uma conta no Stripe (se ainda não tiver)",
-      "2. Acesse o painel do Stripe",
-      "3. Vá em Desenvolvedores > Chaves da API",
-      "4. Copie sua chave secreta do Stripe",
-      "5. Configure a chave aqui para ativar pagamentos"
-    ],
-    docsUrl: "https://stripe.com/docs/keys",
-    autoSetupAvailable: true,
-    setupUrl: "https://dashboard.stripe.com/apikeys"
   },
   crm: {
     title: "Como configurar o CRM",
