@@ -10,16 +10,21 @@ export const useInstanceMutations = () => {
 
   const createMutation = useMutation({
     mutationFn: async (newInstance: { name: string; phone_number: string }) => {
+      if (!user?.id) throw new Error('Usuário não autenticado');
+      
       console.log('Criando nova instância:', newInstance);
       
       // Primeiro cria a instância
-      const { data: instanceData, error: instanceError } = await supabase.functions.invoke('create-evolution-instance', {
-        body: { 
-          name: newInstance.name,
-          phone_number: newInstance.phone_number,
-          userId: user?.id
+      const { data: instanceData, error: instanceError } = await supabase.functions.invoke(
+        'create-evolution-instance',
+        {
+          body: { 
+            name: newInstance.name,
+            phone_number: newInstance.phone_number,
+            userId: user.id
+          }
         }
-      });
+      );
       
       if (instanceError) {
         console.error('Erro ao criar instância:', instanceError);
@@ -30,11 +35,14 @@ export const useInstanceMutations = () => {
 
       // Configura o webhook após criar a instância
       console.log('Iniciando configuração do webhook para a instância:', newInstance.name);
-      const { data: webhookResponse, error: webhookError } = await supabase.functions.invoke('configure-evolution-webhook', {
-        body: { 
-          instanceName: newInstance.name
+      const { data: webhookResponse, error: webhookError } = await supabase.functions.invoke(
+        'configure-evolution-webhook',
+        {
+          body: { 
+            instanceName: newInstance.name
+          }
         }
-      });
+      );
 
       if (webhookError) {
         console.error('Erro ao configurar webhook:', webhookError);
