@@ -84,12 +84,28 @@ export function InstanceSlotCard({
     if (!instance?.id) return
     
     try {
-      const { error } = await supabase
+      console.log('Deletando configurações da instância:', instance.id)
+      
+      // Primeiro deleta as configurações
+      const { error: configError } = await supabase
+        .from('instance_configurations')
+        .delete()
+        .eq('instance_id', instance.id)
+
+      if (configError) {
+        console.error('Erro ao deletar configurações:', configError)
+        throw configError
+      }
+
+      console.log('Configurações deletadas, agora deletando a instância')
+      
+      // Depois deleta a instância
+      const { error: instanceError } = await supabase
         .from('evolution_instances')
         .delete()
         .eq('id', instance.id)
 
-      if (error) throw error
+      if (instanceError) throw instanceError
 
       toast({
         title: "Sucesso",
