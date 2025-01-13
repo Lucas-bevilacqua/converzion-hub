@@ -162,7 +162,7 @@ export function InstancesCard() {
                   key={instance?.id || index}
                   isUsed={!!instance}
                   instance={instance}
-                  onClick={!instance ? handleNewInstance : undefined}
+                  onClick={handleNewInstance}
                   onDisconnect={instance ? () => handleDisconnectInstance(instance.id) : undefined}
                 />
               )
