@@ -3,6 +3,7 @@ import { CalendarDays, Laptop2, Power } from "lucide-react"
 import type { Subscription } from "@/integrations/supabase/database-types/subscriptions"
 import type { EvolutionInstance } from "@/integrations/supabase/database-types/evolution-instances"
 import { MetricsOverview } from "./MetricsOverview"
+import { InstancesCard } from "@/components/dashboard/InstancesCard"
 
 interface DashboardOverviewProps {
   subscription: Subscription | null;
