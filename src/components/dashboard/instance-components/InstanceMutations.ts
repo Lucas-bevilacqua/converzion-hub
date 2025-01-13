@@ -29,30 +29,19 @@ export const useInstanceMutations = () => {
       console.log('Instância criada com sucesso:', instanceData);
 
       // Configura o webhook após criar a instância
-      try {
-        console.log('Configurando webhook para a instância:', newInstance.name);
-        const { data: webhookResponse, error: webhookError } = await supabase.functions.invoke('configure-evolution-webhook', {
-          body: { 
-            instanceName: newInstance.name
-          }
-        });
-
-        if (webhookError) {
-          console.error('Erro ao configurar webhook:', webhookError);
-          throw webhookError;
+      console.log('Iniciando configuração do webhook para a instância:', newInstance.name);
+      const { data: webhookResponse, error: webhookError } = await supabase.functions.invoke('configure-evolution-webhook', {
+        body: { 
+          instanceName: newInstance.name
         }
+      });
 
-        console.log('Webhook configurado com sucesso:', webhookResponse);
-      } catch (webhookError) {
+      if (webhookError) {
         console.error('Erro ao configurar webhook:', webhookError);
-        // Não vamos lançar o erro aqui para não impedir a criação da instância
-        toast({
-          title: "Aviso",
-          description: "Instância criada, mas houve um erro ao configurar o webhook. Tente reconectar a instância.",
-          variant: "destructive",
-        });
+        throw webhookError;
       }
 
+      console.log('Webhook configurado com sucesso:', webhookResponse);
       return instanceData;
     },
     onSuccess: () => {
