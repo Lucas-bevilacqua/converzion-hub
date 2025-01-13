@@ -41,30 +41,25 @@ export const useInstanceMutations = () => {
       console.log('[createMutation] Instância criada com sucesso:', instanceData);
 
       // Configura o webhook após criar a instância
-      console.log('[createMutation] Iniciando configuração do webhook para a instância:', newInstance.name);
+      console.log('[createMutation] Iniciando configuração do webhook para a instância:', instanceData.id);
       
-      try {
-        const { data: webhookResponse, error: webhookError } = await supabase.functions.invoke(
-          'configure-evolution-webhook',
-          {
-            body: { 
-              instanceName: newInstance.name,
-              instanceId: instanceData.id // Adicionando o ID da instância
-            }
+      const { data: webhookResponse, error: webhookError } = await supabase.functions.invoke(
+        'configure-evolution-webhook',
+        {
+          body: { 
+            instanceName: newInstance.name,
+            instanceId: instanceData.id
           }
-        );
-
-        if (webhookError) {
-          console.error('[createMutation] Erro ao configurar webhook:', webhookError);
-          throw webhookError;
         }
+      );
 
-        console.log('[createMutation] Webhook configurado com sucesso:', webhookResponse);
-        return instanceData;
-      } catch (webhookError) {
-        console.error('[createMutation] Erro ao tentar configurar webhook:', webhookError);
+      if (webhookError) {
+        console.error('[createMutation] Erro ao configurar webhook:', webhookError);
         throw webhookError;
       }
+
+      console.log('[createMutation] Webhook configurado com sucesso:', webhookResponse);
+      return instanceData;
     },
     onSuccess: () => {
       console.log('[createMutation] Mutação completada com sucesso');
