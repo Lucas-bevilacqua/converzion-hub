@@ -5,35 +5,58 @@ import { supabase } from "@/integrations/supabase/client"
 import { useToast } from "@/hooks/use-toast"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { useNavigate } from "react-router-dom"
 
 export default function Login() {
   const { toast } = useToast()
+  const navigate = useNavigate()
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+    // Check for existing session on mount
+    const checkSession = async () => {
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+      
+      if (sessionError) {
+        console.error('Error checking session:', sessionError)
+        setError(sessionError.message)
+        return
+      }
+
+      if (session) {
+        console.log('Active session found, redirecting to dashboard')
+        navigate('/dashboard')
+      }
+    }
+
+    checkSession()
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log('Auth state changed:', event, session)
       
       if (event === 'SIGNED_IN') {
         console.log('User signed in successfully')
         setError(null)
+        navigate('/dashboard')
       }
       
-      if (event === 'USER_UPDATED') {
-        console.log('User updated')
+      if (event === 'TOKEN_REFRESHED') {
+        console.log('Token refreshed successfully')
         setError(null)
       }
 
       if (event === 'SIGNED_OUT') {
         console.log('User signed out')
         setError(null)
+        // Clear any stored auth data
+        localStorage.removeItem('supabase.auth.token')
       }
     })
 
     return () => {
       subscription.unsubscribe()
     }
-  }, [])
+  }, [navigate])
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
