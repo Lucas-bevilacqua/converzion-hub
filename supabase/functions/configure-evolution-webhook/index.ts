@@ -17,17 +17,21 @@ serve(async (req) => {
   }
 
   try {
-    console.log('Processing request:', req.method)
-    const { instanceName } = await req.json()
+    console.log('Processing webhook configuration request')
+    const { instanceName, instanceId } = await req.json()
     
-    if (!instanceName) {
-      throw new Error('Nome da instância é obrigatório')
+    if (!instanceName || !instanceId) {
+      console.error('Parâmetros inválidos:', { instanceName, instanceId })
+      throw new Error('Nome da instância e ID são obrigatórios')
     }
+
+    console.log('Configurando webhook para:', { instanceName, instanceId })
 
     const EVOLUTION_API_URL = Deno.env.get('EVOLUTION_API_URL')
     const EVOLUTION_API_KEY = Deno.env.get('EVOLUTION_API_KEY')
 
     if (!EVOLUTION_API_URL || !EVOLUTION_API_KEY) {
+      console.error('Configuração da Evolution API não encontrada')
       throw new Error('Configuração da Evolution API não encontrada')
     }
 
@@ -37,11 +41,13 @@ serve(async (req) => {
     // URL do webhook que receberá os eventos
     const webhookUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/evolution-webhook`
     
-    console.log('Configurando webhook para instância:', instanceName)
-    console.log('URL base da Evolution API:', cleanBaseUrl)
-    console.log('URL do webhook:', webhookUrl)
+    console.log('Configurando webhook:', {
+      baseUrl: cleanBaseUrl,
+      instanceName,
+      webhookUrl
+    })
     
-    // Configura o webhook na Evolution API usando a rota correta
+    // Configura o webhook na Evolution API
     const response = await fetch(`${cleanBaseUrl}/webhook/set/${instanceName}`, {
       method: 'POST',
       headers: {
@@ -55,8 +61,6 @@ serve(async (req) => {
           headers: {
             'Content-Type': 'application/json'
           },
-          byEvents: false,
-          base64: true,
           events: [
             "MESSAGES_UPSERT",
             "CONNECTION_UPDATE"
@@ -67,7 +71,7 @@ serve(async (req) => {
 
     if (!response.ok) {
       const error = await response.text()
-      console.error('Erro ao configurar webhook:', error)
+      console.error('Erro ao configurar webhook na Evolution API:', error)
       throw new Error(`Erro na Evolution API: ${error}`)
     }
 

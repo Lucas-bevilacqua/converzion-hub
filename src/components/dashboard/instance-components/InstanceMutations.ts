@@ -10,9 +10,16 @@ export const useInstanceMutations = () => {
 
   const createMutation = useMutation({
     mutationFn: async (newInstance: { name: string; phone_number: string }) => {
-      if (!user?.id) throw new Error('Usuário não autenticado');
+      if (!user?.id) {
+        console.error('Erro: Usuário não autenticado');
+        throw new Error('Usuário não autenticado');
+      }
       
-      console.log('Criando nova instância:', newInstance);
+      console.log('[createMutation] Iniciando criação de instância:', {
+        name: newInstance.name,
+        phone_number: newInstance.phone_number,
+        userId: user.id
+      });
       
       // Primeiro cria a instância
       const { data: instanceData, error: instanceError } = await supabase.functions.invoke(
@@ -27,32 +34,40 @@ export const useInstanceMutations = () => {
       );
       
       if (instanceError) {
-        console.error('Erro ao criar instância:', instanceError);
+        console.error('[createMutation] Erro ao criar instância:', instanceError);
         throw instanceError;
       }
 
-      console.log('Instância criada com sucesso:', instanceData);
+      console.log('[createMutation] Instância criada com sucesso:', instanceData);
 
       // Configura o webhook após criar a instância
-      console.log('Iniciando configuração do webhook para a instância:', newInstance.name);
-      const { data: webhookResponse, error: webhookError } = await supabase.functions.invoke(
-        'configure-evolution-webhook',
-        {
-          body: { 
-            instanceName: newInstance.name
+      console.log('[createMutation] Iniciando configuração do webhook para a instância:', newInstance.name);
+      
+      try {
+        const { data: webhookResponse, error: webhookError } = await supabase.functions.invoke(
+          'configure-evolution-webhook',
+          {
+            body: { 
+              instanceName: newInstance.name,
+              instanceId: instanceData.id // Adicionando o ID da instância
+            }
           }
-        }
-      );
+        );
 
-      if (webhookError) {
-        console.error('Erro ao configurar webhook:', webhookError);
+        if (webhookError) {
+          console.error('[createMutation] Erro ao configurar webhook:', webhookError);
+          throw webhookError;
+        }
+
+        console.log('[createMutation] Webhook configurado com sucesso:', webhookResponse);
+        return instanceData;
+      } catch (webhookError) {
+        console.error('[createMutation] Erro ao tentar configurar webhook:', webhookError);
         throw webhookError;
       }
-
-      console.log('Webhook configurado com sucesso:', webhookResponse);
-      return instanceData;
     },
     onSuccess: () => {
+      console.log('[createMutation] Mutação completada com sucesso');
       queryClient.invalidateQueries({ queryKey: ['instances'] });
       toast({
         title: "Sucesso",
@@ -60,7 +75,7 @@ export const useInstanceMutations = () => {
       });
     },
     onError: (error) => {
-      console.error('Error creating instance:', error);
+      console.error('[createMutation] Erro na mutação:', error);
       toast({
         title: "Erro",
         description: "Não foi possível criar a instância. Tente novamente.",
