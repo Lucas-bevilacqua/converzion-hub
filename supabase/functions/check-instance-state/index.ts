@@ -3,8 +3,6 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
-  'Content-Type': 'application/json'
 }
 
 serve(async (req) => {
@@ -20,7 +18,7 @@ serve(async (req) => {
       console.error('Missing instanceId in request')
       return new Response(
         JSON.stringify({ error: 'Instance ID is required' }),
-        { headers: corsHeaders, status: 400 }
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
       )
     }
 
@@ -32,7 +30,7 @@ serve(async (req) => {
       console.error('Missing required environment variables')
       return new Response(
         JSON.stringify({ error: 'Server configuration error' }),
-        { headers: corsHeaders, status: 500 }
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
       )
     }
 
@@ -51,7 +49,7 @@ serve(async (req) => {
       console.error('Error from Evolution API:', await response.text())
       return new Response(
         JSON.stringify({ error: 'Failed to check instance state' }),
-        { headers: corsHeaders, status: response.status }
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: response.status }
       )
     }
 
@@ -60,14 +58,14 @@ serve(async (req) => {
 
     return new Response(
       JSON.stringify(data),
-      { headers: corsHeaders }
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
 
   } catch (error) {
     console.error('Error in check-instance-state:', error)
     return new Response(
       JSON.stringify({ error: error.message }),
-      { headers: corsHeaders, status: 500 }
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
     )
   }
 })
