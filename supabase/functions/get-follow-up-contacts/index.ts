@@ -18,6 +18,7 @@ serve(async (req) => {
       timestamp: startTime.getTime()
     })
     
+    // Criar cliente Supabase com service role key
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
@@ -62,7 +63,9 @@ serve(async (req) => {
         instanceId: f.instance_id,
         instanceName: f.instance?.name,
         status: f.instance?.connection_status,
-        isActive: f.is_active
+        isActive: f.is_active,
+        tipo: f.follow_up_type,
+        mensagens: f.manual_messages
       }))
     })
 
