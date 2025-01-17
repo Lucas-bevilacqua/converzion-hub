@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { useToast } from "@/components/ui/use-toast"
+import { Plus, Trash2 } from "lucide-react"
 import {
   Select,
   SelectContent,
@@ -19,7 +20,12 @@ interface FollowUpSectionProps {
   instanceId: string
 }
 
-type FollowUpType = "automatic" | "ai_generated" | "manual";
+type FollowUpType = "ai_generated" | "manual";
+
+interface ManualMessage {
+  message: string;
+  delay_minutes: number;
+}
 
 interface FormData {
   is_active: boolean
@@ -32,7 +38,7 @@ interface FormData {
   max_attempts: number
   stop_on_reply: boolean
   stop_on_keyword: string[]
-  manual_messages: any[]
+  manual_messages: ManualMessage[]
 }
 
 export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
@@ -61,7 +67,7 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
 
   const [formData, setFormData] = useState<FormData>({
     is_active: followUp?.is_active || false,
-    follow_up_type: (followUp?.follow_up_type as FollowUpType) || "automatic",
+    follow_up_type: (followUp?.follow_up_type as FollowUpType) || "manual",
     delay_minutes: followUp?.delay_minutes || 60,
     template_message: followUp?.template_message || '',
     schedule_start_time: followUp?.schedule_start_time || '09:00',
@@ -69,7 +75,7 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
     schedule_days: followUp?.schedule_days || [1,2,3,4,5],
     max_attempts: followUp?.max_attempts || 3,
     stop_on_reply: followUp?.stop_on_reply ?? true,
-    stop_on_keyword: followUp?.stop_on_keyword || [],
+    stop_on_keyword: followUp?.stop_on_keyword || ['comprou', 'agendou', 'agendado', 'comprado'],
     manual_messages: followUp?.manual_messages || []
   })
 
@@ -105,6 +111,29 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
       })
     }
   })
+
+  const addMessage = () => {
+    setFormData(prev => ({
+      ...prev,
+      manual_messages: [...prev.manual_messages, { message: '', delay_minutes: 60 }]
+    }))
+  }
+
+  const removeMessage = (index: number) => {
+    setFormData(prev => ({
+      ...prev,
+      manual_messages: prev.manual_messages.filter((_, i) => i !== index)
+    }))
+  }
+
+  const updateMessage = (index: number, field: keyof ManualMessage, value: string | number) => {
+    setFormData(prev => ({
+      ...prev,
+      manual_messages: prev.manual_messages.map((msg, i) => 
+        i === index ? { ...msg, [field]: value } : msg
+      )
+    }))
+  }
 
   if (isLoading) {
     return (
@@ -144,31 +173,54 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="automatic">Automático</SelectItem>
+              <SelectItem value="manual">Manual</SelectItem>
               <SelectItem value="ai_generated">Gerado por IA</SelectItem>
-              <SelectItem value="manual">Template</SelectItem>
             </SelectContent>
           </Select>
         </div>
 
-        <div className="grid gap-2">
-          <Label>Atraso (minutos)</Label>
-          <Input
-            type="number"
-            min="1"
-            value={formData.delay_minutes}
-            onChange={(e) => setFormData(prev => ({ ...prev, delay_minutes: parseInt(e.target.value) }))}
-          />
-        </div>
-
         {formData.follow_up_type === 'manual' && (
-          <div className="grid gap-2">
-            <Label>Mensagem Template</Label>
-            <Textarea
-              value={formData.template_message}
-              onChange={(e) => setFormData(prev => ({ ...prev, template_message: e.target.value }))}
-              placeholder="Digite a mensagem que será enviada"
-            />
+          <div className="space-y-4">
+            <div className="flex justify-between items-center">
+              <Label>Sequência de Mensagens</Label>
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={addMessage}
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Adicionar Mensagem
+              </Button>
+            </div>
+            
+            {formData.manual_messages.map((msg, index) => (
+              <div key={index} className="space-y-2 p-4 border rounded-lg">
+                <div className="flex justify-between items-start">
+                  <Label>Mensagem {index + 1}</Label>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => removeMessage(index)}
+                  >
+                    <Trash2 className="h-4 w-4 text-destructive" />
+                  </Button>
+                </div>
+                <Textarea
+                  value={msg.message}
+                  onChange={(e) => updateMessage(index, 'message', e.target.value)}
+                  placeholder="Digite a mensagem que será enviada"
+                />
+                <div className="grid gap-2">
+                  <Label>Atraso após mensagem anterior (minutos)</Label>
+                  <Input
+                    type="number"
+                    min="1"
+                    value={msg.delay_minutes}
+                    onChange={(e) => updateMessage(index, 'delay_minutes', parseInt(e.target.value))}
+                  />
+                </div>
+              </div>
+            ))}
           </div>
         )}
 
@@ -182,12 +234,29 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
           />
         </div>
 
-        <div className="flex items-center gap-2">
-          <Switch
-            checked={formData.stop_on_reply}
-            onCheckedChange={(checked) => setFormData(prev => ({ ...prev, stop_on_reply: checked }))}
-          />
-          <Label>Parar ao receber resposta</Label>
+        <div className="space-y-4">
+          <div className="flex items-center gap-2">
+            <Switch
+              checked={formData.stop_on_reply}
+              onCheckedChange={(checked) => setFormData(prev => ({ ...prev, stop_on_reply: checked }))}
+            />
+            <Label>Parar ao receber resposta</Label>
+          </div>
+          
+          <div className="grid gap-2">
+            <Label>Palavras-chave para parar o follow-up</Label>
+            <Input
+              placeholder="Ex: comprou, agendou (separadas por vírgula)"
+              value={formData.stop_on_keyword.join(', ')}
+              onChange={(e) => setFormData(prev => ({ 
+                ...prev, 
+                stop_on_keyword: e.target.value.split(',').map(k => k.trim()).filter(Boolean)
+              }))}
+            />
+            <p className="text-sm text-muted-foreground">
+              O follow-up será interrompido se alguma dessas palavras for detectada na resposta
+            </p>
+          </div>
         </div>
 
         <div className="flex justify-end gap-2">
@@ -195,7 +264,7 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
             variant="outline"
             onClick={() => setFormData({
               is_active: followUp?.is_active || false,
-              follow_up_type: (followUp?.follow_up_type as FollowUpType) || "automatic",
+              follow_up_type: (followUp?.follow_up_type as FollowUpType) || "manual",
               delay_minutes: followUp?.delay_minutes || 60,
               template_message: followUp?.template_message || '',
               schedule_start_time: followUp?.schedule_start_time || '09:00',
@@ -203,7 +272,7 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
               schedule_days: followUp?.schedule_days || [1,2,3,4,5],
               max_attempts: followUp?.max_attempts || 3,
               stop_on_reply: followUp?.stop_on_reply ?? true,
-              stop_on_keyword: followUp?.stop_on_keyword || [],
+              stop_on_keyword: followUp?.stop_on_keyword || ['comprou', 'agendou', 'agendado', 'comprado'],
               manual_messages: followUp?.manual_messages || []
             })}
           >
