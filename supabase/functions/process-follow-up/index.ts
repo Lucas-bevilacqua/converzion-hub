@@ -12,86 +12,72 @@ serve(async (req) => {
   }
 
   try {
-    console.log('🚀 Iniciando processamento de follow-up')
     const { contact } = await req.json()
     
     if (!contact) {
-      console.error('❌ Nenhum contato fornecido na requisição')
-      throw new Error('Contato não fornecido')
+      throw new Error('Dados do contato não fornecidos')
     }
 
-    console.log('📋 Dados do contato recebidos:', {
+    console.log('📨 Processando follow-up para contato:', {
       id: contact.id,
       telefone: contact.TelefoneClientes,
-      ultimaMensagem: contact.last_message_time,
-      configuracaoFollowUp: contact.followUp
+      instancia: contact.followUp?.instanceName
     })
 
-    // Verificar se há configuração de follow-up válida
-    const manualMessages = Array.isArray(contact.followUp?.manual_messages) 
-      ? contact.followUp.manual_messages 
-      : []
+    // Criar cliente Supabase
+    const supabaseClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    )
 
-    if (!manualMessages.length) {
-      console.error('❌ Configuração de follow-up inválida:', contact.followUp)
-      throw new Error('Configuração de follow-up inválida')
-    }
-
-    // Determinar o índice da próxima mensagem
+    // Determinar próxima mensagem
     let currentMessageIndex = -1
     if (contact.ConversationId?.startsWith('follow-up-sent-')) {
       currentMessageIndex = parseInt(contact.ConversationId.split('-').pop() || '-1')
     }
 
     const nextMessageIndex = currentMessageIndex + 1
+    const manualMessages = Array.isArray(contact.followUp?.manual_messages) 
+      ? contact.followUp.manual_messages 
+      : []
 
-    console.log('🔄 Status da sequência:', {
-      indiceAtual: currentMessageIndex,
-      proximoIndice: nextMessageIndex,
-      totalMensagens: manualMessages.length
-    })
-
-    // Verificar se há próxima mensagem disponível
     if (nextMessageIndex >= manualMessages.length) {
-      console.log('✅ Sequência de mensagens completa')
+      console.log('✅ Sequência de mensagens completa para o contato:', contact.id)
       return new Response(
         JSON.stringify({ 
-          success: false, 
-          message: 'Sequência de mensagens completa' 
+          success: true, 
+          message: 'Sequência completa' 
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
-    // Obter a próxima mensagem
     const nextMessage = manualMessages[nextMessageIndex]
     
-    console.log('📨 Próxima mensagem:', {
-      indice: nextMessageIndex,
-      mensagem: nextMessage.message,
-      atrasoMinutos: nextMessage.delay_minutes
-    })
-
-    // Enviar mensagem via Evolution API
-    const evolutionApiUrl = (Deno.env.get('EVOLUTION_API_URL') || '').replace(/\/+$/, '')
-    const evolutionApiEndpoint = `${evolutionApiUrl}/message/sendText/${contact.followUp.instanceName}`
+    // Fix URL construction for Evolution API
+    const evolutionApiUrl = (Deno.env.get('EVOLUTION_API_URL') || '').replace(/\/$/, '')
     
-    console.log('🔗 Preparando envio via Evolution API:', {
-      url: evolutionApiEndpoint,
-      instancia: contact.followUp.instanceName
+    console.log('🚀 Enviando mensagem via Evolution API:', {
+      url: `${evolutionApiUrl}/message/sendText/${contact.followUp.instanceName}`,
+      telefone: contact.TelefoneClientes,
+      mensagem: nextMessage.message
     })
 
-    const evolutionResponse = await fetch(evolutionApiEndpoint, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'apikey': Deno.env.get('EVOLUTION_API_KEY') || '',
-      },
-      body: JSON.stringify({
-        number: contact.TelefoneClientes,
-        text: nextMessage.message
-      }),
-    })
+    // Enviar mensagem
+    const evolutionResponse = await fetch(
+      `${evolutionApiUrl}/message/sendText/${contact.followUp.instanceName}`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': Deno.env.get('EVOLUTION_API_KEY') || '',
+        },
+        body: JSON.stringify({
+          number: contact.TelefoneClientes,
+          text: nextMessage.message
+        })
+      }
+    )
 
     if (!evolutionResponse.ok) {
       const error = await evolutionResponse.text()
@@ -103,25 +89,13 @@ serve(async (req) => {
     }
 
     const evolutionData = await evolutionResponse.json()
-    console.log('✅ Mensagem enviada com sucesso:', evolutionData)
-
-    // Atualizar o registro do contato usando service role
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    )
-
-    console.log('📝 Atualizando registro do contato:', {
-      id: contact.id,
-      novoStatus: `follow-up-sent-${nextMessageIndex}`,
-      horarioEnvio: new Date().toISOString()
-    })
-
+    
+    // Atualizar status do contato
     const { error: updateError } = await supabaseClient
       .from('Users_clientes')
-      .update({ 
-        last_message_time: new Date().toISOString(),
-        ConversationId: `follow-up-sent-${nextMessageIndex}`
+      .update({
+        ConversationId: `follow-up-sent-${nextMessageIndex}`,
+        last_message_time: new Date().toISOString()
       })
       .eq('id', contact.id)
 
@@ -130,31 +104,33 @@ serve(async (req) => {
       throw updateError
     }
 
-    // Registrar mensagem no histórico
-    console.log('📝 Registrando mensagem no histórico')
-
-    const { error: chatError } = await supabaseClient
+    // Registrar mensagem
+    const { error: messageError } = await supabaseClient
       .from('chat_messages')
       .insert({
-        instance_id: contact.NomeDaEmpresa,
+        instance_id: contact.followUp.instance_id,
         user_id: contact.followUp.userId,
         sender_type: 'follow_up',
         content: nextMessage.message,
         whatsapp_message_id: evolutionData.key?.id
       })
 
-    if (chatError) {
-      console.error('❌ Erro ao registrar mensagem:', chatError)
-      throw chatError
+    if (messageError) {
+      console.error('❌ Erro ao registrar mensagem:', messageError)
+      throw messageError
     }
 
-    console.log('✅ Follow-up processado com sucesso')
+    console.log('✅ Follow-up processado com sucesso:', {
+      contactId: contact.id,
+      messageIndex: nextMessageIndex,
+      messageId: evolutionData.key?.id
+    })
 
     return new Response(
       JSON.stringify({ 
         success: true,
         messageIndex: nextMessageIndex,
-        nextDelay: nextMessage.delay_minutes 
+        messageId: evolutionData.key?.id
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )

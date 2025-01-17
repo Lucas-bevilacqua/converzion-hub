@@ -197,8 +197,11 @@ serve(async (req) => {
             mensagem: nextMessage.message
           })
 
+          // Fix URL construction by ensuring SUPABASE_URL is properly formatted
+          const supabaseUrl = (Deno.env.get('SUPABASE_URL') || '').replace(/\/$/, '')
+          
           const processResponse = await fetch(
-            `${Deno.env.get('SUPABASE_URL')}/functions/v1/process-follow-up`,
+            `${supabaseUrl}/functions/v1/process-follow-up`,
             {
               method: 'POST',
               headers: {
