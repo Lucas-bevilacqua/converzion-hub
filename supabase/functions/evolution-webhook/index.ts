@@ -6,8 +6,10 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+console.log('🎯 Evolution Webhook function started')
+
 serve(async (req) => {
-  console.log('🎯 Webhook received request:', {
+  console.log('📥 Webhook received request:', {
     method: req.method,
     url: req.url,
     headers: Object.fromEntries(req.headers.entries())
@@ -104,7 +106,30 @@ serve(async (req) => {
           throw error
         }
 
-        console.log('✅ Message processed successfully')
+        // Enviar resposta via Evolution API
+        console.log('📤 Sending response through Evolution API:', response)
+        const evolutionResponse = await fetch(
+          `${Deno.env.get('EVOLUTION_API_URL')}/message/sendText/${instanceName}`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'apikey': Deno.env.get('EVOLUTION_API_KEY') || '',
+            },
+            body: JSON.stringify({
+              number: payload.message.from,
+              text: response.response || "Desculpe, não consegui processar sua mensagem."
+            }),
+          }
+        )
+
+        if (!evolutionResponse.ok) {
+          const error = await evolutionResponse.text()
+          console.error('❌ Evolution API error:', error)
+          throw new Error(`Evolution API error: ${error}`)
+        }
+
+        console.log('✅ Message processed and response sent successfully')
       } else {
         console.log('⏭️ Skipping message from bot (fromMe=true)')
       }
