@@ -42,6 +42,11 @@ interface FormData {
   manual_messages: ManualMessage[]
 }
 
+interface JsonManualMessage {
+  message?: string;
+  delay_minutes?: number;
+}
+
 export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
   const { user } = useAuth()
   const { toast } = useToast()
@@ -68,7 +73,7 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
         try {
           const messages = typeof data.manual_messages === 'string' 
             ? JSON.parse(data.manual_messages)
-            : data.manual_messages
+            : data.manual_messages as JsonManualMessage[]
 
           data.manual_messages = Array.isArray(messages) 
             ? messages.map(msg => ({
@@ -98,7 +103,7 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
     stop_on_reply: followUp?.stop_on_reply ?? true,
     stop_on_keyword: followUp?.stop_on_keyword || ['comprou', 'agendou', 'agendado', 'comprado'],
     manual_messages: Array.isArray(followUp?.manual_messages) 
-      ? followUp.manual_messages.map(msg => ({
+      ? (followUp.manual_messages as JsonManualMessage[]).map(msg => ({
           message: msg.message || '',
           delay_minutes: Number(msg.delay_minutes) || 60
         }))
@@ -109,7 +114,7 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
   useEffect(() => {
     if (followUp) {
       const messages = Array.isArray(followUp.manual_messages)
-        ? followUp.manual_messages.map(msg => ({
+        ? (followUp.manual_messages as JsonManualMessage[]).map(msg => ({
             message: msg.message || '',
             delay_minutes: Number(msg.delay_minutes) || 60
           }))
@@ -216,7 +221,7 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
 
   const resetForm = () => {
     const defaultMessages: ManualMessage[] = Array.isArray(followUp?.manual_messages) 
-      ? (followUp.manual_messages as ManualMessage[]).map(msg => ({
+      ? (followUp.manual_messages as JsonManualMessage[]).map(msg => ({
           message: msg.message || '',
           delay_minutes: Number(msg.delay_minutes) || 60
         }))
