@@ -8,6 +8,44 @@ const corsHeaders = {
 
 console.log('⚡ Process Message with OpenAI function initialized')
 
+async function splitAndSendMessage(message: string, instanceName: string, phoneNumber: string, evolutionApiUrl: string, evolutionApiKey: string) {
+  // Divide a mensagem em frases usando pontuação como delimitador
+  const sentences = message.match(/[^.!?]+[.!?]+/g) || [message];
+  
+  console.log(`🔄 Dividindo mensagem em ${sentences.length} partes`)
+  
+  for (const sentence of sentences) {
+    // Adiciona um pequeno delay aleatório entre as mensagens (1-3 segundos)
+    const delay = Math.floor(Math.random() * 2000) + 1000;
+    await new Promise(resolve => setTimeout(resolve, delay));
+    
+    console.log(`📤 Enviando parte da mensagem: ${sentence.substring(0, 50)}...`)
+    
+    const evolutionResponse = await fetch(
+      `${evolutionApiUrl}/message/sendText/${instanceName}`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': evolutionApiKey,
+        },
+        body: JSON.stringify({
+          number: phoneNumber,
+          text: sentence.trim()
+        }),
+      }
+    )
+
+    if (!evolutionResponse.ok) {
+      const error = await evolutionResponse.text()
+      console.error(`❌ Erro ao enviar parte da mensagem: ${error}`)
+      throw new Error(`Evolution API error: ${error}`)
+    }
+    
+    console.log('✅ Parte da mensagem enviada com sucesso')
+  }
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     console.log('🔄 Handling CORS preflight request')
@@ -97,7 +135,7 @@ serve(async (req) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4',
+        model: 'gpt-4o',
         messages: messages,
         temperature: 0.7,
       }),
@@ -131,39 +169,21 @@ serve(async (req) => {
 
     // Clean and normalize the Evolution API URL
     const evolutionApiUrl = Deno.env.get('EVOLUTION_API_URL')?.replace(/\/+$/, '') || ''
-    console.log('📤 Sending message through Evolution API...')
-    console.log('Evolution API URL:', `${evolutionApiUrl}/message/sendText/${instance.name}`)
+    console.log('📤 Iniciando envio fracionado da mensagem...')
     
-    const evolutionResponse = await fetch(
-      `${evolutionApiUrl}/message/sendText/${instance.name}`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'apikey': Deno.env.get('EVOLUTION_API_KEY') || '',
-        },
-        body: JSON.stringify({
-          number: phoneNumber,
-          text: aiResponse
-        }),
-      }
+    await splitAndSendMessage(
+      aiResponse,
+      instance.name,
+      phoneNumber,
+      evolutionApiUrl,
+      Deno.env.get('EVOLUTION_API_KEY') || ''
     )
-
-    if (!evolutionResponse.ok) {
-      const error = await evolutionResponse.text()
-      console.error('❌ Evolution API error:', error)
-      throw new Error(`Evolution API error: ${error}`)
-    }
-
-    const evolutionData = await evolutionResponse.json()
-    console.log('✅ Evolution API response:', evolutionData)
 
     console.log('🎉 Function completed successfully')
     return new Response(
       JSON.stringify({ 
         success: true,
-        response: aiResponse,
-        evolutionResponse: evolutionData 
+        response: aiResponse
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
