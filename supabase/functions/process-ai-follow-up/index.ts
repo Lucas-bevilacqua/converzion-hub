@@ -39,7 +39,7 @@ serve(async (req) => {
       throw new Error('No chat history found');
     }
 
-    // Get the last user message to extract phone number and context
+    // Get the last user message to extract context
     const lastUserMessage = chatHistory.find(msg => msg.sender_type === 'user');
     if (!lastUserMessage) {
       console.error('❌ No user messages found in chat history');
@@ -65,11 +65,23 @@ serve(async (req) => {
 
     console.log('📱 Found phone number:', clientData.TelefoneClientes);
 
-    // Prepare context for AI
+    // Detect language from chat history
+    const userMessages = chatHistory
+      .filter(msg => msg.sender_type === 'user')
+      .map(msg => msg.content);
+    
+    // Simple language detection based on common words
+    const isPortuguese = userMessages.some(msg => 
+      msg.toLowerCase().match(/(\s|^)(oi|olá|obrigado|bom dia|boa tarde|boa noite)(\s|$)/)
+    );
+
+    console.log('🌐 Detected language:', isPortuguese ? 'Portuguese' : 'English');
+
+    // Prepare context for AI with language instruction
     const contextMessages = chatHistory.map(msg => ({
       role: msg.sender_type === 'user' ? 'user' : 'assistant',
       content: msg.content
-    })).reverse(); // Reverse to get chronological order
+    })).reverse();
 
     // Generate message with OpenAI
     console.log('🤖 Generating AI message...');
@@ -84,14 +96,16 @@ serve(async (req) => {
         messages: [
           { 
             role: 'system', 
-            content: 'You are an AI assistant generating follow-up messages. Keep responses friendly, professional, and concise.'
+            content: isPortuguese 
+              ? 'Você é um assistente gerando mensagens de follow-up em português. Mantenha as respostas amigáveis, profissionais e concisas.'
+              : 'You are an AI assistant generating follow-up messages. Keep responses friendly, professional, and concise.'
           },
           ...contextMessages,
           { 
             role: 'user', 
-            content: `Generate a follow-up message for a customer who hasn't responded. 
-                     Consider the chat history and keep the message engaging but brief.
-                     Do not mention specific times or dates.`
+            content: isPortuguese
+              ? 'Gere uma mensagem de follow-up para um cliente que não respondeu. Considere o histórico do chat e mantenha a mensagem envolvente mas breve. Não mencione horários ou datas específicas.'
+              : 'Generate a follow-up message for a customer who hasn\'t responded. Consider the chat history and keep the message engaging but brief. Do not mention specific times or dates.'
           }
         ],
         temperature: 0.7,
