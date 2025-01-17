@@ -120,7 +120,6 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
       : []
   })
 
-  // Atualiza o formulário quando os dados são carregados
   useEffect(() => {
     if (followUp) {
       const messages = Array.isArray(followUp.manual_messages)
@@ -150,23 +149,31 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
     mutationFn: async (values: FormData) => {
       console.log('Salvando configuração de follow-up:', values)
       
+      const dataToSave = {
+        instance_id: instanceId,
+        is_active: values.is_active,
+        follow_up_type: values.follow_up_type,
+        delay_minutes: values.delay_minutes,
+        template_message: values.template_message,
+        schedule_start_time: values.schedule_start_time,
+        schedule_end_time: values.schedule_end_time,
+        schedule_days: values.schedule_days,
+        max_attempts: values.max_attempts,
+        stop_on_reply: values.stop_on_reply,
+        stop_on_keyword: values.stop_on_keyword,
+        manual_messages: JSON.stringify(values.manual_messages),
+        updated_at: new Date().toISOString()
+      }
+      
       // Primeiro salva a configuração do follow-up
       const operation = followUp
         ? supabase
             .from('instance_follow_ups')
-            .update({
-              ...values,
-              manual_messages: JSON.stringify(values.manual_messages),
-              updated_at: new Date().toISOString()
-            })
+            .update(dataToSave)
             .eq('id', followUp.id)
         : supabase
             .from('instance_follow_ups')
-            .insert({
-              ...values,
-              instance_id: instanceId,
-              manual_messages: JSON.stringify(values.manual_messages)
-            })
+            .insert(dataToSave)
 
       const { error } = await operation
       if (error) {
