@@ -12,12 +12,12 @@ serve(async (req) => {
   }
 
   try {
-    const { instanceId } = await req.json()
+    const { instanceId, instanceName } = await req.json()
     
-    if (!instanceId) {
-      console.error('Missing required parameter: instanceId')
+    if (!instanceId || !instanceName) {
+      console.error('Missing required parameters:', { instanceId, instanceName })
       return new Response(
-        JSON.stringify({ error: 'Instance ID is required' }),
+        JSON.stringify({ error: 'Instance ID and name are required' }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
       )
     }
@@ -34,9 +34,9 @@ serve(async (req) => {
       )
     }
 
-    console.log(`Checking state for instance ID: ${instanceId}`)
+    console.log(`Checking state for instance: ${instanceName}`)
     
-    const url = `${evolutionApiUrl}/instance/connectionState/${instanceId}`
+    const url = `${evolutionApiUrl}/instance/connectionState/${instanceName}`
     console.log('Making request to:', url)
 
     const response = await fetch(url, {
