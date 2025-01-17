@@ -7,30 +7,6 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Reduced to 1.5 seconds for faster response
-const MESSAGE_ACCUMULATION_TIME = 1500;
-
-// Global cleanup interval to prevent memory leaks
-const CLEANUP_INTERVAL = 60000; // 1 minute
-
-const messageQueue = new Map<string, {
-  messages: { role: string; content: string }[];
-  lastUpdate: number;
-  processing: boolean;
-  attempts: number;
-}>();
-
-// Cleanup old queues periodically
-setInterval(() => {
-  const now = Date.now();
-  for (const [key, queue] of messageQueue.entries()) {
-    if (now - queue.lastUpdate > CLEANUP_INTERVAL) {
-      console.log('🧹 Cleaning up old queue:', key);
-      messageQueue.delete(key);
-    }
-  }
-}, CLEANUP_INTERVAL);
-
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -39,64 +15,6 @@ serve(async (req) => {
   try {
     const { message, instanceId, phoneNumber } = await req.json();
     console.log('📩 Received message:', { message, instanceId, phoneNumber });
-
-    const queueKey = `${instanceId}-${phoneNumber}`;
-    const now = Date.now();
-    
-    if (!messageQueue.has(queueKey)) {
-      messageQueue.set(queueKey, {
-        messages: [],
-        lastUpdate: now,
-        processing: false,
-        attempts: 0
-      });
-    }
-
-    const queue = messageQueue.get(queueKey)!;
-
-    // Reset processing flag if it's been stuck for too long (30 seconds)
-    if (queue.processing && now - queue.lastUpdate > 30000) {
-      console.log('🔄 Resetting stuck processing flag for:', queueKey);
-      queue.processing = false;
-      queue.attempts = 0;
-    }
-
-    queue.messages.push({ role: 'user', content: message });
-    queue.lastUpdate = now;
-
-    // If already processing, return accumulating status
-    if (queue.processing) {
-      console.log('⏳ Already processing messages for:', queueKey);
-      return new Response(JSON.stringify({ 
-        status: 'accumulating',
-        message: 'Messages are being accumulated'
-      }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
-    }
-
-    // Check if enough time has passed since last message
-    const timeSinceLastUpdate = now - queue.lastUpdate;
-    if (timeSinceLastUpdate < MESSAGE_ACCUMULATION_TIME) {
-      console.log('⏳ Accumulating messages for:', queueKey, 'Time left:', MESSAGE_ACCUMULATION_TIME - timeSinceLastUpdate);
-      return new Response(JSON.stringify({ 
-        status: 'accumulating',
-        message: 'Messages are being accumulated'
-      }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
-    }
-
-    // Increment attempts and check if we've tried too many times
-    queue.attempts++;
-    if (queue.attempts > 3) {
-      console.error('❌ Too many attempts for:', queueKey);
-      messageQueue.delete(queueKey);
-      throw new Error('Too many processing attempts');
-    }
-
-    // Mark as processing
-    queue.processing = true;
 
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
@@ -128,6 +46,21 @@ serve(async (req) => {
       throw chatError;
     }
 
+    // Save user message
+    const { error: saveError } = await supabaseClient
+      .from('chat_messages')
+      .insert({
+        instance_id: instanceId,
+        user_id: instance.user_id,
+        sender_type: 'user',
+        content: message
+      });
+
+    if (saveError) {
+      console.error('❌ Error saving user message:', saveError);
+      throw saveError;
+    }
+
     // Prepare messages for OpenAI
     const messages = [
       { 
@@ -138,10 +71,10 @@ serve(async (req) => {
         role: msg.sender_type === 'user' ? 'user' : 'assistant',
         content: msg.content
       })) || [],
-      ...queue.messages
+      { role: 'user', content: message }
     ];
 
-    console.log('🤖 Sending request to OpenAI with messages:', messages);
+    console.log('🤖 Sending request to OpenAI');
     const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -164,23 +97,6 @@ serve(async (req) => {
     const data = await openaiResponse.json();
     const aiResponse = data.choices[0].message.content;
     console.log('✅ Received AI response:', aiResponse);
-
-    // Save all accumulated messages
-    for (const queuedMsg of queue.messages) {
-      const { error: saveError } = await supabaseClient
-        .from('chat_messages')
-        .insert({
-          instance_id: instanceId,
-          user_id: instance.user_id,
-          sender_type: 'user',
-          content: queuedMsg.content
-        });
-
-      if (saveError) {
-        console.error('❌ Error saving user message:', saveError);
-        throw saveError;
-      }
-    }
 
     // Save AI response
     const { error: saveResponseError } = await supabaseClient
@@ -222,9 +138,6 @@ serve(async (req) => {
 
     const evolutionData = await evolutionResponse.json();
     console.log('✅ Evolution API response:', evolutionData);
-
-    // Clear queue after successful processing
-    messageQueue.delete(queueKey);
 
     return new Response(
       JSON.stringify({ 
