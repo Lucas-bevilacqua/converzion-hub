@@ -187,6 +187,29 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
     saveMutation.mutateAsync(formData)
   }
 
+  const resetForm = () => {
+    const defaultMessages: ManualMessage[] = Array.isArray(followUp?.manual_messages) 
+      ? (followUp.manual_messages as any[]).map(msg => ({
+          message: msg.message || '',
+          delay_minutes: msg.delay_minutes || 60
+        }))
+      : []
+
+    setFormData({
+      is_active: followUp?.is_active || false,
+      follow_up_type: (followUp?.follow_up_type as FollowUpType) || "manual",
+      delay_minutes: followUp?.delay_minutes || 60,
+      template_message: followUp?.template_message || '',
+      schedule_start_time: followUp?.schedule_start_time || '09:00',
+      schedule_end_time: followUp?.schedule_end_time || '18:00',
+      schedule_days: followUp?.schedule_days || [1,2,3,4,5],
+      max_attempts: followUp?.max_attempts || 3,
+      stop_on_reply: followUp?.stop_on_reply ?? true,
+      stop_on_keyword: followUp?.stop_on_keyword || ['comprou', 'agendou', 'agendado', 'comprado'],
+      manual_messages: defaultMessages
+    })
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -302,19 +325,7 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
         <div className="flex justify-end gap-2">
           <Button
             variant="outline"
-            onClick={() => setFormData({
-              is_active: followUp?.is_active || false,
-              follow_up_type: (followUp?.follow_up_type as FollowUpType) || "manual",
-              delay_minutes: followUp?.delay_minutes || 60,
-              template_message: followUp?.template_message || '',
-              schedule_start_time: followUp?.schedule_start_time || '09:00',
-              schedule_end_time: followUp?.schedule_end_time || '18:00',
-              schedule_days: followUp?.schedule_days || [1,2,3,4,5],
-              max_attempts: followUp?.max_attempts || 3,
-              stop_on_reply: followUp?.stop_on_reply ?? true,
-              stop_on_keyword: followUp?.stop_on_keyword || ['comprou', 'agendou', 'agendado', 'comprado'],
-              manual_messages: followUp?.manual_messages || []
-            })}
+            onClick={resetForm}
           >
             Cancelar
           </Button>
