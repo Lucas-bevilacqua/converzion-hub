@@ -81,9 +81,15 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
       // Parse manual_messages from JSON if it exists
       if (data?.manual_messages) {
         try {
+          console.log('Raw manual_messages:', data.manual_messages)
+          // Handle double-encoded JSON string
           const messages = typeof data.manual_messages === 'string' 
-            ? JSON.parse(data.manual_messages)
-            : data.manual_messages as JsonManualMessage[]
+            ? JSON.parse(typeof JSON.parse(data.manual_messages) === 'string' 
+                ? JSON.parse(data.manual_messages) 
+                : data.manual_messages)
+            : data.manual_messages
+
+          console.log('Parsed messages:', messages)
 
           data.manual_messages = Array.isArray(messages) 
             ? messages.map(msg => ({
@@ -91,6 +97,8 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
                 delay_minutes: Number(msg.delay_minutes) || 60
               }))
             : []
+            
+          console.log('Formatted messages:', data.manual_messages)
         } catch (e) {
           console.error('Error parsing manual_messages:', e)
           data.manual_messages = []
@@ -161,11 +169,12 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
         max_attempts: values.max_attempts,
         stop_on_reply: values.stop_on_reply,
         stop_on_keyword: values.stop_on_keyword,
-        manual_messages: JSON.stringify(values.manual_messages),
+        manual_messages: JSON.stringify(values.manual_messages), // Single JSON.stringify
         updated_at: new Date().toISOString()
       }
+
+      console.log('Data being saved:', dataToSave)
       
-      // Primeiro salva a configuração do follow-up
       const operation = followUp
         ? supabase
             .from('instance_follow_ups')
