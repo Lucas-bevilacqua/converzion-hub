@@ -27,28 +27,20 @@ serve(async (req) => {
       configuracaoFollowUp: contact.followUp
     })
 
-    // Verificar se há configuração de follow-up
-    if (!contact.followUp?.messages?.length) {
+    // Verificar se há configuração de follow-up válida
+    const manualMessages = Array.isArray(contact.followUp?.manual_messages) 
+      ? contact.followUp.manual_messages 
+      : []
+
+    if (!manualMessages.length) {
       console.error('❌ Configuração de follow-up inválida:', contact.followUp)
       throw new Error('Configuração de follow-up inválida')
     }
 
-    // Calcular tempo desde a última mensagem
-    const lastMessageTime = new Date(contact.last_message_time || contact.created_at)
-    const now = new Date()
-    const minutesSinceLastMessage = (now.getTime() - lastMessageTime.getTime()) / (1000 * 60)
-
-    console.log('⏰ Tempo desde última mensagem:', {
-      ultimaMensagem: lastMessageTime,
-      agora: now,
-      minutos: minutesSinceLastMessage
-    })
-
-    // Encontrar a próxima mensagem baseada no ConversationId
+    // Determinar o índice da próxima mensagem
     let currentMessageIndex = -1
-    if (contact.ConversationId && contact.ConversationId.startsWith('follow-up-sent-')) {
+    if (contact.ConversationId?.startsWith('follow-up-sent-')) {
       currentMessageIndex = parseInt(contact.ConversationId.split('-').pop() || '-1')
-      console.log('📝 Índice atual recuperado do ConversationId:', currentMessageIndex)
     }
 
     const nextMessageIndex = currentMessageIndex + 1
@@ -56,11 +48,11 @@ serve(async (req) => {
     console.log('🔄 Status da sequência:', {
       indiceAtual: currentMessageIndex,
       proximoIndice: nextMessageIndex,
-      totalMensagens: contact.followUp.messages.length
+      totalMensagens: manualMessages.length
     })
 
     // Verificar se há próxima mensagem disponível
-    if (nextMessageIndex >= contact.followUp.messages.length) {
+    if (nextMessageIndex >= manualMessages.length) {
       console.log('✅ Sequência de mensagens completa')
       return new Response(
         JSON.stringify({ 
@@ -72,28 +64,13 @@ serve(async (req) => {
     }
 
     // Obter a próxima mensagem
-    const nextMessage = contact.followUp.messages[nextMessageIndex]
+    const nextMessage = manualMessages[nextMessageIndex]
     
     console.log('📨 Próxima mensagem:', {
       indice: nextMessageIndex,
       mensagem: nextMessage.message,
       atrasoMinutos: nextMessage.delay_minutes
     })
-
-    // Verificar se já passou tempo suficiente
-    if (minutesSinceLastMessage < nextMessage.delay_minutes) {
-      console.log('⏳ Aguardando tempo necessário para próxima mensagem:', {
-        tempoPassado: minutesSinceLastMessage,
-        tempoNecessario: nextMessage.delay_minutes
-      })
-      return new Response(
-        JSON.stringify({ 
-          success: false, 
-          message: 'Aguardando intervalo para próxima mensagem' 
-        }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
-    }
 
     // Enviar mensagem via Evolution API
     const evolutionApiUrl = (Deno.env.get('EVOLUTION_API_URL') || '').replace(/\/+$/, '')

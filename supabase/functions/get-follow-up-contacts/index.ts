@@ -45,11 +45,13 @@ serve(async (req) => {
     for (const followUp of followUps || []) {
       console.log('🔄 Processando follow-up da instância:', followUp.instance?.name)
 
+      // Buscar contatos que ainda não receberam follow-up ou que estão no meio da sequência
       const { data: contacts, error: contactsError } = await supabaseClient
         .from('Users_clientes')
         .select('*')
         .eq('NomeDaEmpresa', followUp.instance_id)
-        .is('ConversationId', null)
+        .or('ConversationId.is.null,ConversationId.like.follow-up-sent-%')
+        .order('last_message_time', { ascending: true })
 
       if (contactsError) {
         console.error('❌ Erro ao buscar contatos:', contactsError)
@@ -60,9 +62,52 @@ serve(async (req) => {
 
       // Processar cada contato
       for (const contact of contacts || []) {
-        console.log('👤 Processando contato:', contact.TelefoneClientes)
+        console.log('👤 Processando contato:', {
+          id: contact.id,
+          telefone: contact.TelefoneClientes,
+          conversationId: contact.ConversationId,
+          ultimaMensagem: contact.last_message_time
+        })
 
         try {
+          // Determinar o índice da próxima mensagem
+          let currentMessageIndex = -1
+          if (contact.ConversationId?.startsWith('follow-up-sent-')) {
+            currentMessageIndex = parseInt(contact.ConversationId.split('-').pop() || '-1')
+          }
+
+          // Verificar se há mais mensagens para enviar
+          const manualMessages = Array.isArray(followUp.manual_messages) ? followUp.manual_messages : []
+          if (currentMessageIndex + 1 >= manualMessages.length) {
+            console.log('✅ Sequência completa para o contato:', contact.id)
+            continue
+          }
+
+          // Calcular o tempo desde a última mensagem
+          const lastMessageTime = new Date(contact.last_message_time || contact.created_at)
+          const now = new Date()
+          const minutesSinceLastMessage = (now.getTime() - lastMessageTime.getTime()) / (1000 * 60)
+
+          // Obter o delay necessário para a próxima mensagem
+          const nextMessage = manualMessages[currentMessageIndex + 1]
+          if (!nextMessage) {
+            console.log('❌ Próxima mensagem não encontrada')
+            continue
+          }
+
+          console.log('⏰ Análise de tempo:', {
+            ultimaMensagem: lastMessageTime,
+            agora: now,
+            minutos: minutesSinceLastMessage,
+            delayNecessario: nextMessage.delay_minutes
+          })
+
+          // Verificar se já passou tempo suficiente
+          if (minutesSinceLastMessage < nextMessage.delay_minutes) {
+            console.log('⏳ Aguardando tempo necessário para próxima mensagem')
+            continue
+          }
+
           const processResponse = await fetch(
             `${Deno.env.get('SUPABASE_URL')}/functions/v1/process-follow-up`,
             {
@@ -83,6 +128,10 @@ serve(async (req) => {
               })
             }
           )
+
+          if (!processResponse.ok) {
+            throw new Error(`Error processing follow-up: ${await processResponse.text()}`)
+          }
 
           const processResult = await processResponse.json()
           console.log('✅ Resultado do processamento:', processResult)
