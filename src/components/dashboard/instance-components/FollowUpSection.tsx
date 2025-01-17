@@ -113,7 +113,7 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
           
           const typedMessages = parsedMessages.map((msg: any) => ({
             message: String(msg?.message || ''),
-            delay_minutes: Number(msg?.delay_minutes || 60)
+            delay_minutes: Number(msg?.delay_minutes || 10)
           }))
 
           data.manual_messages = typedMessages
@@ -130,7 +130,7 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
   const [formData, setFormData] = useState<FormData>({
     is_active: followUp?.is_active || false,
     follow_up_type: followUp?.follow_up_type || "manual",
-    delay_minutes: followUp?.delay_minutes || 60,
+    delay_minutes: followUp?.delay_minutes || 10,
     template_message: followUp?.template_message || '',
     schedule_start_time: followUp?.schedule_start_time || '09:00',
     schedule_end_time: followUp?.schedule_end_time || '18:00',
@@ -147,7 +147,7 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
       setFormData({
         is_active: followUp.is_active || false,
         follow_up_type: followUp.follow_up_type || "manual",
-        delay_minutes: followUp.delay_minutes || 60,
+        delay_minutes: followUp.delay_minutes || 10,
         template_message: followUp.template_message || '',
         schedule_start_time: followUp.schedule_start_time || '09:00',
         schedule_end_time: followUp.schedule_end_time || '18:00',
@@ -168,7 +168,7 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
       const manualMessages = Array.isArray(values.manual_messages) 
         ? values.manual_messages.map(msg => ({
             message: msg.message || '',
-            delay_minutes: Number(msg.delay_minutes) || 60
+            delay_minutes: Math.max(10, Number(msg.delay_minutes) || 10) // Garante mínimo de 10 minutos
           }))
         : []
 
@@ -176,7 +176,7 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
         instance_id: instanceId,
         is_active: values.is_active,
         follow_up_type: values.follow_up_type,
-        delay_minutes: Math.max(60, values.delay_minutes), // Garante mínimo de 60 minutos
+        delay_minutes: Math.max(10, values.delay_minutes), // Alterado para mínimo de 10 minutos
         template_message: values.template_message,
         schedule_start_time: values.schedule_start_time,
         schedule_end_time: values.schedule_end_time,
@@ -292,7 +292,7 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
       setFormData({
         is_active: false,
         follow_up_type: "manual",
-        delay_minutes: 60,
+        delay_minutes: 10,
         template_message: '',
         schedule_start_time: '09:00',
         schedule_end_time: '18:00',
@@ -316,7 +316,7 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
   const addMessage = () => {
     setFormData(prev => ({
       ...prev,
-      manual_messages: [...prev.manual_messages, { message: '', delay_minutes: 60 }]
+      manual_messages: [...prev.manual_messages, { message: '', delay_minutes: 10 }]
     }))
   }
 
@@ -554,7 +554,7 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
                 setFormData({
                   is_active: followUp.is_active || false,
                   follow_up_type: followUp.follow_up_type || "manual",
-                  delay_minutes: followUp.delay_minutes || 60,
+                  delay_minutes: followUp.delay_minutes || 10,
                   template_message: followUp.template_message || '',
                   schedule_start_time: followUp.schedule_start_time || '09:00',
                   schedule_end_time: followUp.schedule_end_time || '18:00',
