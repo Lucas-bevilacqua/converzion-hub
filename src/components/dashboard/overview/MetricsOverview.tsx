@@ -1,15 +1,16 @@
-import { Card } from "@/components/ui/card"
 import { useQuery } from "@tanstack/react-query"
 import { supabase } from "@/integrations/supabase/client"
-import { useAuth } from "@/contexts/auth/AuthContext"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { ChartContainer } from "@/components/ui/chart"
-import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, Legend } from "recharts"
-import { Loader2 } from "lucide-react"
+import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend } from "recharts"
+import { useAuth } from "@/contexts/auth/AuthContext"
+import { format } from "date-fns"
+import { ptBR } from "date-fns/locale"
 
 export function MetricsOverview() {
   const { user } = useAuth()
 
-  const { data: metrics, isLoading } = useQuery({
+  const { data: metrics } = useQuery({
     queryKey: ['instance-metrics', user?.id],
     queryFn: async () => {
       console.log('Fetching metrics for user:', user?.id)
@@ -17,7 +18,7 @@ export function MetricsOverview() {
         .from('instance_metrics')
         .select('*')
         .eq('user_id', user?.id)
-        .order('created_at', { ascending: false })
+        .order('created_at', { ascending: true })
         .limit(7)
 
       if (error) {
@@ -25,32 +26,22 @@ export function MetricsOverview() {
         throw error
       }
 
-      return data.map(metric => ({
+      return data?.map(metric => ({
         ...metric,
-        date: new Date(metric.created_at).toLocaleDateString('pt-BR', { 
-          weekday: 'short',
-          day: '2-digit',
-          month: '2-digit'
-        }),
+        date: format(new Date(metric.created_at), 'dd/MM', { locale: ptBR }),
       }))
     },
-    enabled: !!user?.id
+    enabled: !!user?.id,
+    refetchInterval: 30000 // Atualiza a cada 30 segundos
   })
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center p-8">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    )
-  }
-
   return (
-    <Card className="p-6">
-      <h3 className="text-lg font-semibold mb-4">Métricas dos Últimos 7 Dias</h3>
-      
-      <div className="space-y-8">
-        <div className="h-[300px]">
+    <Card>
+      <CardHeader>
+        <CardTitle>Métricas dos Últimos 7 Dias</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="h-[300px] w-full">
           <ChartContainer
             className="w-full"
             config={{
@@ -78,9 +69,9 @@ export function MetricsOverview() {
             }}
           >
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={metrics} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
-                <XAxis 
-                  dataKey="date" 
+              <BarChart data={metrics}>
+                <XAxis
+                  dataKey="date"
                   fontSize={12}
                   tickLine={false}
                   axisLine={true}
@@ -99,14 +90,11 @@ export function MetricsOverview() {
                   orientation="right"
                 />
                 <Tooltip 
-                  contentStyle={{ 
-                    backgroundColor: 'var(--background)',
-                    border: '1px solid var(--border)',
-                    borderRadius: '6px'
-                  }}
-                  labelStyle={{
-                    color: 'var(--foreground)'
-                  }}
+                  cursor={{ fill: 'transparent' }}
+                  formatter={(value: number, name: string) => [
+                    value,
+                    name === "Tempo de Resposta" ? `${value}s` : value
+                  ]}
                 />
                 <Legend />
                 <Bar
@@ -135,7 +123,7 @@ export function MetricsOverview() {
           </ChartContainer>
         </div>
 
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-3 gap-4 mt-6">
           <div className="space-y-2">
             <p className="text-sm text-muted-foreground">Total de Mensagens Enviadas</p>
             <p className="text-2xl font-bold">
@@ -155,7 +143,7 @@ export function MetricsOverview() {
             </p>
           </div>
         </div>
-      </div>
+      </CardContent>
     </Card>
   )
 }
