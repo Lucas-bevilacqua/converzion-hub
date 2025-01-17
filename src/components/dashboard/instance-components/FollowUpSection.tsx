@@ -298,6 +298,31 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
     }))
   }
 
+  const handleSave = async () => {
+    console.log('Iniciando salvamento do follow-up:', {
+      formData,
+      instanceId,
+      userId: user?.id
+    })
+
+    try {
+      await saveMutation.mutateAsync(formData)
+      console.log('Follow-up salvo com sucesso')
+      
+      toast({
+        title: "Sucesso",
+        description: "Configurações de follow-up salvas.",
+      })
+    } catch (error) {
+      console.error('Erro ao salvar follow-up:', error)
+      toast({
+        title: "Erro",
+        description: "Não foi possível salvar as configurações.",
+        variant: "destructive",
+      })
+    }
+  }
+
   if (isLoading) {
     return (
       <div className="flex justify-center p-4">
@@ -469,14 +494,18 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
           <Button
             variant="outline"
             onClick={() => {
+              console.log('Cancelando alterações, restaurando estado anterior:', followUp)
               if (followUp) {
                 const messages = Array.isArray(followUp.manual_messages)
-                  ? (followUp.manual_messages as unknown as ManualMessage[])
+                  ? followUp.manual_messages.map(msg => ({
+                      message: String(msg.message || ''),
+                      delay_minutes: Number(msg.delay_minutes || 60)
+                    }))
                   : []
 
                 setFormData({
                   is_active: followUp.is_active || false,
-                  follow_up_type: (followUp.follow_up_type as FollowUpType) || "manual",
+                  follow_up_type: followUp.follow_up_type || "manual",
                   delay_minutes: followUp.delay_minutes || 60,
                   template_message: followUp.template_message || '',
                   schedule_start_time: followUp.schedule_start_time || '09:00',
