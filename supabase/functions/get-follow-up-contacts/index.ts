@@ -52,14 +52,19 @@ serve(async (req) => {
         currentTime >= followUp.schedule_start_time &&
         currentTime <= followUp.schedule_end_time
       ) {
-        // Buscar contatos que não receberam follow-up ainda
-        // ou que já passou o tempo de delay desde a última mensagem
+        // Calcular o tempo mínimo desde a última mensagem
+        const minLastMessageTime = new Date()
+        minLastMessageTime.setMinutes(minLastMessageTime.getMinutes() - followUp.delay_minutes)
+
+        console.log(`⏰ Buscando contatos com última mensagem anterior a ${minLastMessageTime.toISOString()}`)
+
+        // Buscar contatos que não receberam follow-up ainda ou que já passou o tempo de delay
         const { data: eligibleContacts, error: contactsError } = await supabaseClient
           .from('Users_clientes')
           .select('*')
           .eq('NomeDaEmpresa', followUp.instance_id)
-          .or(`ConversationId.is.null,and(last_message_time.lt.${new Date(now.getTime() - followUp.delay_minutes * 60000).toISOString()})`)
-          .limit(10) // Limitar a 10 contatos por vez para não sobrecarregar
+          .or(`last_message_time.is.null,last_message_time.lt.${minLastMessageTime.toISOString()}`)
+          .limit(10)
 
         if (contactsError) {
           console.error('❌ Erro ao buscar contatos:', contactsError)
@@ -68,31 +73,25 @@ serve(async (req) => {
 
         console.log(`✅ Encontrados ${eligibleContacts?.length || 0} contatos elegíveis`)
 
-        // Para follow-ups do tipo AI, precisamos incluir o prompt do sistema
-        if (followUp.follow_up_type === 'ai_generated') {
-          contacts.push(...(eligibleContacts || []).map(contact => ({
+        if (eligibleContacts && eligibleContacts.length > 0) {
+          contacts.push(...eligibleContacts.map(contact => ({
             ...contact,
             followUp: {
+              id: followUp.id,
               type: followUp.follow_up_type,
-              delay_minutes: followUp.delay_minutes,
+              messages: followUp.manual_messages,
               instanceName: followUp.evolution_instances.name,
               instancePhone: followUp.evolution_instances.phone_number,
-              systemPrompt: followUp.evolution_instances.system_prompt,
-              maxAttempts: followUp.max_attempts
-            }
-          })))
-        } else {
-          contacts.push(...(eligibleContacts || []).map(contact => ({
-            ...contact,
-            followUp: {
-              type: followUp.follow_up_type,
-              template: followUp.template_message,
-              instanceName: followUp.evolution_instances.name,
-              instancePhone: followUp.evolution_instances.phone_number,
-              maxAttempts: followUp.max_attempts
+              maxAttempts: followUp.max_attempts,
+              stopOnReply: followUp.stop_on_reply,
+              stopOnKeyword: followUp.stop_on_keyword
             }
           })))
         }
+      } else {
+        console.log(`⏰ Fora do horário permitido para follow-up ${followUp.id}`)
+        console.log(`Dia atual: ${currentDay}, Horário atual: ${currentTime}`)
+        console.log(`Configuração: dias ${followUp.schedule_days}, início ${followUp.schedule_start_time}, fim ${followUp.schedule_end_time}`)
       }
     }
 
@@ -112,7 +111,7 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({ error: error.message }),
       { 
-        status: 400,
+        status: 500,
         headers: { 
           ...corsHeaders,
           'Content-Type': 'application/json'

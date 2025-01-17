@@ -469,6 +469,7 @@ export type Database = {
           ConversationId: string | null
           created_at: string
           id: number
+          last_message_time: string | null
           NomeClientes: string | null
           NomeDaEmpresa: string | null
           TelefoneClientes: string | null
@@ -477,6 +478,7 @@ export type Database = {
           ConversationId?: string | null
           created_at?: string
           id?: number
+          last_message_time?: string | null
           NomeClientes?: string | null
           NomeDaEmpresa?: string | null
           TelefoneClientes?: string | null
@@ -485,6 +487,7 @@ export type Database = {
           ConversationId?: string | null
           created_at?: string
           id?: number
+          last_message_time?: string | null
           NomeClientes?: string | null
           NomeDaEmpresa?: string | null
           TelefoneClientes?: string | null
