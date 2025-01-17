@@ -29,6 +29,7 @@ serve(async (req) => {
 
     const EVOLUTION_API_URL = Deno.env.get('EVOLUTION_API_URL')
     const EVOLUTION_API_KEY = Deno.env.get('EVOLUTION_API_KEY')
+    const SUPABASE_PROJECT_ID = 'vodexhppkasbulogmcqb'
 
     if (!EVOLUTION_API_URL || !EVOLUTION_API_KEY) {
       console.error('Configuração da Evolution API não encontrada')
@@ -38,8 +39,8 @@ serve(async (req) => {
     // Limpa a URL base removendo barras extras
     const cleanBaseUrl = EVOLUTION_API_URL.replace(/\/+$/, '')
     
-    // URL do webhook da Evolution API
-    const webhookUrl = `${cleanBaseUrl}/webhook/evolution/${instanceId}`
+    // URL do webhook da Supabase
+    const webhookUrl = `https://${SUPABASE_PROJECT_ID}.supabase.co/functions/v1/evolution-webhook`
     
     console.log('Configurando webhook:', {
       baseUrl: cleanBaseUrl,
