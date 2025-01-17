@@ -15,6 +15,25 @@ serve(async (req) => {
     const { contact } = await req.json()
     console.log('📩 Processando follow-up para:', contact)
 
+    // Verificar se já passou o tempo de delay configurado
+    const lastMessageTime = new Date(contact.last_message_time || contact.created_at)
+    const now = new Date()
+    const minutesSinceLastMessage = (now.getTime() - lastMessageTime.getTime()) / (1000 * 60)
+
+    console.log('⏰ Tempo desde última mensagem:', minutesSinceLastMessage, 'minutos')
+    console.log('⚙️ Delay configurado:', contact.followUp.messages[0]?.delay_minutes, 'minutos')
+
+    if (minutesSinceLastMessage < (contact.followUp.messages[0]?.delay_minutes || 60)) {
+      console.log('⏳ Ainda não é hora de enviar o follow-up')
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          message: 'Aguardando tempo de delay' 
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
     // Enviar mensagem via Evolution API
     const evolutionApiUrl = (Deno.env.get('EVOLUTION_API_URL') || '').replace(/\/+$/, '')
     const evolutionApiEndpoint = `${evolutionApiUrl}/message/sendText/${contact.followUp.instanceName}`
@@ -27,6 +46,9 @@ serve(async (req) => {
     if (!message) {
       throw new Error('Nenhuma mensagem configurada para envio')
     }
+
+    console.log('📤 Enviando mensagem:', message)
+    console.log('📱 Para o número:', contact.TelefoneClientes)
 
     const evolutionResponse = await fetch(evolutionApiEndpoint, {
       method: 'POST',
@@ -58,7 +80,8 @@ serve(async (req) => {
     const { error: updateError } = await supabaseClient
       .from('Users_clientes')
       .update({ 
-        last_message_time: new Date().toISOString()
+        last_message_time: new Date().toISOString(),
+        ConversationId: 'follow-up-sent'
       })
       .eq('id', contact.id)
 
@@ -81,6 +104,8 @@ serve(async (req) => {
       console.error('❌ Erro ao registrar mensagem:', chatError)
       throw chatError
     }
+
+    console.log('✅ Follow-up processado com sucesso')
 
     return new Response(
       JSON.stringify({ success: true }),
