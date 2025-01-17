@@ -7,13 +7,13 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const TYPING_DELAY_PER_CHAR = 50; // ms per character for typing simulation
-const MIN_RESPONSE_DELAY = 2000; // minimum 2 seconds delay
-const MESSAGE_ACCUMULATION_TIME = 10000; // 10 seconds to accumulate messages
+// Reduced accumulation time to 3 seconds for better responsiveness
+const MESSAGE_ACCUMULATION_TIME = 3000; // 3 seconds
 
 const messageQueue = new Map<string, {
   messages: { role: string; content: string }[];
   lastUpdate: number;
+  processing: boolean;
 }>();
 
 serve(async (req) => {
@@ -25,14 +25,16 @@ serve(async (req) => {
     const { message, instanceId, phoneNumber } = await req.json();
     console.log('📩 Received message:', { message, instanceId, phoneNumber });
 
-    // Initialize or get queue for this conversation
+    // Create queue key
     const queueKey = `${instanceId}-${phoneNumber}`;
     const now = Date.now();
     
+    // Initialize or update queue
     if (!messageQueue.has(queueKey)) {
       messageQueue.set(queueKey, {
         messages: [],
-        lastUpdate: now
+        lastUpdate: now,
+        processing: false
       });
     }
 
@@ -40,9 +42,9 @@ serve(async (req) => {
     queue.messages.push({ role: 'user', content: message });
     queue.lastUpdate = now;
 
-    // Check if we should process messages (if enough time has passed)
-    if (now - queue.lastUpdate < MESSAGE_ACCUMULATION_TIME) {
-      console.log('⏳ Accumulating messages, waiting more time...');
+    // If already processing, return accumulating status
+    if (queue.processing) {
+      console.log('⏳ Already processing messages for:', queueKey);
       return new Response(JSON.stringify({ 
         status: 'accumulating',
         message: 'Messages are being accumulated before processing'
@@ -50,6 +52,21 @@ serve(async (req) => {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
+
+    // Check if enough time has passed since last message
+    const timeSinceLastUpdate = now - queue.lastUpdate;
+    if (timeSinceLastUpdate < MESSAGE_ACCUMULATION_TIME) {
+      console.log('⏳ Accumulating messages for:', queueKey);
+      return new Response(JSON.stringify({ 
+        status: 'accumulating',
+        message: 'Messages are being accumulated before processing'
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    // Mark as processing to prevent duplicate processing
+    queue.processing = true;
 
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
@@ -79,7 +96,7 @@ serve(async (req) => {
     const messages = [
       { 
         role: 'system', 
-        content: instance?.system_prompt || "Você é um assistente prestativo que responde de forma natural e amigável. Espere alguns segundos antes de responder para simular uma conversa mais natural." 
+        content: instance?.system_prompt || "Você é um assistente prestativo que responde de forma natural e amigável." 
       },
       ...chatHistory?.map(msg => ({
         role: msg.sender_type === 'user' ? 'user' : 'assistant',
@@ -89,6 +106,7 @@ serve(async (req) => {
     ];
 
     // Get OpenAI response
+    console.log('🤖 Sending request to OpenAI with messages:', messages);
     const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -109,14 +127,7 @@ serve(async (req) => {
 
     const data = await openaiResponse.json();
     const aiResponse = data.choices[0].message.content;
-
-    // Calculate delay based on message length
-    const responseDelay = Math.max(
-      MIN_RESPONSE_DELAY,
-      aiResponse.length * TYPING_DELAY_PER_CHAR
-    );
-    
-    await new Promise(resolve => setTimeout(resolve, responseDelay));
+    console.log('✅ Received AI response:', aiResponse);
 
     // Save all accumulated messages
     for (const queuedMsg of queue.messages) {
@@ -140,10 +151,7 @@ serve(async (req) => {
         content: aiResponse
       });
 
-    // Clear queue after processing
-    messageQueue.delete(queueKey);
-
-    // Send response through Evolution API
+    // Send through Evolution API
     const evolutionResponse = await fetch(
       `${Deno.env.get('EVOLUTION_API_URL')}/message/sendText/${instance.name}`,
       {
@@ -164,6 +172,9 @@ serve(async (req) => {
       throw new Error(`Evolution API error: ${error}`);
     }
 
+    // Clear queue after successful processing
+    messageQueue.delete(queueKey);
+
     return new Response(
       JSON.stringify({ 
         success: true,
@@ -173,7 +184,7 @@ serve(async (req) => {
     );
 
   } catch (error) {
-    console.error('Error:', error);
+    console.error('❌ Error:', error);
     return new Response(
       JSON.stringify({ 
         success: false,
