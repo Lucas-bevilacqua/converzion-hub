@@ -27,7 +27,6 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { useAuth } from "@/contexts/auth/AuthContext"
-import { Json } from "@/integrations/supabase/types"
 
 interface FollowUpSectionProps {
   instanceId: string
@@ -52,6 +51,22 @@ interface FormData {
   stop_on_reply: boolean
   stop_on_keyword: string[]
   manual_messages: ManualMessage[]
+}
+
+interface FollowUpData {
+  id: string;
+  instance_id: string;
+  is_active: boolean;
+  follow_up_type: FollowUpType;
+  delay_minutes: number;
+  template_message: string;
+  schedule_start_time: string;
+  schedule_end_time: string;
+  schedule_days: number[];
+  max_attempts: number;
+  stop_on_reply: boolean;
+  stop_on_keyword: string[];
+  manual_messages: ManualMessage[];
 }
 
 export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
@@ -98,13 +113,10 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
           }
           
           // Convert to proper format
-          data.manual_messages = parsedMessages.map((msg: unknown) => {
-            const typedMsg = msg as Record<string, unknown>
-            return {
-              message: typeof typedMsg?.message === 'string' ? typedMsg.message : '',
-              delay_minutes: typeof typedMsg?.delay_minutes === 'number' ? typedMsg.delay_minutes : 60
-            }
-          })
+          data.manual_messages = parsedMessages.map((msg: any) => ({
+            message: String(msg?.message || ''),
+            delay_minutes: Number(msg?.delay_minutes || 60)
+          }))
 
           console.log('Parsed manual_messages:', data.manual_messages)
         } catch (e) {
@@ -113,7 +125,7 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
         }
       }
 
-      return data
+      return data as FollowUpData
     }
   })
 
@@ -233,70 +245,6 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
       })
     }
   })
-
-  const deleteMutation = useMutation({
-    mutationFn: async () => {
-      console.log('Deletando configuração de follow-up para instância:', instanceId)
-      const { error } = await supabase
-        .from('instance_follow_ups')
-        .delete()
-        .eq('instance_id', instanceId)
-
-      if (error) throw error
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['follow-up'] })
-      toast({
-        title: "Sucesso",
-        description: "Configurações de follow-up excluídas com sucesso.",
-      })
-      // Reset form to default values
-      setFormData({
-        is_active: false,
-        follow_up_type: "manual",
-        delay_minutes: 60,
-        template_message: '',
-        schedule_start_time: '09:00',
-        schedule_end_time: '18:00',
-        schedule_days: [1,2,3,4,5],
-        max_attempts: 3,
-        stop_on_reply: true,
-        stop_on_keyword: ['comprou', 'agendou', 'agendado', 'comprado'],
-        manual_messages: []
-      })
-    },
-    onError: (error) => {
-      console.error('Erro ao excluir follow-up:', error)
-      toast({
-        title: "Erro",
-        description: "Não foi possível excluir as configurações.",
-        variant: "destructive",
-      })
-    }
-  })
-
-  const addMessage = () => {
-    setFormData(prev => ({
-      ...prev,
-      manual_messages: [...prev.manual_messages, { message: '', delay_minutes: 60 }]
-    }))
-  }
-
-  const removeMessage = (index: number) => {
-    setFormData(prev => ({
-      ...prev,
-      manual_messages: prev.manual_messages.filter((_, i) => i !== index)
-    }))
-  }
-
-  const updateMessage = (index: number, field: keyof ManualMessage, value: string | number) => {
-    setFormData(prev => ({
-      ...prev,
-      manual_messages: prev.manual_messages.map((msg, i) => 
-        i === index ? { ...msg, [field]: value } : msg
-      )
-    }))
-  }
 
   const handleSave = async () => {
     console.log('Iniciando salvamento do follow-up:', {
