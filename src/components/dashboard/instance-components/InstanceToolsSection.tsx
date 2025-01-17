@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { Calendar, Users, Check, X, ExternalLink, Key, Webhook } from "lucide-react";
+import { Calendar, Users, Check, X, ExternalLink, Key, Webhook, Brain } from "lucide-react";
 import { InstanceTool, ToolType } from "@/types/instance-tools";
 import { useToast } from "@/components/ui/use-toast";
 import { Button } from "@/components/ui/button";
@@ -37,18 +37,21 @@ const TOOL_ICONS = {
   calendar: Calendar,
   crm: Users,
   n8n: Webhook,
+  langchain: Brain, // Adding LangChain icon
 };
 
 const TOOL_LABELS = {
   calendar: "Calendário",
   crm: "CRM",
   n8n: "n8n (Automação)",
+  langchain: "LangChain (IA)",
 };
 
 const TOOL_DESCRIPTIONS = {
   calendar: "Conecte seu sistema de agendamentos para que seus clientes possam marcar horários automaticamente pelo WhatsApp",
   crm: "Conecte seu CRM para registrar automaticamente informações dos seus clientes",
   n8n: "Conecte o n8n para criar automações personalizadas com seu WhatsApp",
+  langchain: "Configure o LangChain para respostas mais inteligentes e personalizadas",
 };
 
 const TOOL_PROVIDERS = {
@@ -63,6 +66,13 @@ const TOOL_PROVIDERS = {
   ],
   n8n: [
     { id: 'n8n', name: 'n8n', setupUrl: 'https://docs.n8n.io/hosting/installation/docker/' },
+  ],
+  langchain: [
+    { 
+      id: 'langchain', 
+      name: 'LangChain', 
+      setupUrl: 'https://js.langchain.com/docs/get_started/introduction' 
+    },
   ],
 };
 
@@ -100,6 +110,17 @@ const TOOL_SETUP_GUIDES = {
       "5. Cole a URL aqui para ativar a integração"
     ],
     docsUrl: "https://docs.n8n.io/integrations/builtin/trigger-nodes/webhook/",
+    autoSetupAvailable: true,
+  },
+  langchain: {
+    title: "Como configurar o LangChain",
+    steps: [
+      "1. Configure seu modelo de linguagem preferido",
+      "2. Defina as configurações de temperatura e tokens",
+      "3. Personalize o prompt do sistema",
+      "4. Teste a integração"
+    ],
+    docsUrl: "https://js.langchain.com/docs/get_started/introduction",
     autoSetupAvailable: true,
   },
 };
@@ -229,7 +250,7 @@ export function InstanceToolsSection({ instanceId }: InstanceToolsSectionProps) 
     return tool?.is_active || false;
   };
 
-  const availableTools: ToolType[] = ['calendar', 'crm'];
+  const availableTools: ToolType[] = ['calendar', 'crm', 'langchain'];
 
   if (isLoading) {
     return (

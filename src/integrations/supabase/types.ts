@@ -285,6 +285,7 @@ export type Database = {
           id: string
           instance_id: string
           is_active: boolean | null
+          langchain_config: Json | null
           settings: Json | null
           setup_guide: Json | null
           tool_type: Database["public"]["Enums"]["tool_type"]
@@ -298,6 +299,7 @@ export type Database = {
           id?: string
           instance_id: string
           is_active?: boolean | null
+          langchain_config?: Json | null
           settings?: Json | null
           setup_guide?: Json | null
           tool_type: Database["public"]["Enums"]["tool_type"]
@@ -311,6 +313,7 @@ export type Database = {
           id?: string
           instance_id?: string
           is_active?: boolean | null
+          langchain_config?: Json | null
           settings?: Json | null
           setup_guide?: Json | null
           tool_type?: Database["public"]["Enums"]["tool_type"]
@@ -483,7 +486,11 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      follow_up_type: "automatic" | "ai_generated" | "template"
+      follow_up_type:
+        | "automatic"
+        | "ai_generated"
+        | "template"
+        | "langchain_generated"
       instance_objective:
         | "sales"
         | "support"
@@ -491,7 +498,7 @@ export type Database = {
         | "education"
         | "custom"
       subscription_status: "active" | "canceled" | "past_due" | "trial"
-      tool_type: "calendar" | "crm" | "payment" | "custom" | "n8n"
+      tool_type: "calendar" | "crm" | "payment" | "custom" | "n8n" | "langchain"
       webhook_type: "n8n" | "zapier" | "make"
     }
     CompositeTypes: {

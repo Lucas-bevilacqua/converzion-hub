@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query"
 import { supabase } from "@/integrations/supabase/client"
 import { useAuth } from "@/contexts/auth/AuthContext"
 import { ChartContainer } from "@/components/ui/chart"
-import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer } from "recharts"
+import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, Legend } from "recharts"
 import { Loader2 } from "lucide-react"
 
 export function MetricsOverview() {
@@ -27,7 +27,11 @@ export function MetricsOverview() {
 
       return data.map(metric => ({
         ...metric,
-        date: new Date(metric.created_at).toLocaleDateString('pt-BR'),
+        date: new Date(metric.created_at).toLocaleDateString('pt-BR', { 
+          weekday: 'short',
+          day: '2-digit',
+          month: '2-digit'
+        }),
       }))
     },
     enabled: !!user?.id
@@ -46,7 +50,7 @@ export function MetricsOverview() {
       <h3 className="text-lg font-semibold mb-4">Métricas dos Últimos 7 Dias</h3>
       
       <div className="space-y-8">
-        <div className="h-[200px]">
+        <div className="h-[300px]">
           <ChartContainer
             className="w-full"
             config={{
@@ -55,42 +59,62 @@ export function MetricsOverview() {
                   light: "#0056D2",
                   dark: "#60A5FA",
                 },
-                label: "Mensagens Enviadas",
+                label: "Mensagens",
               },
               time: {
                 theme: {
                   light: "#00C896",
                   dark: "#34D399",
                 },
-                label: "Tempo de Conexão (min)",
+                label: "Tempo Online (min)",
               },
             }}
           >
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={metrics}>
+              <BarChart data={metrics} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
                 <XAxis 
                   dataKey="date" 
                   fontSize={12}
                   tickLine={false}
+                  axisLine={true}
                 />
                 <YAxis 
                   fontSize={12}
                   tickLine={false}
-                  axisLine={false}
+                  axisLine={true}
+                  yAxisId="left"
                 />
+                <YAxis 
+                  fontSize={12}
+                  tickLine={false}
+                  axisLine={true}
+                  yAxisId="right"
+                  orientation="right"
+                />
+                <Tooltip 
+                  contentStyle={{ 
+                    backgroundColor: 'var(--background)',
+                    border: '1px solid var(--border)',
+                    borderRadius: '6px'
+                  }}
+                  labelStyle={{
+                    color: 'var(--foreground)'
+                  }}
+                />
+                <Legend />
                 <Bar
                   dataKey="messages_sent"
-                  name="messages"
+                  name="Mensagens"
                   fill="var(--color-messages)"
                   radius={[4, 4, 0, 0]}
-                  isAnimationActive={false}
+                  yAxisId="left"
                 />
                 <Bar
                   dataKey="connection_time_minutes"
-                  name="time"
+                  name="Tempo Online"
                   fill="var(--color-time)"
                   radius={[4, 4, 0, 0]}
-                  isAnimationActive={false}
+                  yAxisId="right"
                 />
               </BarChart>
             </ResponsiveContainer>
@@ -105,7 +129,7 @@ export function MetricsOverview() {
             </p>
           </div>
           <div className="space-y-2">
-            <p className="text-sm text-muted-foreground">Tempo Total Conectado</p>
+            <p className="text-sm text-muted-foreground">Tempo Total Online</p>
             <p className="text-2xl font-bold">
               {Math.round(metrics?.reduce((acc, curr) => acc + (curr.connection_time_minutes || 0), 0) / 60)}h
             </p>

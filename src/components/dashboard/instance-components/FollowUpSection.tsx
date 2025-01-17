@@ -19,7 +19,7 @@ interface FollowUpSectionProps {
   instanceId: string
 }
 
-type FollowUpType = "automatic" | "ai_generated" | "template"
+type FollowUpType = "automatic" | "ai_generated" | "template" | "langchain_generated";
 
 interface FormData {
   is_active: boolean
@@ -29,6 +29,11 @@ interface FormData {
   schedule_start_time: string
   schedule_end_time: string
   schedule_days: number[]
+  langchain_config?: {
+    temperature?: number
+    maxTokens?: number
+    systemPrompt?: string
+  };
 }
 
 export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
@@ -95,7 +100,12 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
     template_message: followUp?.template_message || '',
     schedule_start_time: followUp?.schedule_start_time || '09:00',
     schedule_end_time: followUp?.schedule_end_time || '18:00',
-    schedule_days: followUp?.schedule_days || [1,2,3,4,5]
+    schedule_days: followUp?.schedule_days || [1,2,3,4,5],
+    langchain_config: followUp?.settings?.langchain_config || {
+      temperature: 0.7,
+      maxTokens: 150,
+      systemPrompt: "Você é um assistente amigável que gera follow-ups personalizados."
+    }
   })
 
   if (isLoading) {
@@ -139,6 +149,7 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
               <SelectItem value="automatic">Automático</SelectItem>
               <SelectItem value="ai_generated">Gerado por IA</SelectItem>
               <SelectItem value="template">Template</SelectItem>
+              <SelectItem value="langchain_generated">LangChain</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -170,14 +181,57 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
           />
         </div>
 
-        {formData.follow_up_type === 'template' && (
-          <div className="grid gap-2">
-            <Label>Mensagem Template</Label>
-            <Textarea
-              value={formData.template_message}
-              onChange={(e) => setFormData(prev => ({ ...prev, template_message: e.target.value }))}
-              placeholder="Digite a mensagem que será enviada..."
-            />
+        {formData.follow_up_type === 'langchain_generated' && (
+          <div className="space-y-4">
+            <div className="grid gap-2">
+              <Label>Temperatura (Criatividade)</Label>
+              <Input
+                type="number"
+                min="0"
+                max="1"
+                step="0.1"
+                value={formData.langchain_config?.temperature}
+                onChange={(e) => setFormData(prev => ({
+                  ...prev,
+                  langchain_config: {
+                    ...prev.langchain_config,
+                    temperature: parseFloat(e.target.value)
+                  }
+                }))}
+              />
+            </div>
+
+            <div className="grid gap-2">
+              <Label>Máximo de Tokens</Label>
+              <Input
+                type="number"
+                min="1"
+                max="500"
+                value={formData.langchain_config?.maxTokens}
+                onChange={(e) => setFormData(prev => ({
+                  ...prev,
+                  langchain_config: {
+                    ...prev.langchain_config,
+                    maxTokens: parseInt(e.target.value)
+                  }
+                }))}
+              />
+            </div>
+
+            <div className="grid gap-2">
+              <Label>Prompt do Sistema</Label>
+              <Textarea
+                value={formData.langchain_config?.systemPrompt}
+                onChange={(e) => setFormData(prev => ({
+                  ...prev,
+                  langchain_config: {
+                    ...prev.langchain_config,
+                    systemPrompt: e.target.value
+                  }
+                }))}
+                placeholder="Instruções para o modelo de IA gerar follow-ups"
+              />
+            </div>
           </div>
         )}
 
@@ -191,7 +245,12 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
               template_message: followUp?.template_message || '',
               schedule_start_time: followUp?.schedule_start_time || '09:00',
               schedule_end_time: followUp?.schedule_end_time || '18:00',
-              schedule_days: followUp?.schedule_days || [1,2,3,4,5]
+              schedule_days: followUp?.schedule_days || [1,2,3,4,5],
+              langchain_config: followUp?.settings?.langchain_config || {
+                temperature: 0.7,
+                maxTokens: 150,
+                systemPrompt: "Você é um assistente amigável que gera follow-ups personalizados."
+              }
             })}
           >
             Cancelar
