@@ -116,23 +116,27 @@ serve(async (req) => {
     // Send through Evolution API
     console.log('📤 Sending message through Evolution API');
     try {
-      const evolutionResponse = await fetch(
-        `${Deno.env.get('EVOLUTION_API_URL')}/message/sendText/${instance.name}`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'apikey': Deno.env.get('EVOLUTION_API_KEY') || '',
-          },
-          body: JSON.stringify({
-            number: phoneNumber,
-            text: aiResponse
-          }),
-        }
-      );
+      // Clean the base URL by removing trailing slashes
+      const evolutionApiUrl = (Deno.env.get('EVOLUTION_API_URL') || '').replace(/\/+$/, '');
+      const evolutionApiEndpoint = `${evolutionApiUrl}/message/sendText/${instance.name}`;
+      
+      console.log('Evolution API endpoint:', evolutionApiEndpoint);
+      
+      const evolutionResponse = await fetch(evolutionApiEndpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': Deno.env.get('EVOLUTION_API_KEY') || '',
+        },
+        body: JSON.stringify({
+          number: phoneNumber,
+          text: aiResponse
+        }),
+      });
 
       if (!evolutionResponse.ok) {
-        console.error('❌ Evolution API error:', await evolutionResponse.text());
+        const errorText = await evolutionResponse.text();
+        console.error('❌ Evolution API error:', errorText);
         // Don't throw here, just log the error and continue
       } else {
         const evolutionData = await evolutionResponse.json();
