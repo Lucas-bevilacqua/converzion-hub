@@ -20,30 +20,45 @@ serve(async (req) => {
       mensagens: contact.followUp.messages
     })
 
-    // Verificar se já passou o tempo de delay configurado
+    // Verificar qual é a próxima mensagem a ser enviada
     const lastMessageTime = new Date(contact.last_message_time || contact.created_at)
     const now = new Date()
     const minutesSinceLastMessage = (now.getTime() - lastMessageTime.getTime()) / (1000 * 60)
-    const configuredDelay = contact.followUp.messages[0]?.delay_minutes || 60
 
-    console.log('⏰ Análise de tempo:', {
-      ultimaMensagem: lastMessageTime,
-      agora: now,
-      minutos: minutesSinceLastMessage,
-      delayConfigurado: configuredDelay,
-      mensagemConfig: contact.followUp.messages[0]
+    // Encontrar a próxima mensagem baseada no tempo acumulado
+    let accumulatedDelay = 0
+    let nextMessageIndex = -1
+    let nextMessage = null
+
+    console.log('⏰ Calculando próxima mensagem:', {
+      tempoDesdeUltima: minutesSinceLastMessage,
+      mensagensDisponiveis: contact.followUp.messages.length
     })
 
-    if (minutesSinceLastMessage < configuredDelay) {
-      console.log('⏳ Ainda não é hora de enviar o follow-up:', {
-        tempoPassado: minutesSinceLastMessage,
-        tempoNecessario: configuredDelay,
-        diferenca: configuredDelay - minutesSinceLastMessage
+    for (let i = 0; i < contact.followUp.messages.length; i++) {
+      accumulatedDelay += contact.followUp.messages[i].delay_minutes
+      if (minutesSinceLastMessage >= accumulatedDelay) {
+        nextMessageIndex = i + 1 // Próxima mensagem
+      }
+    }
+
+    // Se encontrou próxima mensagem e está dentro do limite
+    if (nextMessageIndex >= 0 && nextMessageIndex < contact.followUp.messages.length) {
+      nextMessage = contact.followUp.messages[nextMessageIndex]
+      console.log('✅ Próxima mensagem encontrada:', {
+        indice: nextMessageIndex,
+        atrasoAcumulado: accumulatedDelay,
+        mensagem: nextMessage
+      })
+    } else {
+      console.log('⏳ Nenhuma mensagem disponível para envio:', {
+        indice: nextMessageIndex,
+        totalMensagens: contact.followUp.messages.length
       })
       return new Response(
         JSON.stringify({ 
           success: false, 
-          message: 'Aguardando tempo de delay' 
+          message: 'Nenhuma mensagem disponível para envio' 
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
@@ -60,18 +75,15 @@ serve(async (req) => {
       instancia: contact.followUp.instanceName
     })
 
-    // Se for follow-up manual, enviar a primeira mensagem da sequência
-    const message = contact.followUp.messages[0]?.message || ''
-    
-    if (!message) {
-      console.error('❌ Nenhuma mensagem configurada para envio')
-      throw new Error('Nenhuma mensagem configurada para envio')
+    if (!nextMessage?.message) {
+      console.error('❌ Mensagem não configurada corretamente')
+      throw new Error('Mensagem não configurada corretamente')
     }
 
     console.log('📤 Preparando envio:', {
-      mensagem: message,
+      mensagem: nextMessage.message,
       numero: contact.TelefoneClientes,
-      delay: configuredDelay,
+      delay: nextMessage.delay_minutes,
       headers: {
         'Content-Type': 'application/json',
         'apikey': 'PRESENTE' // não logamos a chave real
@@ -86,7 +98,7 @@ serve(async (req) => {
       },
       body: JSON.stringify({
         number: contact.TelefoneClientes,
-        text: message
+        text: nextMessage.message
       }),
     })
 
@@ -111,14 +123,14 @@ serve(async (req) => {
     console.log('📝 Atualizando registro do contato:', {
       id: contact.id,
       novoStatus: 'follow-up-sent',
-      delay: configuredDelay
+      mensagemEnviada: nextMessageIndex
     })
 
     const { error: updateError } = await supabaseClient
       .from('Users_clientes')
       .update({ 
         last_message_time: new Date().toISOString(),
-        ConversationId: 'follow-up-sent'
+        ConversationId: `follow-up-sent-${nextMessageIndex}`
       })
       .eq('id', contact.id)
 
@@ -132,7 +144,7 @@ serve(async (req) => {
       instancia: contact.NomeDaEmpresa,
       usuario: contact.followUp.userId,
       tipo: 'follow_up',
-      delay: configuredDelay
+      sequencia: nextMessageIndex
     })
 
     const { error: chatError } = await supabaseClient
@@ -141,7 +153,7 @@ serve(async (req) => {
         instance_id: contact.NomeDaEmpresa,
         user_id: contact.followUp.userId,
         sender_type: 'follow_up',
-        content: message
+        content: nextMessage.message
       })
 
     if (chatError) {
@@ -152,7 +164,11 @@ serve(async (req) => {
     console.log('✅ Follow-up processado com sucesso')
 
     return new Response(
-      JSON.stringify({ success: true }),
+      JSON.stringify({ 
+        success: true,
+        messageIndex: nextMessageIndex,
+        nextDelay: nextMessage.delay_minutes 
+      }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   } catch (error) {
