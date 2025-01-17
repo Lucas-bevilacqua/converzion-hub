@@ -26,6 +26,7 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import * as z from "zod"
 import { InstanceToolsSection } from "./InstanceToolsSection"
+import { FollowUpSection } from "./FollowUpSection"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
 const formSchema = z.object({
@@ -214,9 +215,10 @@ export function InstancePromptDialog({
           <DialogTitle>Configurar Instância</DialogTitle>
         </DialogHeader>
         <Tabs defaultValue="prompt">
-          <TabsList className="grid w-full grid-cols-2">
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="prompt">Prompt</TabsTrigger>
             <TabsTrigger value="tools">Ferramentas</TabsTrigger>
+            <TabsTrigger value="follow-up">Follow-up</TabsTrigger>
           </TabsList>
           <TabsContent value="prompt">
             <Form {...form}>
@@ -299,6 +301,9 @@ export function InstancePromptDialog({
           </TabsContent>
           <TabsContent value="tools">
             {instanceId && <InstanceToolsSection instanceId={instanceId} />}
+          </TabsContent>
+          <TabsContent value="follow-up">
+            {instanceId && <FollowUpSection instanceId={instanceId} />}
           </TabsContent>
         </Tabs>
       </DialogContent>
