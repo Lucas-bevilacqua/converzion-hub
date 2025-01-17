@@ -89,14 +89,12 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
         throw error
       }
 
-      // Parse manual_messages from JSON if it exists
       if (data?.manual_messages) {
         try {
           console.log('Raw manual_messages:', data.manual_messages)
           
           let parsedMessages = data.manual_messages
           
-          // Handle string JSON if needed
           if (typeof parsedMessages === 'string') {
             try {
               parsedMessages = JSON.parse(parsedMessages)
@@ -106,20 +104,17 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
             }
           }
           
-          // Ensure we have a valid array
           if (!Array.isArray(parsedMessages)) {
             console.error('manual_messages is not an array:', parsedMessages)
             parsedMessages = []
           }
           
-          // Convert to proper format with explicit type casting
-          const typedMessages: ManualMessage[] = parsedMessages.map((msg: any) => ({
+          const typedMessages = parsedMessages.map((msg: any) => ({
             message: String(msg?.message || ''),
             delay_minutes: Number(msg?.delay_minutes || 60)
           }))
 
           data.manual_messages = typedMessages
-          console.log('Parsed manual_messages:', data.manual_messages)
         } catch (e) {
           console.error('Error processing manual_messages:', e)
           data.manual_messages = []
@@ -132,7 +127,7 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
 
   const [formData, setFormData] = useState<FormData>({
     is_active: followUp?.is_active || false,
-    follow_up_type: (followUp?.follow_up_type as FollowUpType) || "manual",
+    follow_up_type: followUp?.follow_up_type || "manual",
     delay_minutes: followUp?.delay_minutes || 60,
     template_message: followUp?.template_message || '',
     schedule_start_time: followUp?.schedule_start_time || '09:00',
@@ -141,9 +136,7 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
     max_attempts: followUp?.max_attempts || 3,
     stop_on_reply: followUp?.stop_on_reply ?? true,
     stop_on_keyword: followUp?.stop_on_keyword || ['comprou', 'agendou', 'agendado', 'comprado'],
-    manual_messages: Array.isArray(followUp?.manual_messages) 
-      ? followUp.manual_messages
-      : []
+    manual_messages: followUp?.manual_messages || []
   })
 
   useEffect(() => {
@@ -159,9 +152,7 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
         max_attempts: followUp.max_attempts || 3,
         stop_on_reply: followUp.stop_on_reply ?? true,
         stop_on_keyword: followUp.stop_on_keyword || ['comprou', 'agendou', 'agendado', 'comprado'],
-        manual_messages: Array.isArray(followUp.manual_messages) 
-          ? followUp.manual_messages
-          : []
+        manual_messages: followUp.manual_messages || []
       })
     }
   }, [followUp])
@@ -170,7 +161,6 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
     mutationFn: async (values: FormData) => {
       console.log('Salvando configuração de follow-up:', values)
       
-      // Ensure manual_messages is a valid array
       const manualMessages = Array.isArray(values.manual_messages) 
         ? values.manual_messages.map(msg => ({
             message: msg.message || '',
@@ -211,7 +201,6 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
         throw error
       }
 
-      // Registra as mensagens no histórico
       if (user && values.manual_messages.length > 0) {
         const { error: chatError } = await supabase
           .from('chat_messages')
@@ -261,7 +250,6 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
         title: "Sucesso",
         description: "Configurações de follow-up excluídas com sucesso.",
       })
-      // Reset form to default values
       setFormData({
         is_active: false,
         follow_up_type: "manual",
@@ -507,13 +495,6 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
             onClick={() => {
               console.log('Cancelando alterações, restaurando estado anterior:', followUp)
               if (followUp) {
-                const messages = Array.isArray(followUp.manual_messages)
-                  ? followUp.manual_messages.map(msg => ({
-                      message: String(msg.message || ''),
-                      delay_minutes: Number(msg.delay_minutes || 60)
-                    }))
-                  : []
-
                 setFormData({
                   is_active: followUp.is_active || false,
                   follow_up_type: followUp.follow_up_type || "manual",
@@ -525,7 +506,7 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
                   max_attempts: followUp.max_attempts || 3,
                   stop_on_reply: followUp.stop_on_reply ?? true,
                   stop_on_keyword: followUp.stop_on_keyword || ['comprou', 'agendou', 'agendado', 'comprado'],
-                  manual_messages: messages
+                  manual_messages: followUp.manual_messages || []
                 })
               }
             }}
