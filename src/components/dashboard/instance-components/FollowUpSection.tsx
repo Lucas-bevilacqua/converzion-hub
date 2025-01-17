@@ -40,11 +40,6 @@ interface ManualMessage {
   delay_minutes: number;
 }
 
-interface ParsedMessage {
-  message?: string;
-  delay_minutes?: number;
-}
-
 interface FormData {
   is_active: boolean
   follow_up_type: FollowUpType
@@ -84,55 +79,36 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
         try {
           console.log('Raw manual_messages:', data.manual_messages)
           
-          // Handle triple-encoded JSON string
-          let parsedMessages: Json | ParsedMessage[] = data.manual_messages
+          let parsedMessages = data.manual_messages
           
-          // First decode
+          // Handle string JSON if needed
           if (typeof parsedMessages === 'string') {
             try {
               parsedMessages = JSON.parse(parsedMessages)
-              console.log('After first decode:', parsedMessages)
             } catch (e) {
-              console.error('Error in first decode:', e)
+              console.error('Error parsing manual_messages string:', e)
+              parsedMessages = []
             }
           }
           
-          // Second decode
-          if (typeof parsedMessages === 'string') {
-            try {
-              parsedMessages = JSON.parse(parsedMessages)
-              console.log('After second decode:', parsedMessages)
-            } catch (e) {
-              console.error('Error in second decode:', e)
-            }
+          // Ensure we have a valid array
+          if (!Array.isArray(parsedMessages)) {
+            console.error('manual_messages is not an array:', parsedMessages)
+            parsedMessages = []
           }
           
-          // Third decode
-          if (typeof parsedMessages === 'string') {
-            try {
-              parsedMessages = JSON.parse(parsedMessages)
-              console.log('After third decode:', parsedMessages)
-            } catch (e) {
-              console.error('Error in third decode:', e)
+          // Convert to proper format
+          data.manual_messages = parsedMessages.map((msg: unknown) => {
+            const typedMsg = msg as Record<string, unknown>
+            return {
+              message: typeof typedMsg?.message === 'string' ? typedMsg.message : '',
+              delay_minutes: typeof typedMsg?.delay_minutes === 'number' ? typedMsg.delay_minutes : 60
             }
-          }
+          })
 
-          console.log('Final parsed messages:', parsedMessages)
-
-          // Ensure we have a valid array with correct structure
-          data.manual_messages = Array.isArray(parsedMessages) 
-            ? parsedMessages.map((msg: unknown) => {
-                const typedMsg = msg as Record<string, unknown>
-                return {
-                  message: typeof typedMsg?.message === 'string' ? typedMsg.message : '',
-                  delay_minutes: typeof typedMsg?.delay_minutes === 'number' ? typedMsg.delay_minutes : 60
-                }
-              })
-            : []
-            
-          console.log('Formatted messages:', data.manual_messages)
+          console.log('Parsed manual_messages:', data.manual_messages)
         } catch (e) {
-          console.error('Error parsing manual_messages:', e)
+          console.error('Error processing manual_messages:', e)
           data.manual_messages = []
         }
       }
@@ -153,20 +129,14 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
     stop_on_reply: followUp?.stop_on_reply ?? true,
     stop_on_keyword: followUp?.stop_on_keyword || ['comprou', 'agendou', 'agendado', 'comprado'],
     manual_messages: Array.isArray(followUp?.manual_messages) 
-      ? (followUp.manual_messages as unknown as ManualMessage[]).map(msg => ({
-          message: msg.message || '',
-          delay_minutes: Number(msg.delay_minutes) || 60
-        }))
+      ? (followUp.manual_messages as unknown as ManualMessage[])
       : []
   })
 
   useEffect(() => {
     if (followUp) {
       const messages = Array.isArray(followUp.manual_messages)
-        ? (followUp.manual_messages as unknown as ManualMessage[]).map(msg => ({
-            message: msg.message || '',
-            delay_minutes: Number(msg.delay_minutes) || 60
-          }))
+        ? (followUp.manual_messages as unknown as ManualMessage[])
         : []
 
       setFormData({
@@ -189,7 +159,7 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
     mutationFn: async (values: FormData) => {
       console.log('Salvando configuração de follow-up:', values)
       
-      // Ensure manual_messages is a valid array before saving
+      // Ensure manual_messages is a valid array
       const manualMessages = Array.isArray(values.manual_messages) 
         ? values.manual_messages.map(msg => ({
             message: msg.message || '',
@@ -209,7 +179,7 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
         max_attempts: values.max_attempts,
         stop_on_reply: values.stop_on_reply,
         stop_on_keyword: values.stop_on_keyword,
-        manual_messages: manualMessages, // Save array directly without stringify
+        manual_messages: manualMessages,
         updated_at: new Date().toISOString()
       }
 
@@ -326,11 +296,6 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
         i === index ? { ...msg, [field]: value } : msg
       )
     }))
-  }
-
-  const handleSave = () => {
-    console.log('Salvando follow-up com dados:', formData)
-    saveMutation.mutateAsync(formData)
   }
 
   if (isLoading) {
@@ -506,10 +471,7 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
             onClick={() => {
               if (followUp) {
                 const messages = Array.isArray(followUp.manual_messages)
-                  ? (followUp.manual_messages as unknown as ManualMessage[]).map(msg => ({
-                      message: msg.message || '',
-                      delay_minutes: Number(msg.delay_minutes) || 60
-                    }))
+                  ? (followUp.manual_messages as unknown as ManualMessage[])
                   : []
 
                 setFormData({
