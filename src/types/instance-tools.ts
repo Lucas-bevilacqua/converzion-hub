@@ -1,4 +1,4 @@
-export type ToolType = 'calendar' | 'crm' | 'payment' | 'custom' | 'n8n' | 'langchain';
+export type ToolType = 'calendar' | 'crm' | 'payment' | 'custom' | 'n8n';
 
 export interface InstanceTool {
   id: string;
