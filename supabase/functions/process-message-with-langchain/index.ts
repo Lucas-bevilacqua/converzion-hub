@@ -6,7 +6,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-console.log('⚡ Process Message with LangChain function initialized')
+console.log('⚡ Process Message with OpenAI function initialized')
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -42,6 +42,7 @@ serve(async (req) => {
 
     console.log('✅ Instance fetched:', instance)
 
+    console.log('🤖 Sending request to OpenAI...')
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -63,8 +64,14 @@ serve(async (req) => {
       }),
     })
 
+    if (!response.ok) {
+      const error = await response.text()
+      console.error('❌ OpenAI API error:', error)
+      throw new Error(`OpenAI API error: ${error}`)
+    }
+
     const data = await response.json()
-    console.log('✅ OpenAI response:', data)
+    console.log('✅ OpenAI response received')
 
     const aiResponse = data.choices[0].message.content
 
