@@ -168,7 +168,7 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
       const manualMessages = Array.isArray(values.manual_messages) 
         ? values.manual_messages.map(msg => ({
             message: msg.message || '',
-            delay_minutes: Math.max(10, Number(msg.delay_minutes) || 10) // Garante mínimo de 10 minutos
+            delay_minutes: Math.max(10, Number(msg.delay_minutes) || 10)
           }))
         : []
 
@@ -176,7 +176,7 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
         instance_id: instanceId,
         is_active: values.is_active,
         follow_up_type: values.follow_up_type,
-        delay_minutes: Math.max(10, values.delay_minutes), // Alterado para mínimo de 10 minutos
+        delay_minutes: Math.max(10, values.delay_minutes),
         template_message: values.template_message,
         schedule_start_time: values.schedule_start_time,
         schedule_end_time: values.schedule_end_time,
@@ -206,21 +206,8 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
         throw error
       }
 
-      if (user && values.manual_messages.length > 0) {
-        const { error: chatError } = await supabase
-          .from('chat_messages')
-          .insert(values.manual_messages.map(msg => ({
-            instance_id: instanceId,
-            user_id: user.id,
-            sender_type: 'assistant',
-            content: msg.message
-          })))
-
-        if (chatError) {
-          console.error('Erro ao registrar mensagens:', chatError)
-          throw chatError
-        }
-      }
+      // Removido o registro automático de mensagens no chat_messages
+      // para evitar envio imediato
 
       // Get instance name for AI follow-up
       if (values.follow_up_type === 'ai_generated') {
