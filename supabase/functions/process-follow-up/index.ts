@@ -16,25 +16,29 @@ serve(async (req) => {
     console.log('📩 Processando follow-up para:', {
       contato: contact.TelefoneClientes,
       ultimaMensagem: contact.last_message_time,
-      followUpConfig: contact.followUp
+      followUpConfig: contact.followUp,
+      mensagens: contact.followUp.messages
     })
 
     // Verificar se já passou o tempo de delay configurado
     const lastMessageTime = new Date(contact.last_message_time || contact.created_at)
     const now = new Date()
     const minutesSinceLastMessage = (now.getTime() - lastMessageTime.getTime()) / (1000 * 60)
+    const configuredDelay = contact.followUp.messages[0]?.delay_minutes || 60
 
     console.log('⏰ Análise de tempo:', {
       ultimaMensagem: lastMessageTime,
       agora: now,
       minutos: minutesSinceLastMessage,
-      delayConfigurado: contact.followUp.messages[0]?.delay_minutes
+      delayConfigurado: configuredDelay,
+      mensagemConfig: contact.followUp.messages[0]
     })
 
-    if (minutesSinceLastMessage < (contact.followUp.messages[0]?.delay_minutes || 60)) {
+    if (minutesSinceLastMessage < configuredDelay) {
       console.log('⏳ Ainda não é hora de enviar o follow-up:', {
         tempoPassado: minutesSinceLastMessage,
-        tempoNecessario: contact.followUp.messages[0]?.delay_minutes
+        tempoNecessario: configuredDelay,
+        diferenca: configuredDelay - minutesSinceLastMessage
       })
       return new Response(
         JSON.stringify({ 
@@ -67,6 +71,7 @@ serve(async (req) => {
     console.log('📤 Preparando envio:', {
       mensagem: message,
       numero: contact.TelefoneClientes,
+      delay: configuredDelay,
       headers: {
         'Content-Type': 'application/json',
         'apikey': 'PRESENTE' // não logamos a chave real
@@ -105,7 +110,8 @@ serve(async (req) => {
 
     console.log('📝 Atualizando registro do contato:', {
       id: contact.id,
-      novoStatus: 'follow-up-sent'
+      novoStatus: 'follow-up-sent',
+      delay: configuredDelay
     })
 
     const { error: updateError } = await supabaseClient
@@ -125,7 +131,8 @@ serve(async (req) => {
     console.log('📝 Registrando mensagem no histórico:', {
       instancia: contact.NomeDaEmpresa,
       usuario: contact.followUp.userId,
-      tipo: 'follow_up'
+      tipo: 'follow_up',
+      delay: configuredDelay
     })
 
     const { error: chatError } = await supabaseClient
