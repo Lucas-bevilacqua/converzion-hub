@@ -13,7 +13,6 @@ serve(async (req) => {
 
   try {
     const { message, instanceId, phoneNumber } = await req.json()
-    console.log('Received webhook request:', { message, instanceId, phoneNumber })
 
     if (!message || !instanceId || !phoneNumber) {
       throw new Error('Message, instanceId and phoneNumber are required')
@@ -24,8 +23,6 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    // Get instance details to check system prompt
-    console.log('Fetching instance details for ID:', instanceId)
     const { data: instance, error: instanceError } = await supabaseClient
       .from('evolution_instances')
       .select('*, profiles!inner(*)')
@@ -33,19 +30,9 @@ serve(async (req) => {
       .single()
 
     if (instanceError) {
-      console.error('Error fetching instance:', instanceError)
       throw instanceError
     }
 
-    console.log('Instance found:', {
-      instanceId: instance.id,
-      instanceName: instance.name,
-      userId: instance.user_id,
-      userName: instance.profiles?.full_name
-    })
-
-    // Get recent chat history
-    console.log('Fetching recent chat history')
     const { data: chatHistory, error: chatError } = await supabaseClient
       .from('chat_messages')
       .select('*')
@@ -55,12 +42,9 @@ serve(async (req) => {
       .limit(10)
 
     if (chatError) {
-      console.error('Error fetching chat history:', chatError)
       throw chatError
     }
 
-    // Save the new user message
-    console.log('Saving user message to chat history')
     const { error: saveError } = await supabaseClient
       .from('chat_messages')
       .insert({
@@ -71,16 +55,13 @@ serve(async (req) => {
       })
 
     if (saveError) {
-      console.error('Error saving message:', saveError)
       throw saveError
     }
 
-    // Prepare messages array for OpenAI
     const messages = [
       { role: 'system', content: instance.system_prompt || "You are a helpful AI assistant." }
     ]
 
-    // Add chat history to context
     if (chatHistory) {
       chatHistory.forEach((msg) => {
         messages.push({
@@ -90,10 +71,8 @@ serve(async (req) => {
       })
     }
 
-    // Add current message
     messages.push({ role: 'user', content: message })
 
-    console.log('Sending request to OpenAI with messages:', messages)
     const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -109,16 +88,12 @@ serve(async (req) => {
 
     if (!openaiResponse.ok) {
       const error = await openaiResponse.text()
-      console.error('OpenAI API error:', error)
       throw new Error(`OpenAI API error: ${error}`)
     }
 
     const data = await openaiResponse.json()
     const aiResponse = data.choices[0].message.content
-    console.log('Generated response:', aiResponse)
 
-    // Send response through Evolution API with correct format
-    console.log('Sending response through Evolution API')
     const evolutionResponse = await fetch(`${Deno.env.get('EVOLUTION_API_URL')}/message/sendText/${instance.name}`, {
       method: 'POST',
       headers: {
@@ -133,15 +108,11 @@ serve(async (req) => {
 
     if (!evolutionResponse.ok) {
       const error = await evolutionResponse.text()
-      console.error('Evolution API error:', error)
       throw new Error(`Evolution API error: ${error}`)
     }
 
     const evolutionData = await evolutionResponse.json()
-    console.log('Evolution API response:', evolutionData)
 
-    // Save the AI response to chat history
-    console.log('Saving AI response to chat history')
     const { error: saveResponseError } = await supabaseClient
       .from('chat_messages')
       .insert({
@@ -152,7 +123,6 @@ serve(async (req) => {
       })
 
     if (saveResponseError) {
-      console.error('Error saving AI response:', saveResponseError)
       throw saveResponseError
     }
 
@@ -165,7 +135,6 @@ serve(async (req) => {
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   } catch (error) {
-    console.error('Error in chat-with-openai:', error)
     return new Response(
       JSON.stringify({ 
         success: false,
