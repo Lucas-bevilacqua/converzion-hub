@@ -33,7 +33,11 @@ serve(async (req) => {
     const ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')
 
     if (!EVOLUTION_API_URL || !EVOLUTION_API_KEY || !ANON_KEY) {
-      console.error('❌ Configurações necessárias não encontradas')
+      console.error('❌ Configurações necessárias não encontradas:', {
+        hasUrl: !!EVOLUTION_API_URL,
+        hasKey: !!EVOLUTION_API_KEY,
+        hasAnonKey: !!ANON_KEY
+      })
       throw new Error('Configurações necessárias não encontradas')
     }
 
@@ -77,7 +81,40 @@ serve(async (req) => {
       "TYPEBOT_START"
     ]
     
+    // Primeiro, vamos verificar se o webhook já existe
+    const checkResponse = await fetch(`${cleanBaseUrl}/webhook/find/${instanceName}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': EVOLUTION_API_KEY
+      }
+    })
+
+    console.log('🔍 Verificando webhook existente:', {
+      status: checkResponse.status,
+      ok: checkResponse.ok
+    })
+
+    // Se existir, vamos deletar primeiro
+    if (checkResponse.ok) {
+      console.log('🗑️ Deletando webhook existente')
+      const deleteResponse = await fetch(`${cleanBaseUrl}/webhook/delete/${instanceName}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': EVOLUTION_API_KEY
+        }
+      })
+
+      if (!deleteResponse.ok) {
+        console.error('❌ Erro ao deletar webhook:', await deleteResponse.text())
+      } else {
+        console.log('✅ Webhook anterior deletado com sucesso')
+      }
+    }
+    
     // Configura o webhook na Evolution API com todos os eventos necessários
+    console.log('📝 Criando novo webhook com eventos:', requiredEvents)
     const response = await fetch(`${cleanBaseUrl}/webhook/set/${instanceName}`, {
       method: 'POST',
       headers: {
@@ -98,17 +135,35 @@ serve(async (req) => {
       })
     })
 
+    const responseText = await response.text()
+    console.log('📤 Resposta da Evolution API:', {
+      status: response.status,
+      ok: response.ok,
+      body: responseText
+    })
+
     if (!response.ok) {
-      const error = await response.text()
-      console.error('❌ Erro ao configurar webhook na Evolution API:', error)
-      throw new Error(`Erro na Evolution API: ${error}`)
+      console.error('❌ Erro ao configurar webhook na Evolution API:', responseText)
+      throw new Error(`Erro na Evolution API: ${responseText}`)
     }
 
-    const result = await response.json()
-    console.log('✅ Webhook configurado com sucesso:', result)
+    // Verifica se o webhook foi realmente configurado
+    const verifyResponse = await fetch(`${cleanBaseUrl}/webhook/find/${instanceName}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': EVOLUTION_API_KEY
+      }
+    })
+
+    console.log('🔍 Verificando configuração do webhook:', {
+      status: verifyResponse.status,
+      ok: verifyResponse.ok,
+      body: await verifyResponse.text()
+    })
 
     return new Response(
-      JSON.stringify(result),
+      JSON.stringify({ success: true }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   } catch (error) {
