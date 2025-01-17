@@ -43,7 +43,12 @@ serve(async (req) => {
     const processedContacts = []
     
     for (const followUp of followUps || []) {
-      console.log('🔄 Processando follow-up da instância:', followUp.instance?.name)
+      console.log('🔄 Processando follow-up da instância:', followUp.instance?.name, {
+        followUpId: followUp.id,
+        isActive: followUp.is_active,
+        followUpType: followUp.follow_up_type,
+        manualMessages: followUp.manual_messages
+      })
 
       // Buscar contatos que ainda não receberam follow-up ou que estão no meio da sequência
       const { data: contacts, error: contactsError } = await supabaseClient
@@ -78,6 +83,13 @@ serve(async (req) => {
 
           // Verificar se há mais mensagens para enviar
           const manualMessages = Array.isArray(followUp.manual_messages) ? followUp.manual_messages : []
+          
+          console.log('📝 Status das mensagens:', {
+            indiceAtual: currentMessageIndex,
+            totalMensagens: manualMessages.length,
+            proximaMensagem: currentMessageIndex + 1 < manualMessages.length ? manualMessages[currentMessageIndex + 1] : null
+          })
+
           if (currentMessageIndex + 1 >= manualMessages.length) {
             console.log('✅ Sequência completa para o contato:', contact.id)
             continue
@@ -86,20 +98,21 @@ serve(async (req) => {
           // Calcular o tempo desde a última mensagem
           const lastMessageTime = new Date(contact.last_message_time || contact.created_at)
           const now = new Date()
-          const minutesSinceLastMessage = (now.getTime() - lastMessageTime.getTime()) / (1000 * 60)
+          const minutesSinceLastMessage = Math.floor((now.getTime() - lastMessageTime.getTime()) / (1000 * 60))
 
           // Obter o delay necessário para a próxima mensagem
           const nextMessage = manualMessages[currentMessageIndex + 1]
           if (!nextMessage) {
-            console.log('❌ Próxima mensagem não encontrada')
+            console.error('❌ Próxima mensagem não encontrada')
             continue
           }
 
           console.log('⏰ Análise de tempo:', {
-            ultimaMensagem: lastMessageTime,
-            agora: now,
+            ultimaMensagem: lastMessageTime.toISOString(),
+            agora: now.toISOString(),
             minutos: minutesSinceLastMessage,
-            delayNecessario: nextMessage.delay_minutes
+            delayNecessario: nextMessage.delay_minutes,
+            podeEnviar: minutesSinceLastMessage >= nextMessage.delay_minutes
           })
 
           // Verificar se já passou tempo suficiente
@@ -107,6 +120,8 @@ serve(async (req) => {
             console.log('⏳ Aguardando tempo necessário para próxima mensagem')
             continue
           }
+
+          console.log('🚀 Iniciando processamento do follow-up para o contato:', contact.id)
 
           const processResponse = await fetch(
             `${Deno.env.get('SUPABASE_URL')}/functions/v1/process-follow-up`,
@@ -130,7 +145,12 @@ serve(async (req) => {
           )
 
           if (!processResponse.ok) {
-            throw new Error(`Error processing follow-up: ${await processResponse.text()}`)
+            const errorText = await processResponse.text()
+            console.error('❌ Erro ao processar follow-up:', {
+              status: processResponse.status,
+              erro: errorText
+            })
+            throw new Error(`Error processing follow-up: ${errorText}`)
           }
 
           const processResult = await processResponse.json()
@@ -151,7 +171,8 @@ serve(async (req) => {
     }
 
     console.log('✅ Processamento de follow-ups concluído:', {
-      totalProcessado: processedContacts.length
+      totalProcessado: processedContacts.length,
+      resultados: processedContacts
     })
 
     return new Response(
