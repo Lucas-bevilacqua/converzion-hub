@@ -78,7 +78,9 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
     max_attempts: followUp?.max_attempts || 3,
     stop_on_reply: followUp?.stop_on_reply ?? true,
     stop_on_keyword: followUp?.stop_on_keyword || ['comprou', 'agendou', 'agendado', 'comprado'],
-    manual_messages: (followUp?.manual_messages as ManualMessage[]) || []
+    manual_messages: Array.isArray(followUp?.manual_messages) 
+      ? (followUp.manual_messages as ManualMessage[])
+      : []
   })
 
   const saveMutation = useMutation({
@@ -112,7 +114,7 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
           .insert(values.manual_messages.map(msg => ({
             instance_id: instanceId,
             user_id: user.id,
-            sender_type: 'follow_up',
+            sender_type: 'assistant',
             content: msg.message
           })))
 
