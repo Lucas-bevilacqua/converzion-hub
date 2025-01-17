@@ -15,6 +15,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 import { useAuth } from "@/contexts/auth/AuthContext"
 
 interface FollowUpSectionProps {
@@ -192,6 +203,48 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
     }
   })
 
+  const deleteMutation = useMutation({
+    mutationFn: async () => {
+      console.log('Deletando configuração de follow-up para instância:', instanceId)
+      const { error } = await supabase
+        .from('instance_follow_ups')
+        .delete()
+        .eq('instance_id', instanceId)
+
+      if (error) throw error
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['follow-up'] })
+      toast({
+        title: "Sucesso",
+        description: "Configurações de follow-up excluídas com sucesso.",
+      })
+      setIsEditing(false)
+      // Reset form to default values
+      setFormData({
+        is_active: false,
+        follow_up_type: "manual",
+        delay_minutes: 60,
+        template_message: '',
+        schedule_start_time: '09:00',
+        schedule_end_time: '18:00',
+        schedule_days: [1,2,3,4,5],
+        max_attempts: 3,
+        stop_on_reply: true,
+        stop_on_keyword: ['comprou', 'agendou', 'agendado', 'comprado'],
+        manual_messages: []
+      })
+    },
+    onError: (error) => {
+      console.error('Erro ao excluir follow-up:', error)
+      toast({
+        title: "Erro",
+        description: "Não foi possível excluir as configurações.",
+        variant: "destructive",
+      })
+    }
+  })
+
   const addMessage = () => {
     setFormData(prev => ({
       ...prev,
@@ -259,10 +312,42 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
             Configure como e quando os follow-ups serão enviados.
           </p>
         </div>
-        <Switch
-          checked={formData.is_active}
-          onCheckedChange={(checked) => setFormData(prev => ({ ...prev, is_active: checked }))}
-        />
+        <div className="flex items-center gap-2">
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button
+                variant="destructive"
+                size="sm"
+                disabled={!followUp}
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Excluir
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Excluir Follow-up</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Tem certeza que deseja excluir todas as configurações de follow-up desta instância?
+                  Esta ação não pode ser desfeita.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={() => deleteMutation.mutate()}
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                >
+                  Excluir
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+          <Switch
+            checked={formData.is_active}
+            onCheckedChange={(checked) => setFormData(prev => ({ ...prev, is_active: checked }))}
+          />
+        </div>
       </div>
 
       <div className="grid gap-4">
