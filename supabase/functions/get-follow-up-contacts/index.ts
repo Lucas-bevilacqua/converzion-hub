@@ -12,7 +12,11 @@ serve(async (req) => {
   }
 
   try {
-    console.log('🚀 Iniciando verificação de follow-ups:', new Date().toISOString())
+    const startTime = new Date()
+    console.log('🚀 INICIANDO VERIFICAÇÃO DE FOLLOW-UPS:', {
+      horário: startTime.toISOString(),
+      timestamp: startTime.getTime()
+    })
     
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
@@ -51,7 +55,16 @@ serve(async (req) => {
       )
     }
 
-    console.log('📋 Follow-ups ativos encontrados:', followUps.length)
+    console.log('📋 Follow-ups ativos encontrados:', {
+      quantidade: followUps.length,
+      followUps: followUps.map(f => ({
+        id: f.id,
+        instanceId: f.instance_id,
+        instanceName: f.instance?.name,
+        status: f.instance?.connection_status,
+        isActive: f.is_active
+      }))
+    })
 
     // Para cada follow-up ativo, buscar contatos elegíveis
     const processedContacts = []
@@ -59,15 +72,20 @@ serve(async (req) => {
     for (const followUp of followUps) {
       // Verificar se a instância está conectada
       if (followUp.instance?.connection_status !== 'connected') {
-        console.log('⚠️ Instância desconectada, pulando:', followUp.instance?.name)
+        console.log('⚠️ Instância desconectada, pulando:', {
+          instanceId: followUp.instance_id,
+          instanceName: followUp.instance?.name,
+          status: followUp.instance?.connection_status
+        })
         continue
       }
 
-      console.log('🔄 Processando follow-up da instância:', followUp.instance?.name, {
+      console.log('🔄 Processando follow-up:', {
+        instanceId: followUp.instance_id,
+        instanceName: followUp.instance?.name,
         followUpId: followUp.id,
-        isActive: followUp.is_active,
-        followUpType: followUp.follow_up_type,
-        instanceId: followUp.instance_id
+        tipo: followUp.follow_up_type,
+        mensagens: followUp.manual_messages
       })
 
       // Buscar contatos que ainda não receberam follow-up ou que estão no meio da sequência
@@ -79,25 +97,39 @@ serve(async (req) => {
         .order('last_message_time', { ascending: true })
 
       if (contactsError) {
-        console.error('❌ Erro ao buscar contatos:', contactsError)
+        console.error('❌ Erro ao buscar contatos:', {
+          erro: contactsError,
+          instanceId: followUp.instance_id
+        })
         continue
       }
 
       if (!contacts?.length) {
-        console.log('ℹ️ Nenhum contato encontrado para processamento na instância:', followUp.instance?.name)
+        console.log('ℹ️ Nenhum contato encontrado para processamento:', {
+          instanceId: followUp.instance_id,
+          instanceName: followUp.instance?.name
+        })
         continue
       }
 
-      console.log('👥 Contatos encontrados para a instância:', contacts.length)
+      console.log('👥 Contatos encontrados:', {
+        quantidade: contacts.length,
+        instanceId: followUp.instance_id,
+        contatos: contacts.map(c => ({
+          id: c.id,
+          telefone: c.TelefoneClientes,
+          conversationId: c.ConversationId,
+          ultimaMensagem: c.last_message_time
+        }))
+      })
 
       // Processar cada contato
       for (const contact of contacts) {
-        console.log('👤 Processando contato:', {
+        console.log('👤 Iniciando processamento do contato:', {
           id: contact.id,
           telefone: contact.TelefoneClientes,
           conversationId: contact.ConversationId,
-          ultimaMensagem: contact.last_message_time,
-          nomeDaEmpresa: contact.NomeDaEmpresa
+          ultimaMensagem: contact.last_message_time
         })
 
         try {
@@ -129,7 +161,11 @@ serve(async (req) => {
           // Obter o delay necessário para a próxima mensagem
           const nextMessage = manualMessages[currentMessageIndex + 1]
           if (!nextMessage) {
-            console.error('❌ Próxima mensagem não encontrada para o contato:', contact.id)
+            console.error('❌ Próxima mensagem não encontrada:', {
+              contactId: contact.id,
+              currentIndex: currentMessageIndex,
+              totalMessages: manualMessages.length
+            })
             continue
           }
 
@@ -143,11 +179,20 @@ serve(async (req) => {
 
           // Verificar se já passou tempo suficiente
           if (minutesSinceLastMessage < nextMessage.delay_minutes) {
-            console.log('⏳ Aguardando tempo necessário para próxima mensagem. Faltam:', nextMessage.delay_minutes - minutesSinceLastMessage, 'minutos')
+            console.log('⏳ Aguardando tempo necessário:', {
+              contactId: contact.id,
+              minutosPassados: minutesSinceLastMessage,
+              minutosNecessarios: nextMessage.delay_minutes,
+              faltam: nextMessage.delay_minutes - minutesSinceLastMessage
+            })
             continue
           }
 
-          console.log('🚀 Iniciando processamento do follow-up para o contato:', contact.id)
+          console.log('🚀 Iniciando envio do follow-up:', {
+            contactId: contact.id,
+            instanceId: followUp.instance_id,
+            mensagem: nextMessage.message
+          })
 
           const processResponse = await fetch(
             `${Deno.env.get('SUPABASE_URL')}/functions/v1/process-follow-up`,
@@ -182,7 +227,7 @@ serve(async (req) => {
           }
 
           const processResult = await processResponse.json()
-          console.log('✅ Resultado do processamento:', {
+          console.log('✅ Follow-up processado:', {
             contactId: contact.id,
             resultado: processResult
           })
@@ -202,10 +247,13 @@ serve(async (req) => {
       }
     }
 
-    console.log('✅ Processamento de follow-ups concluído:', {
+    const endTime = new Date()
+    console.log('✅ Processamento concluído:', {
+      inicio: startTime.toISOString(),
+      fim: endTime.toISOString(),
+      duracao: `${(endTime.getTime() - startTime.getTime()) / 1000} segundos`,
       totalProcessado: processedContacts.length,
-      resultados: processedContacts,
-      timestamp: new Date().toISOString()
+      resultados: processedContacts
     })
 
     return new Response(
