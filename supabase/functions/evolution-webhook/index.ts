@@ -13,7 +13,6 @@ serve(async (req) => {
     headers: Object.fromEntries(req.headers.entries())
   })
 
-  // Handle CORS
   if (req.method === 'OPTIONS') {
     console.log('👉 Handling CORS preflight request')
     return new Response(null, { headers: corsHeaders })
@@ -24,23 +23,19 @@ serve(async (req) => {
     const payload = await req.json()
     console.log('📦 Webhook payload received:', JSON.stringify(payload, null, 2))
 
-    // Initialize Supabase client
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    // Handle different event types
     if (payload.event === 'messages.upsert') {
       console.log('📨 Received message event:', payload)
       
-      // Validate webhook payload
       if (!payload.message) {
         console.error('❌ No message data in payload')
         throw new Error('No message data in payload')
       }
 
-      // Extract instance name from the webhook data
       const instanceName = payload.instance?.instanceName
       if (!instanceName) {
         console.error('❌ Instance name not found in webhook payload')
@@ -49,7 +44,6 @@ serve(async (req) => {
 
       console.log('🔍 Looking for instance:', instanceName)
 
-      // Get instance details from database
       const { data: instance, error: instanceError } = await supabaseClient
         .from('evolution_instances')
         .select('*, profiles!inner(*)')
@@ -72,7 +66,6 @@ serve(async (req) => {
         userId: instance.user_id
       })
 
-      // Process incoming message if it's from a user (not from the bot)
       if (payload.message?.fromMe === false) {
         console.log('📥 Processing incoming message:', {
           content: payload.message.content,
@@ -98,15 +91,18 @@ serve(async (req) => {
             })
         }
         
-        // Call chat-with-openai function to process the message
-        console.log('🤖 Calling chat-with-openai function')
-        const { data: response, error } = await supabaseClient.functions.invoke('chat-with-openai', {
-          body: {
-            message: payload.message.content,
-            instanceId: instance.id,
-            phoneNumber: payload.message.from
+        // Processar mensagem com LangChain
+        console.log('🤖 Calling process-message-with-langchain function')
+        const { data: response, error } = await supabaseClient.functions.invoke(
+          'process-message-with-langchain',
+          {
+            body: {
+              message: payload.message.content,
+              instanceId: instance.id,
+              phoneNumber: payload.message.from
+            }
           }
-        })
+        )
 
         if (error) {
           console.error('❌ Error processing message:', error)
@@ -120,7 +116,6 @@ serve(async (req) => {
     } else if (payload.event === 'connection.update') {
       console.log('🔌 Received connection update event:', payload)
       
-      // Update instance connection status
       const instanceName = payload.instance?.instanceName
       if (instanceName) {
         console.log('📝 Updating connection status for instance:', instanceName)
