@@ -54,20 +54,27 @@ export function MetricsOverview() {
           <ChartContainer
             className="w-full"
             config={{
-              messages: {
+              messages_sent: {
                 theme: {
                   light: "#0056D2",
                   dark: "#60A5FA",
                 },
-                label: "Mensagens",
+                label: "Mensagens Enviadas",
               },
-              time: {
+              messages_received: {
                 theme: {
                   light: "#00C896",
                   dark: "#34D399",
                 },
-                label: "Tempo Online (min)",
+                label: "Mensagens Recebidas",
               },
+              response_time: {
+                theme: {
+                  light: "#F59E0B",
+                  dark: "#FBBF24",
+                },
+                label: "Tempo de Resposta (s)",
+              }
             }}
           >
             <ResponsiveContainer width="100%" height="100%">
@@ -82,13 +89,13 @@ export function MetricsOverview() {
                   fontSize={12}
                   tickLine={false}
                   axisLine={true}
-                  yAxisId="left"
+                  yAxisId="messages"
                 />
                 <YAxis 
                   fontSize={12}
                   tickLine={false}
                   axisLine={true}
-                  yAxisId="right"
+                  yAxisId="time"
                   orientation="right"
                 />
                 <Tooltip 
@@ -104,34 +111,47 @@ export function MetricsOverview() {
                 <Legend />
                 <Bar
                   dataKey="messages_sent"
-                  name="Mensagens"
-                  fill="var(--color-messages)"
+                  name="Mensagens Enviadas"
+                  fill="var(--color-messages_sent)"
                   radius={[4, 4, 0, 0]}
-                  yAxisId="left"
+                  yAxisId="messages"
                 />
                 <Bar
-                  dataKey="connection_time_minutes"
-                  name="Tempo Online"
-                  fill="var(--color-time)"
+                  dataKey="messages_received"
+                  name="Mensagens Recebidas"
+                  fill="var(--color-messages_received)"
                   radius={[4, 4, 0, 0]}
-                  yAxisId="right"
+                  yAxisId="messages"
+                />
+                <Bar
+                  dataKey="average_response_time_seconds"
+                  name="Tempo de Resposta"
+                  fill="var(--color-response_time)"
+                  radius={[4, 4, 0, 0]}
+                  yAxisId="time"
                 />
               </BarChart>
             </ResponsiveContainer>
           </ChartContainer>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-3 gap-4">
           <div className="space-y-2">
-            <p className="text-sm text-muted-foreground">Total de Mensagens</p>
+            <p className="text-sm text-muted-foreground">Total de Mensagens Enviadas</p>
             <p className="text-2xl font-bold">
               {metrics?.reduce((acc, curr) => acc + (curr.messages_sent || 0), 0)}
             </p>
           </div>
           <div className="space-y-2">
-            <p className="text-sm text-muted-foreground">Tempo Total Online</p>
+            <p className="text-sm text-muted-foreground">Total de Mensagens Recebidas</p>
             <p className="text-2xl font-bold">
-              {Math.round(metrics?.reduce((acc, curr) => acc + (curr.connection_time_minutes || 0), 0) / 60)}h
+              {metrics?.reduce((acc, curr) => acc + (curr.messages_received || 0), 0)}
+            </p>
+          </div>
+          <div className="space-y-2">
+            <p className="text-sm text-muted-foreground">Tempo Médio de Resposta</p>
+            <p className="text-2xl font-bold">
+              {Math.round(metrics?.reduce((acc, curr) => acc + (curr.average_response_time_seconds || 0), 0) / (metrics?.length || 1))}s
             </p>
           </div>
         </div>

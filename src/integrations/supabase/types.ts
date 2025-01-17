@@ -247,28 +247,37 @@ export type Database = {
       }
       instance_metrics: {
         Row: {
+          average_response_time_seconds: number | null
+          common_questions: Json | null
           connection_time_minutes: number | null
           created_at: string | null
           id: string
           instance_id: string
+          messages_received: number | null
           messages_sent: number | null
           updated_at: string | null
           user_id: string
         }
         Insert: {
+          average_response_time_seconds?: number | null
+          common_questions?: Json | null
           connection_time_minutes?: number | null
           created_at?: string | null
           id?: string
           instance_id: string
+          messages_received?: number | null
           messages_sent?: number | null
           updated_at?: string | null
           user_id: string
         }
         Update: {
+          average_response_time_seconds?: number | null
+          common_questions?: Json | null
           connection_time_minutes?: number | null
           created_at?: string | null
           id?: string
           instance_id?: string
+          messages_received?: number | null
           messages_sent?: number | null
           updated_at?: string | null
           user_id?: string
