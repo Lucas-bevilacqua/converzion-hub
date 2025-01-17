@@ -206,10 +206,7 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
         throw error
       }
 
-      // Removido o registro automático de mensagens no chat_messages
-      // para evitar envio imediato
-
-      // Get instance name for AI follow-up
+      // Get instance name for AI follow-up configuration only
       if (values.follow_up_type === 'ai_generated') {
         const { data: instance, error: instanceError } = await supabase
           .from('evolution_instances')
@@ -222,7 +219,7 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
           throw instanceError
         }
 
-        // Invoke the process-ai-follow-up function
+        // Configure AI follow-up without sending immediate message
         const { data: aiResponse, error: aiError } = await supabase.functions.invoke('process-ai-follow-up', {
           body: {
             instanceId,
@@ -232,7 +229,8 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
             maxAttempts: values.max_attempts,
             stopOnReply: values.stop_on_reply,
             stopKeywords: values.stop_on_keyword,
-            systemPrompt: values.system_prompt
+            systemPrompt: values.system_prompt,
+            skipInitialMessage: true // Add flag to skip immediate message
           }
         })
 
@@ -241,7 +239,7 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
           throw aiError
         }
 
-        console.log('AI follow-up response:', aiResponse)
+        console.log('AI follow-up configured:', aiResponse)
       }
     },
     onSuccess: () => {

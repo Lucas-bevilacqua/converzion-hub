@@ -13,8 +13,35 @@ serve(async (req) => {
   }
 
   try {
-    const { instanceId, instanceName, userId, delayMinutes, maxAttempts, stopOnReply, stopKeywords, systemPrompt } = await req.json()
-    console.log('📩 Processing AI follow-up for instance:', instanceId)
+    const { 
+      instanceId, 
+      instanceName, 
+      userId, 
+      delayMinutes, 
+      maxAttempts, 
+      stopOnReply, 
+      stopKeywords, 
+      systemPrompt,
+      skipInitialMessage 
+    } = await req.json()
+
+    console.log('Processing AI follow-up:', {
+      instanceId,
+      instanceName,
+      skipInitialMessage
+    })
+
+    // If skipInitialMessage is true, just configure the follow-up without sending a message
+    if (skipInitialMessage) {
+      console.log('Skipping initial message as requested')
+      return new Response(
+        JSON.stringify({ 
+          success: true, 
+          message: 'Follow-up configured successfully, initial message skipped' 
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
 
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
@@ -96,7 +123,7 @@ serve(async (req) => {
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   } catch (error) {
-    console.error('❌ Error processing AI follow-up:', error)
+    console.error('Error in process-ai-follow-up:', error)
     return new Response(
       JSON.stringify({ error: error.message }),
       { 
