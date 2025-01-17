@@ -12,7 +12,7 @@ serve(async (req) => {
   }
 
   try {
-    console.log('🔍 Iniciando busca de contatos para follow-up:', new Date().toISOString())
+    console.log('🚀 Iniciando verificação de follow-ups:', new Date().toISOString())
     
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
@@ -28,7 +28,8 @@ serve(async (req) => {
         instance:evolution_instances(
           id,
           name,
-          user_id
+          user_id,
+          connection_status
         )
       `)
       .eq('is_active', true)
@@ -38,17 +39,34 @@ serve(async (req) => {
       throw followUpsError
     }
 
-    console.log('📋 Follow-ups ativos encontrados:', followUps?.length || 0)
+    if (!followUps?.length) {
+      console.log('ℹ️ Nenhum follow-up ativo encontrado')
+      return new Response(
+        JSON.stringify({ 
+          success: true,
+          message: 'Nenhum follow-up ativo',
+          processed: [] 
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    console.log('📋 Follow-ups ativos encontrados:', followUps.length)
 
     // Para cada follow-up ativo, buscar contatos elegíveis
     const processedContacts = []
     
-    for (const followUp of followUps || []) {
+    for (const followUp of followUps) {
+      // Verificar se a instância está conectada
+      if (followUp.instance?.connection_status !== 'connected') {
+        console.log('⚠️ Instância desconectada, pulando:', followUp.instance?.name)
+        continue
+      }
+
       console.log('🔄 Processando follow-up da instância:', followUp.instance?.name, {
         followUpId: followUp.id,
         isActive: followUp.is_active,
         followUpType: followUp.follow_up_type,
-        manualMessages: followUp.manual_messages,
         instanceId: followUp.instance_id
       })
 
@@ -65,10 +83,15 @@ serve(async (req) => {
         continue
       }
 
-      console.log('👥 Contatos encontrados para a instância:', contacts?.length || 0)
+      if (!contacts?.length) {
+        console.log('ℹ️ Nenhum contato encontrado para processamento na instância:', followUp.instance?.name)
+        continue
+      }
+
+      console.log('👥 Contatos encontrados para a instância:', contacts.length)
 
       // Processar cada contato
-      for (const contact of contacts || []) {
+      for (const contact of contacts) {
         console.log('👤 Processando contato:', {
           id: contact.id,
           telefone: contact.TelefoneClientes,
