@@ -42,8 +42,55 @@ serve(async (req) => {
 
     console.log('✅ Instance fetched:', instance)
 
-    console.log('🤖 Sending request to OpenAI...')
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    console.log('🔍 Fetching chat history...')
+    const { data: chatHistory, error: chatError } = await supabaseClient
+      .from('chat_messages')
+      .select('*')
+      .eq('instance_id', instanceId)
+      .eq('user_id', instance.user_id)
+      .order('created_at', { ascending: true })
+      .limit(10)
+
+    if (chatError) {
+      console.error('❌ Error fetching chat history:', chatError)
+      throw chatError
+    }
+    console.log('✅ Chat history fetched, count:', chatHistory?.length)
+
+    console.log('💾 Saving user message...')
+    const { error: saveError } = await supabaseClient
+      .from('chat_messages')
+      .insert({
+        instance_id: instanceId,
+        user_id: instance.user_id,
+        sender_type: 'user',
+        content: message
+      })
+
+    if (saveError) {
+      console.error('❌ Error saving user message:', saveError)
+      throw saveError
+    }
+    console.log('✅ User message saved successfully')
+
+    const messages = [
+      { role: 'system', content: instance.system_prompt || "You are a helpful AI assistant." }
+    ]
+
+    if (chatHistory) {
+      chatHistory.forEach((msg) => {
+        messages.push({
+          role: msg.sender_type === 'user' ? 'user' : 'assistant',
+          content: msg.content
+        })
+      })
+    }
+
+    messages.push({ role: 'user', content: message })
+    console.log('🤖 Prepared messages for OpenAI, count:', messages.length)
+
+    console.log('🔄 Sending request to OpenAI...')
+    const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${Deno.env.get('OPENAI_API_KEY')}`,
@@ -51,41 +98,81 @@ serve(async (req) => {
       },
       body: JSON.stringify({
         model: 'gpt-4o-mini',
-        messages: [
-          { 
-            role: 'system', 
-            content: instance.system_prompt || "You are a helpful AI assistant." 
-          },
-          { 
-            role: 'user', 
-            content: message 
-          }
-        ],
+        messages: messages,
+        temperature: 0.7,
       }),
     })
 
-    if (!response.ok) {
-      const error = await response.text()
+    if (!openaiResponse.ok) {
+      const error = await openaiResponse.text()
       console.error('❌ OpenAI API error:', error)
       throw new Error(`OpenAI API error: ${error}`)
     }
 
-    const data = await response.json()
-    console.log('✅ OpenAI response received')
-
+    const data = await openaiResponse.json()
     const aiResponse = data.choices[0].message.content
+    console.log('✅ Received AI response:', aiResponse.substring(0, 100) + '...')
 
+    console.log('💾 Saving AI response...')
+    const { error: saveResponseError } = await supabaseClient
+      .from('chat_messages')
+      .insert({
+        instance_id: instanceId,
+        user_id: instance.user_id,
+        sender_type: 'assistant',
+        content: aiResponse
+      })
+
+    if (saveResponseError) {
+      console.error('❌ Error saving AI response:', saveResponseError)
+      throw saveResponseError
+    }
+    console.log('✅ AI response saved successfully')
+
+    console.log('📤 Sending message through Evolution API...')
+    const evolutionResponse = await fetch(
+      `${Deno.env.get('EVOLUTION_API_URL')}/message/sendText/${instance.name}`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': Deno.env.get('EVOLUTION_API_KEY') || '',
+        },
+        body: JSON.stringify({
+          number: phoneNumber,
+          text: aiResponse
+        }),
+      }
+    )
+
+    if (!evolutionResponse.ok) {
+      const error = await evolutionResponse.text()
+      console.error('❌ Evolution API error:', error)
+      throw new Error(`Evolution API error: ${error}`)
+    }
+
+    const evolutionData = await evolutionResponse.json()
+    console.log('✅ Evolution API response:', evolutionData)
+
+    console.log('🎉 Function completed successfully')
     return new Response(
-      JSON.stringify({ success: true, response: aiResponse }),
+      JSON.stringify({ 
+        success: true,
+        response: aiResponse,
+        evolutionResponse: evolutionData 
+      }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   } catch (error) {
-    console.error('❌ Error processing message:', error)
+    console.error('❌ Function error:', error)
     return new Response(
-      JSON.stringify({ success: false, error: error.message }),
+      JSON.stringify({ 
+        success: false,
+        error: error.message 
+      }),
       { 
         status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
       }
     )
   }
