@@ -6,23 +6,21 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-console.log('🎯 Evolution Webhook function started')
+console.log('🚀 Evolution Webhook function started')
 
 serve(async (req) => {
-  console.log('📥 Webhook received request:', {
-    method: req.method,
-    url: req.url,
-    headers: Object.fromEntries(req.headers.entries())
-  })
-
-  if (req.method === 'OPTIONS') {
-    console.log('👉 Handling CORS preflight request')
-    return new Response(null, { headers: corsHeaders })
-  }
-
   try {
-    const payload = await req.json()
-    console.log('📦 Webhook payload received:', JSON.stringify(payload, null, 2))
+    // Handle CORS preflight requests
+    if (req.method === 'OPTIONS') {
+      console.log('👉 Handling CORS preflight request')
+      return new Response(null, { headers: corsHeaders })
+    }
+
+    const rawBody = await req.text()
+    console.log('📥 Raw webhook payload:', rawBody)
+
+    const payload = JSON.parse(rawBody)
+    console.log('📦 Parsed webhook payload:', JSON.stringify(payload, null, 2))
 
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
@@ -88,6 +86,8 @@ serve(async (req) => {
           throw saveError
         }
 
+        console.log('✅ Message saved successfully')
+
         // Processar mensagem com LangChain
         console.log('🤖 Processing message with LangChain')
         const { data: response, error } = await supabaseClient.functions.invoke(
@@ -106,15 +106,26 @@ serve(async (req) => {
           throw error
         }
 
+        console.log('✅ LangChain response:', response)
+
         // Enviar resposta via Evolution API
-        console.log('📤 Sending response through Evolution API:', response)
+        console.log('📤 Sending response through Evolution API')
+        const evolutionApiUrl = Deno.env.get('EVOLUTION_API_URL')
+        const evolutionApiKey = Deno.env.get('EVOLUTION_API_KEY')
+
+        console.log('📡 Evolution API config:', { 
+          url: evolutionApiUrl,
+          hasKey: !!evolutionApiKey,
+          instanceName
+        })
+
         const evolutionResponse = await fetch(
-          `${Deno.env.get('EVOLUTION_API_URL')}/message/sendText/${instanceName}`,
+          `${evolutionApiUrl}/message/sendText/${instanceName}`,
           {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              'apikey': Deno.env.get('EVOLUTION_API_KEY') || '',
+              'apikey': evolutionApiKey || '',
             },
             body: JSON.stringify({
               number: payload.message.from,
@@ -123,10 +134,16 @@ serve(async (req) => {
           }
         )
 
+        const evolutionResponseText = await evolutionResponse.text()
+        console.log('📨 Evolution API response:', {
+          status: evolutionResponse.status,
+          ok: evolutionResponse.ok,
+          text: evolutionResponseText
+        })
+
         if (!evolutionResponse.ok) {
-          const error = await evolutionResponse.text()
-          console.error('❌ Evolution API error:', error)
-          throw new Error(`Evolution API error: ${error}`)
+          console.error('❌ Evolution API error:', evolutionResponseText)
+          throw new Error(`Evolution API error: ${evolutionResponseText}`)
         }
 
         console.log('✅ Message processed and response sent successfully')
