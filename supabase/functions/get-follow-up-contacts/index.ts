@@ -7,7 +7,6 @@ const corsHeaders = {
 }
 
 serve(async (req) => {
-  // Handle CORS
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
   }
@@ -27,7 +26,8 @@ serve(async (req) => {
         *,
         evolution_instances (
           name,
-          phone_number
+          phone_number,
+          system_prompt
         )
       `)
       .eq('is_active', true)
@@ -44,6 +44,8 @@ serve(async (req) => {
     const currentTime = now.toLocaleTimeString('en-US', { hour12: false })
 
     for (const followUp of followUps) {
+      console.log(`📝 Processando follow-up ${followUp.id} do tipo ${followUp.follow_up_type}`)
+      
       // Verificar se está dentro do horário permitido
       if (
         followUp.schedule_days.includes(currentDay) &&
@@ -55,22 +57,38 @@ serve(async (req) => {
           .from('Users_clientes')
           .select('*')
           .eq('NomeDaEmpresa', followUp.instance_id)
-          .is('ConversationId', null) // Ainda não teve follow-up
+          .is('ConversationId', null)
 
         if (contactsError) {
           console.error('❌ Erro ao buscar contatos:', contactsError)
           continue
         }
 
-        contacts.push(...(eligibleContacts || []).map(contact => ({
-          ...contact,
-          followUp: {
-            type: followUp.follow_up_type,
-            template: followUp.template_message,
-            instanceName: followUp.evolution_instances.name,
-            instancePhone: followUp.evolution_instances.phone_number
-          }
-        })))
+        // Para follow-ups do tipo AI, precisamos incluir o prompt do sistema
+        if (followUp.follow_up_type === 'ai_generated') {
+          contacts.push(...(eligibleContacts || []).map(contact => ({
+            ...contact,
+            followUp: {
+              type: followUp.follow_up_type,
+              delay_minutes: followUp.delay_minutes,
+              instanceName: followUp.evolution_instances.name,
+              instancePhone: followUp.evolution_instances.phone_number,
+              systemPrompt: followUp.evolution_instances.system_prompt,
+              maxAttempts: followUp.max_attempts
+            }
+          })))
+        } else {
+          contacts.push(...(eligibleContacts || []).map(contact => ({
+            ...contact,
+            followUp: {
+              type: followUp.follow_up_type,
+              template: followUp.template_message,
+              instanceName: followUp.evolution_instances.name,
+              instancePhone: followUp.evolution_instances.phone_number,
+              maxAttempts: followUp.max_attempts
+            }
+          })))
+        }
       }
     }
 
