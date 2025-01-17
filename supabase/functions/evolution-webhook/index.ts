@@ -73,24 +73,6 @@ serve(async (req) => {
           instanceId: instance.id
         })
 
-        // Registrar o contato para follow-up
-        const { data: existingContact } = await supabaseClient
-          .from('Users_clientes')
-          .select('*')
-          .eq('TelefoneClientes', payload.message.from)
-          .eq('NomeDaEmpresa', instance.id)
-          .maybeSingle()
-
-        if (!existingContact) {
-          console.log('👤 Registrando novo contato para follow-up')
-          await supabaseClient
-            .from('Users_clientes')
-            .insert({
-              TelefoneClientes: payload.message.from,
-              NomeDaEmpresa: instance.id
-            })
-        }
-        
         // Processar mensagem com LangChain
         console.log('🤖 Calling process-message-with-langchain function')
         const { data: response, error } = await supabaseClient.functions.invoke(
@@ -109,7 +91,30 @@ serve(async (req) => {
           throw error
         }
 
-        console.log('✅ Successfully processed message. Response:', response)
+        // Enviar resposta via Evolution API
+        console.log('📤 Sending response through Evolution API:', response)
+        const evolutionResponse = await fetch(
+          `${Deno.env.get('EVOLUTION_API_URL')}/message/sendText/${instanceName}`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'apikey': Deno.env.get('EVOLUTION_API_KEY') || '',
+            },
+            body: JSON.stringify({
+              number: payload.message.from,
+              text: response.response || "Desculpe, não consegui processar sua mensagem."
+            }),
+          }
+        )
+
+        if (!evolutionResponse.ok) {
+          const error = await evolutionResponse.text()
+          console.error('❌ Evolution API error:', error)
+          throw new Error(`Evolution API error: ${error}`)
+        }
+
+        console.log('✅ Successfully sent response')
       } else {
         console.log('⏭️ Skipping message from bot (fromMe=true)')
       }
