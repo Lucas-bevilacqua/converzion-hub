@@ -82,6 +82,7 @@ serve(async (req) => {
     ]
     
     // Primeiro, vamos verificar se o webhook já existe
+    console.log('🔍 Verificando webhook existente...')
     const checkResponse = await fetch(`${cleanBaseUrl}/webhook/find/${instanceName}`, {
       method: 'GET',
       headers: {
@@ -90,9 +91,10 @@ serve(async (req) => {
       }
     })
 
-    console.log('🔍 Verificando webhook existente:', {
+    console.log('📋 Status da verificação:', {
       status: checkResponse.status,
-      ok: checkResponse.ok
+      ok: checkResponse.ok,
+      body: await checkResponse.text()
     })
 
     // Se existir, vamos deletar primeiro
@@ -128,7 +130,8 @@ serve(async (req) => {
           base64: true,
           headers: {
             'Content-Type': 'application/json',
-            'apikey': ANON_KEY
+            'apikey': ANON_KEY,
+            'Authorization': `Bearer ${ANON_KEY}`
           },
           events: requiredEvents
         }
@@ -148,6 +151,7 @@ serve(async (req) => {
     }
 
     // Verifica se o webhook foi realmente configurado
+    console.log('🔍 Verificando configuração final do webhook')
     const verifyResponse = await fetch(`${cleanBaseUrl}/webhook/find/${instanceName}`, {
       method: 'GET',
       headers: {
@@ -156,10 +160,32 @@ serve(async (req) => {
       }
     })
 
-    console.log('🔍 Verificando configuração do webhook:', {
+    console.log('📋 Status da verificação final:', {
       status: verifyResponse.status,
       ok: verifyResponse.ok,
       body: await verifyResponse.text()
+    })
+
+    // Faz uma chamada de teste para o webhook
+    console.log('🔔 Fazendo chamada de teste para o webhook...')
+    const testResponse = await fetch(webhookUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': ANON_KEY,
+        'Authorization': `Bearer ${ANON_KEY}`
+      },
+      body: JSON.stringify({
+        test: true,
+        instanceName,
+        instanceId
+      })
+    })
+
+    console.log('📋 Resposta do teste do webhook:', {
+      status: testResponse.status,
+      ok: testResponse.ok,
+      body: await testResponse.text()
     })
 
     return new Response(
