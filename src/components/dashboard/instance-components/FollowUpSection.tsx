@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { supabase } from "@/integrations/supabase/client"
 import { Switch } from "@/components/ui/switch"
@@ -66,7 +66,16 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
       // Parse manual_messages from JSON if it exists
       if (data?.manual_messages) {
         try {
-          data.manual_messages = JSON.parse(data.manual_messages as string)
+          const messages = typeof data.manual_messages === 'string' 
+            ? JSON.parse(data.manual_messages)
+            : data.manual_messages
+
+          data.manual_messages = Array.isArray(messages) 
+            ? messages.map(msg => ({
+                message: msg.message || '',
+                delay_minutes: Number(msg.delay_minutes) || 60
+              }))
+            : []
         } catch (e) {
           console.error('Error parsing manual_messages:', e)
           data.manual_messages = []
@@ -89,12 +98,38 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
     stop_on_reply: followUp?.stop_on_reply ?? true,
     stop_on_keyword: followUp?.stop_on_keyword || ['comprou', 'agendou', 'agendado', 'comprado'],
     manual_messages: Array.isArray(followUp?.manual_messages) 
-      ? followUp.manual_messages.map((msg: any) => ({
+      ? followUp.manual_messages.map(msg => ({
           message: msg.message || '',
-          delay_minutes: msg.delay_minutes || 60
+          delay_minutes: Number(msg.delay_minutes) || 60
         }))
       : []
   })
+
+  // Atualiza o formulário quando os dados são carregados
+  useEffect(() => {
+    if (followUp) {
+      const messages = Array.isArray(followUp.manual_messages)
+        ? followUp.manual_messages.map(msg => ({
+            message: msg.message || '',
+            delay_minutes: Number(msg.delay_minutes) || 60
+          }))
+        : []
+
+      setFormData({
+        is_active: followUp.is_active || false,
+        follow_up_type: (followUp.follow_up_type as FollowUpType) || "manual",
+        delay_minutes: followUp.delay_minutes || 60,
+        template_message: followUp.template_message || '',
+        schedule_start_time: followUp.schedule_start_time || '09:00',
+        schedule_end_time: followUp.schedule_end_time || '18:00',
+        schedule_days: followUp.schedule_days || [1,2,3,4,5],
+        max_attempts: followUp.max_attempts || 3,
+        stop_on_reply: followUp.stop_on_reply ?? true,
+        stop_on_keyword: followUp.stop_on_keyword || ['comprou', 'agendou', 'agendado', 'comprado'],
+        manual_messages: messages
+      })
+    }
+  }, [followUp])
 
   const saveMutation = useMutation({
     mutationFn: async (values: FormData) => {
@@ -175,23 +210,15 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
     }))
   }
 
-  if (isLoading) {
-    return (
-      <div className="flex justify-center p-4">
-        <div className="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full" />
-      </div>
-    )
-  }
-
   const handleSave = () => {
     saveMutation.mutateAsync(formData)
   }
 
   const resetForm = () => {
     const defaultMessages: ManualMessage[] = Array.isArray(followUp?.manual_messages) 
-      ? (followUp.manual_messages as any[]).map(msg => ({
+      ? (followUp.manual_messages as ManualMessage[]).map(msg => ({
           message: msg.message || '',
-          delay_minutes: msg.delay_minutes || 60
+          delay_minutes: Number(msg.delay_minutes) || 60
         }))
       : []
 
@@ -208,6 +235,14 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
       stop_on_keyword: followUp?.stop_on_keyword || ['comprou', 'agendou', 'agendado', 'comprado'],
       manual_messages: defaultMessages
     })
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex justify-center p-4">
+        <div className="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full" />
+      </div>
+    )
   }
 
   return (
@@ -241,6 +276,21 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
             </SelectContent>
           </Select>
         </div>
+
+        {formData.follow_up_type === 'ai_generated' && (
+          <div className="grid gap-2">
+            <Label>Intervalo entre mensagens (minutos)</Label>
+            <Input
+              type="number"
+              min="1"
+              value={formData.delay_minutes}
+              onChange={(e) => setFormData(prev => ({ 
+                ...prev, 
+                delay_minutes: parseInt(e.target.value) 
+              }))}
+            />
+          </div>
+        )}
 
         {formData.follow_up_type === 'manual' && (
           <div className="space-y-4">
