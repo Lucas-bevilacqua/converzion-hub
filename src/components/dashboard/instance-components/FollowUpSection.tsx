@@ -112,12 +112,13 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
             parsedMessages = []
           }
           
-          // Convert to proper format
-          data.manual_messages = parsedMessages.map((msg: any) => ({
+          // Convert to proper format with explicit type casting
+          const typedMessages: ManualMessage[] = parsedMessages.map((msg: any) => ({
             message: String(msg?.message || ''),
             delay_minutes: Number(msg?.delay_minutes || 60)
           }))
 
+          data.manual_messages = typedMessages
           console.log('Parsed manual_messages:', data.manual_messages)
         } catch (e) {
           console.error('Error processing manual_messages:', e)
@@ -125,7 +126,7 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
         }
       }
 
-      return data as FollowUpData
+      return data as unknown as FollowUpData
     }
   })
 
@@ -141,19 +142,15 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
     stop_on_reply: followUp?.stop_on_reply ?? true,
     stop_on_keyword: followUp?.stop_on_keyword || ['comprou', 'agendou', 'agendado', 'comprado'],
     manual_messages: Array.isArray(followUp?.manual_messages) 
-      ? (followUp.manual_messages as unknown as ManualMessage[])
+      ? followUp.manual_messages
       : []
   })
 
   useEffect(() => {
     if (followUp) {
-      const messages = Array.isArray(followUp.manual_messages)
-        ? (followUp.manual_messages as unknown as ManualMessage[])
-        : []
-
       setFormData({
         is_active: followUp.is_active || false,
-        follow_up_type: (followUp.follow_up_type as FollowUpType) || "manual",
+        follow_up_type: followUp.follow_up_type || "manual",
         delay_minutes: followUp.delay_minutes || 60,
         template_message: followUp.template_message || '',
         schedule_start_time: followUp.schedule_start_time || '09:00',
@@ -162,7 +159,9 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
         max_attempts: followUp.max_attempts || 3,
         stop_on_reply: followUp.stop_on_reply ?? true,
         stop_on_keyword: followUp.stop_on_keyword || ['comprou', 'agendou', 'agendado', 'comprado'],
-        manual_messages: messages
+        manual_messages: Array.isArray(followUp.manual_messages) 
+          ? followUp.manual_messages
+          : []
       })
     }
   }, [followUp])
@@ -245,6 +244,70 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
       })
     }
   })
+
+  const deleteMutation = useMutation({
+    mutationFn: async () => {
+      console.log('Deletando configuração de follow-up para instância:', instanceId)
+      const { error } = await supabase
+        .from('instance_follow_ups')
+        .delete()
+        .eq('instance_id', instanceId)
+
+      if (error) throw error
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['follow-up'] })
+      toast({
+        title: "Sucesso",
+        description: "Configurações de follow-up excluídas com sucesso.",
+      })
+      // Reset form to default values
+      setFormData({
+        is_active: false,
+        follow_up_type: "manual",
+        delay_minutes: 60,
+        template_message: '',
+        schedule_start_time: '09:00',
+        schedule_end_time: '18:00',
+        schedule_days: [1,2,3,4,5],
+        max_attempts: 3,
+        stop_on_reply: true,
+        stop_on_keyword: ['comprou', 'agendou', 'agendado', 'comprado'],
+        manual_messages: []
+      })
+    },
+    onError: (error) => {
+      console.error('Erro ao excluir follow-up:', error)
+      toast({
+        title: "Erro",
+        description: "Não foi possível excluir as configurações.",
+        variant: "destructive",
+      })
+    }
+  })
+
+  const addMessage = () => {
+    setFormData(prev => ({
+      ...prev,
+      manual_messages: [...prev.manual_messages, { message: '', delay_minutes: 60 }]
+    }))
+  }
+
+  const removeMessage = (index: number) => {
+    setFormData(prev => ({
+      ...prev,
+      manual_messages: prev.manual_messages.filter((_, i) => i !== index)
+    }))
+  }
+
+  const updateMessage = (index: number, field: keyof ManualMessage, value: string | number) => {
+    setFormData(prev => ({
+      ...prev,
+      manual_messages: prev.manual_messages.map((msg, i) => 
+        i === index ? { ...msg, [field]: value } : msg
+      )
+    }))
+  }
 
   const handleSave = async () => {
     console.log('Iniciando salvamento do follow-up:', {
