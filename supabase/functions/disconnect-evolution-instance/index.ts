@@ -53,12 +53,9 @@ serve(async (req) => {
     }
 
     const baseUrl = evolutionApiUrl.replace(/\/+$/, '')
-    const instanceName = encodeURIComponent(instance.name)
     
-    console.log('Evolution API Base URL:', baseUrl)
-    console.log('Instance Name:', instanceName)
-
-    const logoutUrl = `${baseUrl}/instance/logout/${instanceName}`
+    // Use instance ID instead of name for the API call
+    const logoutUrl = `${baseUrl}/instance/logout/${instanceId}`
     console.log('Logout URL:', logoutUrl)
     
     const evolutionResponse = await fetch(logoutUrl, {
@@ -72,7 +69,11 @@ serve(async (req) => {
     if (!evolutionResponse.ok) {
       const errorText = await evolutionResponse.text()
       console.error('Evolution API logout error:', errorText)
-      throw new Error(`Evolution API returned status ${evolutionResponse.status}: ${errorText}`)
+      
+      // If instance doesn't exist in Evolution API, we still want to update our database
+      if (evolutionResponse.status !== 404) {
+        throw new Error(`Evolution API returned status ${evolutionResponse.status}: ${errorText}`)
+      }
     }
 
     // Update instance status in database

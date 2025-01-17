@@ -41,7 +41,7 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
   const queryClient = useQueryClient()
   const [isEditing, setIsEditing] = useState(false)
 
-  const { data: followUp, isLoading } = useQuery({
+  const { data: followUp } = useQuery({
     queryKey: ['follow-up', instanceId],
     queryFn: async () => {
       console.log('Fetching follow-up config for instance:', instanceId)
@@ -49,7 +49,7 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
         .from('instance_follow_ups')
         .select('*')
         .eq('instance_id', instanceId)
-        .single()
+        .maybeSingle()
 
       if (error && error.code !== 'PGRST116') {
         console.error('Error fetching follow-up:', error)
@@ -57,39 +57,6 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
       }
 
       return data
-    }
-  })
-
-  const mutation = useMutation({
-    mutationFn: async (values: FormData) => {
-      console.log('Saving follow-up config:', values)
-      const operation = followUp
-        ? supabase
-            .from('instance_follow_ups')
-            .update(values)
-            .eq('id', followUp.id)
-        : supabase
-            .from('instance_follow_ups')
-            .insert({ ...values, instance_id: instanceId })
-
-      const { error } = await operation
-      if (error) throw error
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['follow-up'] })
-      toast({
-        title: "Sucesso",
-        description: "Configurações de follow-up salvas com sucesso.",
-      })
-      setIsEditing(false)
-    },
-    onError: (error) => {
-      console.error('Error saving follow-up:', error)
-      toast({
-        title: "Erro",
-        description: "Não foi possível salvar as configurações.",
-        variant: "destructive",
-      })
     }
   })
 

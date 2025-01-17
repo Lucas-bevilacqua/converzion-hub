@@ -37,8 +37,8 @@ const TOOL_ICONS = {
   calendar: Calendar,
   crm: Users,
   n8n: Webhook,
-  langchain: Brain, // Adding LangChain icon
-};
+  langchain: Brain,
+} as const;
 
 const TOOL_LABELS = {
   calendar: "Calendário",

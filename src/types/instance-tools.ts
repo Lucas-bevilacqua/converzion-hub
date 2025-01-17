@@ -1,4 +1,4 @@
-export type ToolType = 'calendar' | 'crm' | 'payment' | 'custom' | 'n8n';
+export type ToolType = 'calendar' | 'crm' | 'payment' | 'custom' | 'n8n' | 'langchain';
 
 export interface InstanceTool {
   id: string;
@@ -8,6 +8,11 @@ export interface InstanceTool {
   settings: {
     webhook_url?: string;
     api_credentials?: Record<string, any>;
+    langchain_config?: {
+      temperature?: number;
+      maxTokens?: number;
+      systemPrompt?: string;
+    };
     [key: string]: any;
   };
   created_at: string;
