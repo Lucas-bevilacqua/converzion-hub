@@ -27,6 +27,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { useAuth } from "@/contexts/auth/AuthContext"
+import { Json } from "@/integrations/supabase/types"
 
 interface FollowUpSectionProps {
   instanceId: string
@@ -37,6 +38,11 @@ type FollowUpType = "ai_generated" | "manual" | "automatic";
 interface ManualMessage {
   message: string;
   delay_minutes: number;
+}
+
+interface ParsedMessage {
+  message?: string;
+  delay_minutes?: number;
 }
 
 interface FormData {
@@ -51,11 +57,6 @@ interface FormData {
   stop_on_reply: boolean
   stop_on_keyword: string[]
   manual_messages: ManualMessage[]
-}
-
-interface JsonManualMessage {
-  message?: string;
-  delay_minutes?: number;
 }
 
 export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
@@ -84,7 +85,7 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
           console.log('Raw manual_messages:', data.manual_messages)
           
           // Handle triple-encoded JSON string
-          let parsedMessages = data.manual_messages
+          let parsedMessages: Json | ParsedMessage[] = data.manual_messages
           
           // First decode
           if (typeof parsedMessages === 'string') {
@@ -120,10 +121,16 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
 
           // Ensure we have a valid array with correct structure
           data.manual_messages = Array.isArray(parsedMessages) 
-            ? parsedMessages.map(msg => ({
-                message: msg.message || '',
-                delay_minutes: Number(msg.delay_minutes) || 60
-              }))
+            ? parsedMessages.map((msg: Json) => {
+                // Type guard to ensure we're working with an object
+                if (typeof msg === 'object' && msg !== null) {
+                  return {
+                    message: typeof msg.message === 'string' ? msg.message : '',
+                    delay_minutes: typeof msg.delay_minutes === 'number' ? msg.delay_minutes : 60
+                  }
+                }
+                return { message: '', delay_minutes: 60 }
+              })
             : []
             
           console.log('Formatted messages:', data.manual_messages)
