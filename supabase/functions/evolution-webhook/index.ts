@@ -42,7 +42,7 @@ serve(async (req) => {
     }
 
     const instanceName = payload.instance
-    const phoneNumber = payload.data.key.remoteJid
+    const phoneNumber = payload.data.key.remoteJid.split('@')[0]
     const messageId = payload.data.key.id
     const messageContent = payload.data.message.conversation || payload.data.message.text || ''
 
@@ -66,86 +66,76 @@ serve(async (req) => {
       )
     }
 
-    // Cria uma chave única para este usuário/instância
-    const userKey = `${phoneNumber}-${instanceName}`
-    
-    // Se já existe uma mensagem pendente para este usuário, atualiza o timer
-    if (pendingMessages.has(userKey)) {
-      clearTimeout(pendingMessages.get(userKey).timer)
+    // Busca a instância
+    const { data: instance, error: instanceError } = await supabaseClient
+      .from('evolution_instances')
+      .select('*')
+      .eq('name', instanceName)
+      .single()
+
+    if (instanceError) {
+      console.error('❌ Error fetching instance:', instanceError)
+      throw instanceError
     }
 
-    // Cria uma nova promessa para processar a mensagem após o delay
-    const processingPromise = new Promise((resolve) => {
-      const timer = setTimeout(async () => {
-        try {
-          console.log('🕒 Processing delayed message for:', userKey)
-          
-          // Busca a instância
-          const { data: instance, error: instanceError } = await supabaseClient
-            .from('evolution_instances')
-            .select('*')
-            .eq('name', instanceName)
-            .single()
+    // Atualiza o último tempo de mensagem do cliente
+    const { error: clientError } = await supabaseClient
+      .from('Users_clientes')
+      .upsert({
+        TelefoneClientes: phoneNumber,
+        NomeDaEmpresa: instance.id,
+        last_message_time: new Date().toISOString()
+      }, {
+        onConflict: 'TelefoneClientes'
+      })
 
-          if (instanceError) throw instanceError
+    if (clientError) {
+      console.error('❌ Error updating client:', clientError)
+      throw clientError
+    }
 
-          // Salva a mensagem no histórico com o ID único do WhatsApp
-          await supabaseClient
-            .from('chat_messages')
-            .insert([{
-              instance_id: instance.id,
-              user_id: instance.user_id,
-              sender_type: 'user',
-              content: messageContent,
-              whatsapp_message_id: messageId
-            }])
+    // Salva a mensagem do usuário
+    const { error: saveError } = await supabaseClient
+      .from('chat_messages')
+      .insert({
+        instance_id: instance.id,
+        user_id: instance.user_id,
+        sender_type: 'user',
+        content: messageContent,
+        whatsapp_message_id: messageId
+      })
 
-          // Processa com LangChain
-          const processResponse = await fetch(`${SUPABASE_URL}/functions/v1/process-message-with-langchain`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
-            },
-            body: JSON.stringify({
-              instanceId: instance.id,
-              message: messageContent,
-              phoneNumber
-            })
-          })
+    if (saveError) {
+      console.error('❌ Error saving message:', saveError)
+      throw saveError
+    }
 
-          if (!processResponse.ok) {
-            throw new Error(`Error processing message: ${processResponse.statusText}`)
-          }
-
-          resolve({
-            success: true,
-            message: 'Message processed successfully'
-          })
-        } catch (error) {
-          console.error('❌ Error processing message:', error)
-          resolve({
-            success: false,
-            error: error.message
-          })
-        } finally {
-          // Remove a mensagem do cache após processamento
-          pendingMessages.delete(userKey)
-        }
-      }, 5000) // 5 segundos de delay
-
-      // Armazena o timer e a promessa no cache
-      pendingMessages.set(userKey, {
-        timer,
-        promise: processingPromise
+    // Processa com LangChain e envia resposta automaticamente
+    console.log('🤖 Processing message with LangChain...')
+    const processResponse = await fetch(`${SUPABASE_URL}/functions/v1/process-message-with-langchain`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+      },
+      body: JSON.stringify({
+        instanceId: instance.id,
+        message: messageContent,
+        phoneNumber
       })
     })
 
-    // Aguarda o processamento da mensagem
-    const result = await processingPromise
+    if (!processResponse.ok) {
+      const error = await processResponse.text()
+      console.error('❌ Error processing message:', error)
+      throw new Error(`Error processing message: ${error}`)
+    }
+
+    const result = await processResponse.json()
+    console.log('✅ Message processed successfully:', result)
 
     return new Response(
-      JSON.stringify(result),
+      JSON.stringify({ success: true }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
 
