@@ -16,20 +16,30 @@ const corsHeaders = {
 }
 
 serve(async (req) => {
+  console.log('🚀 LangChain Function Started')
+  
   if (req.method === 'OPTIONS') {
+    console.log('👉 Handling CORS preflight request')
     return new Response(null, { headers: corsHeaders })
   }
 
   try {
+    console.log('📥 Parsing request body...')
     const { message, instanceId, phoneNumber } = await req.json()
-    console.log('📨 Processing message:', { message, instanceId, phoneNumber })
+    console.log('✅ Request parameters:', { message, instanceId, phoneNumber })
 
+    if (!message || !instanceId || !phoneNumber) {
+      console.error('❌ Missing required parameters')
+      throw new Error('Message, instanceId and phoneNumber are required')
+    }
+
+    console.log('🔄 Creating Supabase client...')
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    // Buscar configurações da instância
+    console.log('🔍 Fetching instance configuration...')
     const { data: instance, error: instanceError } = await supabaseClient
       .from('evolution_instances')
       .select('*, instance_follow_ups(*)')
@@ -40,15 +50,17 @@ serve(async (req) => {
       console.error('❌ Error fetching instance:', instanceError)
       throw instanceError
     }
+    console.log('✅ Instance found:', instance)
 
-    // Configurar o modelo de chat
+    console.log('🤖 Configuring ChatOpenAI...')
     const chat = new ChatOpenAI({
       openAIApiKey: Deno.env.get('OPENAI_API_KEY'),
-      modelName: 'gpt-4o-mini',
+      modelName: 'gpt-4',
       temperature: 0.7,
     })
+    console.log('✅ ChatOpenAI configured')
 
-    // Configurar o template do prompt
+    console.log('📝 Setting up chat prompt template...')
     const chatPrompt = ChatPromptTemplate.fromPromptMessages([
       SystemMessagePromptTemplate.fromTemplate(
         instance.system_prompt || "Você é um assistente prestativo que ajuda com follow-ups."
@@ -56,28 +68,30 @@ serve(async (req) => {
       new MessagesPlaceholder("history"),
       HumanMessagePromptTemplate.fromTemplate("{input}")
     ])
+    console.log('✅ Chat prompt template configured')
 
-    // Configurar a memória para manter contexto
+    console.log('💾 Configuring memory...')
     const memory = new BufferMemory({
       returnMessages: true,
       memoryKey: "history",
     })
+    console.log('✅ Memory configured')
 
-    // Criar a chain de conversação
+    console.log('⚡ Creating conversation chain...')
     const chain = new ConversationChain({
       memory: memory,
       prompt: chatPrompt,
       llm: chat,
     })
+    console.log('✅ Conversation chain created')
 
-    // Gerar resposta
-    console.log('🤖 Generating response...')
+    console.log('🤔 Generating response...')
     const response = await chain.call({
       input: message,
     })
+    console.log('✅ Response generated:', response.response)
 
-    // Enviar resposta via Evolution API
-    console.log('📤 Sending response through Evolution API:', response.response)
+    console.log('📤 Sending response through Evolution API...')
     const evolutionResponse = await fetch(
       `${Deno.env.get('EVOLUTION_API_URL')}/message/sendText/${instance.name}`,
       {
@@ -98,9 +112,9 @@ serve(async (req) => {
       console.error('❌ Evolution API error:', error)
       throw new Error(`Evolution API error: ${error}`)
     }
+    console.log('✅ Evolution API response sent successfully')
 
-    // Salvar mensagem no histórico
-    console.log('💾 Saving message to chat history')
+    console.log('💾 Saving message to chat history...')
     const { error: saveError } = await supabaseClient
       .from('chat_messages')
       .insert([
@@ -116,7 +130,9 @@ serve(async (req) => {
       console.error('❌ Error saving message:', saveError)
       throw saveError
     }
+    console.log('✅ Message saved to chat history')
 
+    console.log('🎉 Function completed successfully')
     return new Response(
       JSON.stringify({ 
         success: true,
@@ -125,7 +141,7 @@ serve(async (req) => {
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   } catch (error) {
-    console.error('❌ Error processing message:', error)
+    console.error('❌ Function error:', error)
     return new Response(
       JSON.stringify({ 
         success: false,
