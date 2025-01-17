@@ -63,6 +63,16 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
         throw error
       }
 
+      // Parse manual_messages from JSON if it exists
+      if (data?.manual_messages) {
+        try {
+          data.manual_messages = JSON.parse(data.manual_messages as string)
+        } catch (e) {
+          console.error('Error parsing manual_messages:', e)
+          data.manual_messages = []
+        }
+      }
+
       return data
     }
   })
@@ -79,7 +89,10 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
     stop_on_reply: followUp?.stop_on_reply ?? true,
     stop_on_keyword: followUp?.stop_on_keyword || ['comprou', 'agendou', 'agendado', 'comprado'],
     manual_messages: Array.isArray(followUp?.manual_messages) 
-      ? (followUp.manual_messages as ManualMessage[])
+      ? followUp.manual_messages.map((msg: any) => ({
+          message: msg.message || '',
+          delay_minutes: msg.delay_minutes || 60
+        }))
       : []
   })
 
