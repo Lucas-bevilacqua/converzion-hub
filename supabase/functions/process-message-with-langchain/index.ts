@@ -97,7 +97,7 @@ serve(async (req) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4o-mini',
+        model: 'gpt-4',
         messages: messages,
         temperature: 0.7,
       }),
@@ -129,9 +129,13 @@ serve(async (req) => {
     }
     console.log('✅ AI response saved successfully')
 
+    // Clean and normalize the Evolution API URL
+    const evolutionApiUrl = Deno.env.get('EVOLUTION_API_URL')?.replace(/\/+$/, '') || ''
     console.log('📤 Sending message through Evolution API...')
+    console.log('Evolution API URL:', `${evolutionApiUrl}/message/sendText/${instance.name}`)
+    
     const evolutionResponse = await fetch(
-      `${Deno.env.get('EVOLUTION_API_URL')}/message/sendText/${instance.name}`,
+      `${evolutionApiUrl}/message/sendText/${instance.name}`,
       {
         method: 'POST',
         headers: {
