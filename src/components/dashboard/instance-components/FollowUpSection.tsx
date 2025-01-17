@@ -51,6 +51,7 @@ interface FormData {
   stop_on_reply: boolean
   stop_on_keyword: string[]
   manual_messages: ManualMessage[]
+  system_prompt?: string
 }
 
 interface FollowUpData {
@@ -67,6 +68,7 @@ interface FollowUpData {
   stop_on_reply: boolean;
   stop_on_keyword: string[];
   manual_messages: ManualMessage[];
+  system_prompt?: string;
 }
 
 export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
@@ -136,7 +138,8 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
     max_attempts: followUp?.max_attempts || 3,
     stop_on_reply: followUp?.stop_on_reply ?? true,
     stop_on_keyword: followUp?.stop_on_keyword || ['comprou', 'agendou', 'agendado', 'comprado'],
-    manual_messages: followUp?.manual_messages || []
+    manual_messages: followUp?.manual_messages || [],
+    system_prompt: followUp?.system_prompt || ''
   })
 
   useEffect(() => {
@@ -152,7 +155,8 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
         max_attempts: followUp.max_attempts || 3,
         stop_on_reply: followUp.stop_on_reply ?? true,
         stop_on_keyword: followUp.stop_on_keyword || ['comprou', 'agendou', 'agendado', 'comprado'],
-        manual_messages: followUp.manual_messages || []
+        manual_messages: followUp.manual_messages || [],
+        system_prompt: followUp.system_prompt || ''
       })
     }
   }, [followUp])
@@ -181,6 +185,7 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
         stop_on_reply: values.stop_on_reply,
         stop_on_keyword: values.stop_on_keyword,
         manual_messages: manualMessages,
+        system_prompt: values.system_prompt,
         updated_at: new Date().toISOString()
       }
 
@@ -429,18 +434,35 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
         </div>
 
         {formData.follow_up_type === 'ai_generated' && (
-          <div className="grid gap-2">
-            <Label>Intervalo entre mensagens (minutos)</Label>
-            <Input
-              type="number"
-              min="1"
-              value={formData.delay_minutes}
-              onChange={(e) => setFormData(prev => ({ 
-                ...prev, 
-                delay_minutes: parseInt(e.target.value) 
-              }))}
-            />
-          </div>
+          <>
+            <div className="grid gap-2">
+              <Label>Prompt do Sistema (Instruções para a IA)</Label>
+              <Textarea
+                value={formData.system_prompt}
+                onChange={(e) => setFormData(prev => ({ 
+                  ...prev, 
+                  system_prompt: e.target.value 
+                }))}
+                placeholder="Instruções para a IA sobre como gerar as mensagens de follow-up"
+                className="min-h-[100px]"
+              />
+              <p className="text-sm text-muted-foreground">
+                Este prompt ajuda a IA a entender como deve gerar as mensagens de follow-up
+              </p>
+            </div>
+            <div className="grid gap-2">
+              <Label>Intervalo entre mensagens (minutos)</Label>
+              <Input
+                type="number"
+                min="1"
+                value={formData.delay_minutes}
+                onChange={(e) => setFormData(prev => ({ 
+                  ...prev, 
+                  delay_minutes: parseInt(e.target.value) 
+                }))}
+              />
+            </div>
+          </>
         )}
 
         {formData.follow_up_type === 'manual' && (
@@ -540,7 +562,8 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
                   max_attempts: followUp.max_attempts || 3,
                   stop_on_reply: followUp.stop_on_reply ?? true,
                   stop_on_keyword: followUp.stop_on_keyword || ['comprou', 'agendou', 'agendado', 'comprado'],
-                  manual_messages: followUp.manual_messages || []
+                  manual_messages: followUp.manual_messages || [],
+                  system_prompt: followUp.system_prompt || ''
                 })
               }
             }}
@@ -548,7 +571,7 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
             Cancelar
           </Button>
           <Button 
-            onClick={handleSave}
+            onClick={() => saveMutation.mutate(formData)}
             disabled={saveMutation.isPending}
           >
             {saveMutation.isPending ? (
