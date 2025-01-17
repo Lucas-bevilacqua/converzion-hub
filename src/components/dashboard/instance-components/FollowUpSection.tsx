@@ -83,27 +83,42 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
         try {
           console.log('Raw manual_messages:', data.manual_messages)
           
-          // Tenta fazer o parse do JSON, lidando com possível string ou objeto
-          let parsedMessages
-          if (typeof data.manual_messages === 'string') {
+          // Handle triple-encoded JSON string
+          let parsedMessages = data.manual_messages
+          
+          // First decode
+          if (typeof parsedMessages === 'string') {
             try {
-              // Tenta fazer o parse uma vez
-              parsedMessages = JSON.parse(data.manual_messages)
-              // Se ainda for string, tenta mais uma vez
-              if (typeof parsedMessages === 'string') {
-                parsedMessages = JSON.parse(parsedMessages)
-              }
+              parsedMessages = JSON.parse(parsedMessages)
+              console.log('After first decode:', parsedMessages)
             } catch (e) {
-              console.error('Erro no parse inicial:', e)
-              parsedMessages = []
+              console.error('Error in first decode:', e)
             }
-          } else {
-            parsedMessages = data.manual_messages
+          }
+          
+          // Second decode
+          if (typeof parsedMessages === 'string') {
+            try {
+              parsedMessages = JSON.parse(parsedMessages)
+              console.log('After second decode:', parsedMessages)
+            } catch (e) {
+              console.error('Error in second decode:', e)
+            }
+          }
+          
+          // Third decode
+          if (typeof parsedMessages === 'string') {
+            try {
+              parsedMessages = JSON.parse(parsedMessages)
+              console.log('After third decode:', parsedMessages)
+            } catch (e) {
+              console.error('Error in third decode:', e)
+            }
           }
 
-          console.log('Parsed messages:', parsedMessages)
+          console.log('Final parsed messages:', parsedMessages)
 
-          // Garante que temos um array de mensagens com a estrutura correta
+          // Ensure we have a valid array with correct structure
           data.manual_messages = Array.isArray(parsedMessages) 
             ? parsedMessages.map(msg => ({
                 message: msg.message || '',
@@ -170,7 +185,7 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
     mutationFn: async (values: FormData) => {
       console.log('Salvando configuração de follow-up:', values)
       
-      // Garante que manual_messages é um array válido antes de salvar
+      // Ensure manual_messages is a valid array before saving
       const manualMessages = Array.isArray(values.manual_messages) 
         ? values.manual_messages.map(msg => ({
             message: msg.message || '',
@@ -190,7 +205,7 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
         max_attempts: values.max_attempts,
         stop_on_reply: values.stop_on_reply,
         stop_on_keyword: values.stop_on_keyword,
-        manual_messages: manualMessages, // Salva o array diretamente, sem stringify
+        manual_messages: manualMessages, // Save array directly without stringify
         updated_at: new Date().toISOString()
       }
 
