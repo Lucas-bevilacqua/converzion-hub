@@ -105,7 +105,7 @@ serve(async (req) => {
     const evolutionData = await evolutionResponse.json()
     console.log('✅ Mensagem enviada com sucesso:', evolutionData)
 
-    // Atualizar o registro do contato
+    // Atualizar o registro do contato usando service role
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
