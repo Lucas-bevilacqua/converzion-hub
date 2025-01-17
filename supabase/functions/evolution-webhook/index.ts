@@ -12,11 +12,9 @@ serve(async (req) => {
   console.log('📩 New request received:', {
     method: req.method,
     url: req.url,
-    headers: Object.fromEntries(req.headers.entries())
   })
 
   try {
-    // Handle CORS preflight requests
     if (req.method === 'OPTIONS') {
       console.log('🔄 Handling CORS preflight request')
       return new Response(null, { headers: corsHeaders })
@@ -27,8 +25,10 @@ serve(async (req) => {
 
     let payload
     try {
-      payload = JSON.parse(rawBody)
-      console.log('✅ Successfully parsed webhook payload:', JSON.stringify(payload, null, 2))
+      const webhookData = JSON.parse(rawBody)
+      // Verifica se é um array e pega o primeiro item
+      payload = Array.isArray(webhookData) ? webhookData[0].body : webhookData
+      console.log('✅ Parsed webhook payload:', JSON.stringify(payload, null, 2))
     } catch (parseError) {
       console.error('❌ Failed to parse webhook payload:', parseError)
       throw new Error('Invalid JSON payload')
@@ -43,17 +43,18 @@ serve(async (req) => {
     // Processar diferentes tipos de eventos
     if (payload.event === 'messages.upsert' || payload.event === 'messages.set') {
       console.log('📨 Processing message event:', {
-        content: payload.message?.content,
-        from: payload.message?.from,
-        instance: payload.instance?.instanceName
+        instance: payload.instance,
+        sender: payload.sender,
+        messageContent: payload.data?.message?.conversation,
+        messageType: payload.data?.messageType
       })
       
-      if (!payload.message) {
+      if (!payload.data?.message) {
         console.error('❌ No message data in payload')
         throw new Error('No message data in payload')
       }
 
-      const instanceName = payload.instance?.instanceName
+      const instanceName = payload.instance
       if (!instanceName) {
         console.error('❌ Instance name not found in webhook payload')
         throw new Error('Instance name not found in webhook payload')
@@ -84,7 +85,7 @@ serve(async (req) => {
       })
 
       // Salvar a mensagem no histórico
-      if (!payload.message.fromMe) {
+      if (!payload.data.key.fromMe) {
         console.log('💾 Saving incoming message to chat history')
         const { error: saveError } = await supabaseClient
           .from('chat_messages')
@@ -92,7 +93,7 @@ serve(async (req) => {
             instance_id: instance.id,
             user_id: instance.user_id,
             sender_type: 'user',
-            content: payload.message.content
+            content: payload.data.message.conversation || payload.data.message.text || ''
           }])
 
         if (saveError) {
@@ -108,9 +109,9 @@ serve(async (req) => {
           'process-message-with-langchain',
           {
             body: {
-              message: payload.message.content,
+              message: payload.data.message.conversation || payload.data.message.text || '',
               instanceId: instance.id,
-              phoneNumber: payload.message.from
+              phoneNumber: payload.data.key.remoteJid
             }
           }
         )
@@ -128,18 +129,9 @@ serve(async (req) => {
         const evolutionApiKey = Deno.env.get('EVOLUTION_API_KEY')
 
         if (!evolutionApiUrl || !evolutionApiKey) {
-          console.error('❌ Missing Evolution API configuration:', { 
-            hasUrl: !!evolutionApiUrl,
-            hasKey: !!evolutionApiKey
-          })
+          console.error('❌ Missing Evolution API configuration')
           throw new Error('Missing Evolution API configuration')
         }
-
-        console.log('📡 Evolution API config:', { 
-          url: evolutionApiUrl,
-          hasKey: !!evolutionApiKey,
-          instanceName
-        })
 
         const evolutionResponse = await fetch(
           `${evolutionApiUrl}/message/sendText/${instanceName}`,
@@ -150,7 +142,7 @@ serve(async (req) => {
               'apikey': evolutionApiKey,
             },
             body: JSON.stringify({
-              number: payload.message.from,
+              number: payload.data.key.remoteJid,
               text: response.response || "Desculpe, não consegui processar sua mensagem."
             }),
           }
@@ -175,13 +167,13 @@ serve(async (req) => {
     } else if (payload.event === 'connection.update') {
       console.log('🔌 Processing connection update:', payload)
       
-      const instanceName = payload.instance?.instanceName
+      const instanceName = payload.instance
       if (instanceName) {
         console.log('📝 Updating connection status for instance:', instanceName)
         const { error: updateError } = await supabaseClient
           .from('evolution_instances')
           .update({ 
-            connection_status: payload.state?.status || 'disconnected',
+            connection_status: payload.data?.state?.status || 'disconnected',
             updated_at: new Date().toISOString()
           })
           .eq('name', instanceName)
