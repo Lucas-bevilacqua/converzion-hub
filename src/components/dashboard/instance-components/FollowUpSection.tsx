@@ -82,17 +82,30 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
       if (data?.manual_messages) {
         try {
           console.log('Raw manual_messages:', data.manual_messages)
-          // Handle double-encoded JSON string
-          const messages = typeof data.manual_messages === 'string' 
-            ? JSON.parse(typeof JSON.parse(data.manual_messages) === 'string' 
-                ? JSON.parse(data.manual_messages) 
-                : data.manual_messages)
-            : data.manual_messages
+          
+          // Tenta fazer o parse do JSON, lidando com possível string ou objeto
+          let parsedMessages
+          if (typeof data.manual_messages === 'string') {
+            try {
+              // Tenta fazer o parse uma vez
+              parsedMessages = JSON.parse(data.manual_messages)
+              // Se ainda for string, tenta mais uma vez
+              if (typeof parsedMessages === 'string') {
+                parsedMessages = JSON.parse(parsedMessages)
+              }
+            } catch (e) {
+              console.error('Erro no parse inicial:', e)
+              parsedMessages = []
+            }
+          } else {
+            parsedMessages = data.manual_messages
+          }
 
-          console.log('Parsed messages:', messages)
+          console.log('Parsed messages:', parsedMessages)
 
-          data.manual_messages = Array.isArray(messages) 
-            ? messages.map(msg => ({
+          // Garante que temos um array de mensagens com a estrutura correta
+          data.manual_messages = Array.isArray(parsedMessages) 
+            ? parsedMessages.map(msg => ({
                 message: msg.message || '',
                 delay_minutes: Number(msg.delay_minutes) || 60
               }))
@@ -157,6 +170,14 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
     mutationFn: async (values: FormData) => {
       console.log('Salvando configuração de follow-up:', values)
       
+      // Garante que manual_messages é um array válido antes de salvar
+      const manualMessages = Array.isArray(values.manual_messages) 
+        ? values.manual_messages.map(msg => ({
+            message: msg.message || '',
+            delay_minutes: Number(msg.delay_minutes) || 60
+          }))
+        : []
+
       const dataToSave = {
         instance_id: instanceId,
         is_active: values.is_active,
@@ -169,7 +190,7 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
         max_attempts: values.max_attempts,
         stop_on_reply: values.stop_on_reply,
         stop_on_keyword: values.stop_on_keyword,
-        manual_messages: JSON.stringify(values.manual_messages), // Single JSON.stringify
+        manual_messages: manualMessages, // Salva o array diretamente, sem stringify
         updated_at: new Date().toISOString()
       }
 
