@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -12,12 +13,12 @@ serve(async (req) => {
   }
 
   try {
-    const { instanceId, instanceName } = await req.json()
+    const { instanceId } = await req.json()
     
-    if (!instanceId || !instanceName) {
-      console.error('Missing required parameters:', { instanceId, instanceName })
+    if (!instanceId) {
+      console.error('Missing required parameter: instanceId')
       return new Response(
-        JSON.stringify({ error: 'Instance ID and name are required' }),
+        JSON.stringify({ error: 'Instance ID is required' }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
       )
     }
@@ -25,8 +26,10 @@ serve(async (req) => {
     // Get secrets
     const evolutionApiUrl = Deno.env.get('EVOLUTION_API_URL')?.replace(/\/$/, '')
     const evolutionApiKey = Deno.env.get('EVOLUTION_API_KEY')
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
 
-    if (!evolutionApiUrl || !evolutionApiKey) {
+    if (!evolutionApiUrl || !evolutionApiKey || !supabaseUrl || !supabaseKey) {
       console.error('Missing required environment variables')
       return new Response(
         JSON.stringify({ error: 'Server configuration error' }),
@@ -34,9 +37,27 @@ serve(async (req) => {
       )
     }
 
-    console.log(`Checking state for instance: ${instanceName}`)
+    // Create Supabase client
+    const supabase = createClient(supabaseUrl, supabaseKey)
+
+    // Get instance name from database
+    const { data: instance, error: dbError } = await supabase
+      .from('evolution_instances')
+      .select('name')
+      .eq('id', instanceId)
+      .single()
+
+    if (dbError || !instance) {
+      console.error('Error fetching instance:', dbError)
+      return new Response(
+        JSON.stringify({ error: 'Instance not found' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 404 }
+      )
+    }
+
+    console.log(`Checking state for instance: ${instance.name} (ID: ${instanceId})`)
     
-    const url = `${evolutionApiUrl}/instance/connectionState/${instanceName}`
+    const url = `${evolutionApiUrl}/instance/connectionState/${instance.name}`
     console.log('Making request to:', url)
 
     const response = await fetch(url, {
