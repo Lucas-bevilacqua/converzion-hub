@@ -163,7 +163,11 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
 
   const saveMutation = useMutation({
     mutationFn: async (values: FormData) => {
-      console.log('Salvando configuração de follow-up:', values)
+      console.log('Salvando configuração de follow-up:', {
+        formData,
+        instanceId,
+        userId: user?.id
+      })
       
       const manualMessages = Array.isArray(values.manual_messages) 
         ? values.manual_messages.map(msg => ({
@@ -189,7 +193,7 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
         updated_at: new Date().toISOString()
       }
 
-      console.log('Data being saved:', dataToSave)
+      console.log('Dados sendo salvos:', dataToSave)
       
       const operation = followUp
         ? supabase
@@ -206,7 +210,7 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
         throw error
       }
 
-      // Get instance name for AI follow-up configuration only
+      // Configurar follow-up de IA se necessário
       if (values.follow_up_type === 'ai_generated') {
         const { data: instance, error: instanceError } = await supabase
           .from('evolution_instances')
@@ -219,8 +223,9 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
           throw instanceError
         }
 
-        // Configure AI follow-up without sending immediate message
-        const { data: aiResponse, error: aiError } = await supabase.functions.invoke('process-ai-follow-up', {
+        console.log('Configurando follow-up de IA para instância:', instance.name)
+        
+        const { error: aiError } = await supabase.functions.invoke('process-ai-follow-up', {
           body: {
             instanceId,
             instanceName: instance.name,
@@ -229,8 +234,7 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
             maxAttempts: values.max_attempts,
             stopOnReply: values.stop_on_reply,
             stopKeywords: values.stop_on_keyword,
-            systemPrompt: values.system_prompt,
-            skipInitialMessage: true // Add flag to skip immediate message
+            systemPrompt: values.system_prompt
           }
         })
 
@@ -239,7 +243,7 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
           throw aiError
         }
 
-        console.log('AI follow-up configured:', aiResponse)
+        console.log('Follow-up de IA configurado com sucesso')
       }
     },
     onSuccess: () => {
