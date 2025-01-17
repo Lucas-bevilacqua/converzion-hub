@@ -13,18 +13,29 @@ serve(async (req) => {
 
   try {
     const { contact } = await req.json()
-    console.log('📩 Processando follow-up para:', contact)
+    console.log('📩 Processando follow-up para:', {
+      contato: contact.TelefoneClientes,
+      ultimaMensagem: contact.last_message_time,
+      followUpConfig: contact.followUp
+    })
 
     // Verificar se já passou o tempo de delay configurado
     const lastMessageTime = new Date(contact.last_message_time || contact.created_at)
     const now = new Date()
     const minutesSinceLastMessage = (now.getTime() - lastMessageTime.getTime()) / (1000 * 60)
 
-    console.log('⏰ Tempo desde última mensagem:', minutesSinceLastMessage, 'minutos')
-    console.log('⚙️ Delay configurado:', contact.followUp.messages[0]?.delay_minutes, 'minutos')
+    console.log('⏰ Análise de tempo:', {
+      ultimaMensagem: lastMessageTime,
+      agora: now,
+      minutos: minutesSinceLastMessage,
+      delayConfigurado: contact.followUp.messages[0]?.delay_minutes
+    })
 
     if (minutesSinceLastMessage < (contact.followUp.messages[0]?.delay_minutes || 60)) {
-      console.log('⏳ Ainda não é hora de enviar o follow-up')
+      console.log('⏳ Ainda não é hora de enviar o follow-up:', {
+        tempoPassado: minutesSinceLastMessage,
+        tempoNecessario: contact.followUp.messages[0]?.delay_minutes
+      })
       return new Response(
         JSON.stringify({ 
           success: false, 
@@ -36,25 +47,37 @@ serve(async (req) => {
 
     // Enviar mensagem via Evolution API
     const evolutionApiUrl = (Deno.env.get('EVOLUTION_API_URL') || '').replace(/\/+$/, '')
+    const evolutionApiKey = Deno.env.get('EVOLUTION_API_KEY')
     const evolutionApiEndpoint = `${evolutionApiUrl}/message/sendText/${contact.followUp.instanceName}`
     
-    console.log('🔗 Evolution API endpoint:', evolutionApiEndpoint)
+    console.log('🔗 Configuração Evolution API:', {
+      url: evolutionApiEndpoint,
+      temChave: !!evolutionApiKey,
+      instancia: contact.followUp.instanceName
+    })
 
     // Se for follow-up manual, enviar a primeira mensagem da sequência
     const message = contact.followUp.messages[0]?.message || ''
     
     if (!message) {
+      console.error('❌ Nenhuma mensagem configurada para envio')
       throw new Error('Nenhuma mensagem configurada para envio')
     }
 
-    console.log('📤 Enviando mensagem:', message)
-    console.log('📱 Para o número:', contact.TelefoneClientes)
+    console.log('📤 Preparando envio:', {
+      mensagem: message,
+      numero: contact.TelefoneClientes,
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': 'PRESENTE' // não logamos a chave real
+      }
+    })
 
     const evolutionResponse = await fetch(evolutionApiEndpoint, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'apikey': Deno.env.get('EVOLUTION_API_KEY') || '',
+        'apikey': evolutionApiKey || '',
       },
       body: JSON.stringify({
         number: contact.TelefoneClientes,
@@ -64,7 +87,10 @@ serve(async (req) => {
 
     if (!evolutionResponse.ok) {
       const error = await evolutionResponse.text()
-      console.error('❌ Erro Evolution API:', error)
+      console.error('❌ Erro Evolution API:', {
+        status: evolutionResponse.status,
+        erro: error
+      })
       throw new Error(`Evolution API error: ${error}`)
     }
 
@@ -76,6 +102,11 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
+
+    console.log('📝 Atualizando registro do contato:', {
+      id: contact.id,
+      novoStatus: 'follow-up-sent'
+    })
 
     const { error: updateError } = await supabaseClient
       .from('Users_clientes')
@@ -91,6 +122,12 @@ serve(async (req) => {
     }
 
     // Registrar mensagem no histórico
+    console.log('📝 Registrando mensagem no histórico:', {
+      instancia: contact.NomeDaEmpresa,
+      usuario: contact.followUp.userId,
+      tipo: 'follow_up'
+    })
+
     const { error: chatError } = await supabaseClient
       .from('chat_messages')
       .insert({
@@ -112,7 +149,10 @@ serve(async (req) => {
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   } catch (error) {
-    console.error('❌ Erro ao processar follow-up:', error)
+    console.error('❌ Erro ao processar follow-up:', {
+      mensagem: error.message,
+      stack: error.stack
+    })
     return new Response(
       JSON.stringify({ error: error.message }),
       { 
