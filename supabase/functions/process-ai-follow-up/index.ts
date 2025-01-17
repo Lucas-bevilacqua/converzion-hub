@@ -46,6 +46,25 @@ serve(async (req) => {
       throw new Error('No user messages found');
     }
 
+    // Get the phone number from Users_clientes table
+    const { data: clientData, error: clientError } = await supabaseClient
+      .from('Users_clientes')
+      .select('TelefoneClientes')
+      .eq('NomeDaEmpresa', instanceId)
+      .single();
+
+    if (clientError) {
+      console.error('❌ Error fetching client data:', clientError);
+      throw clientError;
+    }
+
+    if (!clientData?.TelefoneClientes) {
+      console.error('❌ No phone number found for client');
+      throw new Error('No phone number found for client');
+    }
+
+    console.log('📱 Found phone number:', clientData.TelefoneClientes);
+
     // Prepare context for AI
     const contextMessages = chatHistory.map(msg => ({
       role: msg.sender_type === 'user' ? 'user' : 'assistant',
@@ -95,6 +114,10 @@ serve(async (req) => {
     
     console.log('🔗 Evolution API endpoint:', evolutionApiEndpoint);
     
+    // Clean and format the phone number
+    const cleanPhoneNumber = clientData.TelefoneClientes.replace(/\D/g, '');
+    console.log('📱 Clean phone number:', cleanPhoneNumber);
+
     const evolutionResponse = await fetch(evolutionApiEndpoint, {
       method: 'POST',
       headers: {
@@ -102,7 +125,7 @@ serve(async (req) => {
         'apikey': Deno.env.get('EVOLUTION_API_KEY') || '',
       },
       body: JSON.stringify({
-        number: lastUserMessage.whatsapp_message_id?.split('@')[0], // Extract phone number from message ID
+        number: cleanPhoneNumber,
         text: message
       }),
     });
