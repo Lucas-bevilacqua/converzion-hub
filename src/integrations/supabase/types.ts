@@ -196,6 +196,7 @@ export type Database = {
           settings: Json | null
           stop_on_keyword: string[] | null
           stop_on_reply: boolean | null
+          system_prompt: string | null
           template_message: string | null
           updated_at: string
         }
@@ -214,6 +215,7 @@ export type Database = {
           settings?: Json | null
           stop_on_keyword?: string[] | null
           stop_on_reply?: boolean | null
+          system_prompt?: string | null
           template_message?: string | null
           updated_at?: string
         }
@@ -232,6 +234,7 @@ export type Database = {
           settings?: Json | null
           stop_on_keyword?: string[] | null
           stop_on_reply?: boolean | null
+          system_prompt?: string | null
           template_message?: string | null
           updated_at?: string
         }

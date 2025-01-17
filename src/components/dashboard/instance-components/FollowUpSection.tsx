@@ -176,7 +176,7 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
         instance_id: instanceId,
         is_active: values.is_active,
         follow_up_type: values.follow_up_type,
-        delay_minutes: values.delay_minutes,
+        delay_minutes: Math.max(60, values.delay_minutes), // Garante mínimo de 60 minutos
         template_message: values.template_message,
         schedule_start_time: values.schedule_start_time,
         schedule_end_time: values.schedule_end_time,
