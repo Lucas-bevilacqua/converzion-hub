@@ -13,7 +13,7 @@ serve(async (req) => {
   }
 
   try {
-    const { instanceId, instanceName, userId, delayMinutes, maxAttempts, stopOnReply, stopKeywords } = await req.json()
+    const { instanceId, instanceName, userId, delayMinutes, maxAttempts, stopOnReply, stopKeywords, systemPrompt } = await req.json()
     console.log('📩 Processing AI follow-up for instance:', instanceId)
 
     const supabaseClient = createClient(
@@ -34,58 +34,40 @@ serve(async (req) => {
       throw chatError
     }
 
-    // Get the phone number from Users_clientes table
-    const { data: clientData, error: clientError } = await supabaseClient
-      .from('Users_clientes')
-      .select('TelefoneClientes')
-      .eq('NomeDaEmpresa', instanceId)
-      .single()
-
-    if (clientError) {
-      console.error('❌ Error fetching client data:', clientError)
-      throw clientError
-    }
-
-    if (!clientData?.TelefoneClientes) {
-      console.error('❌ No phone number found for client')
-      throw new Error('No phone number found for client')
-    }
-
-    console.log('📱 Found phone number:', clientData.TelefoneClientes)
-
     // Prepare context for AI
     let contextMessages = []
     
     if (chatHistory && chatHistory.length > 0) {
-      // If we have chat history, use it for context
-      const userMessages = chatHistory
-        .filter(msg => msg.sender_type === 'user')
-        .map(msg => msg.content)
-      
-      // Simple language detection based on common words
-      const isPortuguese = userMessages.some(msg => 
-        msg.toLowerCase().match(/(\s|^)(oi|olá|obrigado|bom dia|boa tarde|boa noite)(\s|$)/)
-      )
-      
-      console.log('🌐 Detected language:', isPortuguese ? 'Portuguese' : 'English')
-      
+      console.log('📝 Using existing chat history for context')
       contextMessages = chatHistory.map(msg => ({
         role: msg.sender_type === 'user' ? 'user' : 'assistant',
         content: msg.content
       })).reverse()
-    } else {
-      // If no chat history, use a default Portuguese context
-      console.log('ℹ️ No chat history found, using default Portuguese context')
-      contextMessages = [
-        { 
-          role: 'system', 
-          content: 'Você é um assistente gerando a primeira mensagem de follow-up em português. Mantenha a mensagem amigável, profissional e concisa.'
-        }
-      ]
     }
 
+    // Add system prompt if provided
+    if (systemPrompt) {
+      contextMessages.unshift({
+        role: 'system',
+        content: systemPrompt
+      })
+    } else {
+      // Default system prompt in Portuguese
+      contextMessages.unshift({
+        role: 'system',
+        content: 'Você é um assistente gerando uma mensagem de follow-up em português. Mantenha a mensagem amigável, profissional e concisa.'
+      })
+    }
+
+    // Add a user prompt to generate the follow-up message
+    contextMessages.push({
+      role: 'user',
+      content: 'Gere uma mensagem de follow-up para um cliente. A mensagem deve ser envolvente mas breve. Não mencione horários ou datas específicas.'
+    })
+
+    console.log('🤖 Generating AI message with context:', contextMessages)
+
     // Generate message with OpenAI
-    console.log('🤖 Generating AI message...')
     const openAIResponse = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -94,13 +76,7 @@ serve(async (req) => {
       },
       body: JSON.stringify({
         model: 'gpt-4o-mini',
-        messages: [
-          ...contextMessages,
-          { 
-            role: 'user', 
-            content: 'Gere uma mensagem de follow-up para um cliente. A mensagem deve ser envolvente mas breve. Não mencione horários ou datas específicas.'
-          }
-        ],
+        messages: contextMessages,
         temperature: 0.7,
       }),
     })
@@ -114,55 +90,6 @@ serve(async (req) => {
     const aiData = await openAIResponse.json()
     const message = aiData.choices[0].message.content
     console.log('✅ AI message generated:', message)
-
-    // Send message via Evolution API
-    const evolutionApiUrl = (Deno.env.get('EVOLUTION_API_URL') || '').replace(/\/+$/, '')
-    const evolutionApiEndpoint = `${evolutionApiUrl}/message/sendText/${instanceName}`
-    
-    console.log('🔗 Evolution API endpoint:', evolutionApiEndpoint)
-    
-    // Clean and format the phone number
-    const cleanPhoneNumber = clientData.TelefoneClientes.replace(/\D/g, '')
-    console.log('📱 Clean phone number:', cleanPhoneNumber)
-
-    const evolutionResponse = await fetch(evolutionApiEndpoint, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'apikey': Deno.env.get('EVOLUTION_API_KEY') || '',
-      },
-      body: JSON.stringify({
-        number: cleanPhoneNumber,
-        text: message
-      }),
-    })
-
-    if (!evolutionResponse.ok) {
-      const error = await evolutionResponse.text()
-      console.error('❌ Evolution API error:', error)
-      throw new Error(`Evolution API error: ${error}`)
-    }
-
-    const evolutionData = await evolutionResponse.json()
-    console.log('✅ Message sent:', evolutionData)
-
-    // Save message in chat history
-    const { error: chatSaveError } = await supabaseClient
-      .from('chat_messages')
-      .insert({
-        instance_id: instanceId,
-        user_id: userId,
-        sender_type: 'assistant',
-        content: message,
-        whatsapp_message_id: evolutionData.key?.id
-      })
-
-    if (chatSaveError) {
-      console.error('❌ Error saving message to chat history:', chatSaveError)
-      throw chatSaveError
-    }
-
-    console.log('✅ AI follow-up processed successfully')
 
     return new Response(
       JSON.stringify({ success: true, message }),

@@ -231,7 +231,8 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
             delayMinutes: values.delay_minutes,
             maxAttempts: values.max_attempts,
             stopOnReply: values.stop_on_reply,
-            stopKeywords: values.stop_on_keyword
+            stopKeywords: values.stop_on_keyword,
+            systemPrompt: values.system_prompt
           }
         })
 
