@@ -62,7 +62,6 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
   const { user } = useAuth()
   const { toast } = useToast()
   const queryClient = useQueryClient()
-  const [isEditing, setIsEditing] = useState(false)
 
   const { data: followUp, isLoading } = useQuery({
     queryKey: ['follow-up', instanceId],
@@ -157,7 +156,8 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
             .from('instance_follow_ups')
             .update({
               ...values,
-              manual_messages: JSON.stringify(values.manual_messages)
+              manual_messages: JSON.stringify(values.manual_messages),
+              updated_at: new Date().toISOString()
             })
             .eq('id', followUp.id)
         : supabase
@@ -169,7 +169,10 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
             })
 
       const { error } = await operation
-      if (error) throw error
+      if (error) {
+        console.error('Erro ao salvar follow-up:', error)
+        throw error
+      }
 
       // Registra as mensagens no histórico
       if (user && values.manual_messages.length > 0) {
@@ -182,7 +185,10 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
             content: msg.message
           })))
 
-        if (chatError) throw chatError
+        if (chatError) {
+          console.error('Erro ao registrar mensagens:', chatError)
+          throw chatError
+        }
       }
     },
     onSuccess: () => {
@@ -191,7 +197,6 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
         title: "Sucesso",
         description: "Configurações de follow-up salvas com sucesso.",
       })
-      setIsEditing(false)
     },
     onError: (error) => {
       console.error('Erro ao salvar follow-up:', error)
@@ -219,7 +224,6 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
         title: "Sucesso",
         description: "Configurações de follow-up excluídas com sucesso.",
       })
-      setIsEditing(false)
       // Reset form to default values
       setFormData({
         is_active: false,
@@ -269,30 +273,8 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
   }
 
   const handleSave = () => {
+    console.log('Salvando follow-up com dados:', formData)
     saveMutation.mutateAsync(formData)
-  }
-
-  const resetForm = () => {
-    const defaultMessages: ManualMessage[] = Array.isArray(followUp?.manual_messages) 
-      ? (followUp.manual_messages as JsonManualMessage[]).map(msg => ({
-          message: msg.message || '',
-          delay_minutes: Number(msg.delay_minutes) || 60
-        }))
-      : []
-
-    setFormData({
-      is_active: followUp?.is_active || false,
-      follow_up_type: (followUp?.follow_up_type as FollowUpType) || "manual",
-      delay_minutes: followUp?.delay_minutes || 60,
-      template_message: followUp?.template_message || '',
-      schedule_start_time: followUp?.schedule_start_time || '09:00',
-      schedule_end_time: followUp?.schedule_end_time || '18:00',
-      schedule_days: followUp?.schedule_days || [1,2,3,4,5],
-      max_attempts: followUp?.max_attempts || 3,
-      stop_on_reply: followUp?.stop_on_reply ?? true,
-      stop_on_keyword: followUp?.stop_on_keyword || ['comprou', 'agendou', 'agendado', 'comprado'],
-      manual_messages: defaultMessages
-    })
   }
 
   if (isLoading) {
@@ -465,11 +447,37 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
         <div className="flex justify-end gap-2">
           <Button
             variant="outline"
-            onClick={resetForm}
+            onClick={() => {
+              if (followUp) {
+                const messages = Array.isArray(followUp.manual_messages)
+                  ? (followUp.manual_messages as JsonManualMessage[]).map(msg => ({
+                      message: msg.message || '',
+                      delay_minutes: Number(msg.delay_minutes) || 60
+                    }))
+                  : []
+
+                setFormData({
+                  is_active: followUp.is_active || false,
+                  follow_up_type: (followUp.follow_up_type as FollowUpType) || "manual",
+                  delay_minutes: followUp.delay_minutes || 60,
+                  template_message: followUp.template_message || '',
+                  schedule_start_time: followUp.schedule_start_time || '09:00',
+                  schedule_end_time: followUp.schedule_end_time || '18:00',
+                  schedule_days: followUp.schedule_days || [1,2,3,4,5],
+                  max_attempts: followUp.max_attempts || 3,
+                  stop_on_reply: followUp.stop_on_reply ?? true,
+                  stop_on_keyword: followUp.stop_on_keyword || ['comprou', 'agendou', 'agendado', 'comprado'],
+                  manual_messages: messages
+                })
+              }
+            }}
           >
             Cancelar
           </Button>
-          <Button onClick={handleSave} disabled={saveMutation.isPending}>
+          <Button 
+            onClick={handleSave}
+            disabled={saveMutation.isPending}
+          >
             {saveMutation.isPending ? (
               <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" />
             ) : (
