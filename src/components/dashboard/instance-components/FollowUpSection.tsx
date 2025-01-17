@@ -19,7 +19,7 @@ interface FollowUpSectionProps {
   instanceId: string
 }
 
-type FollowUpType = "automatic" | "ai_generated" | "template" | "langchain_generated";
+type FollowUpType = "automatic" | "ai_generated" | "manual";
 
 interface FormData {
   is_active: boolean
@@ -29,13 +29,10 @@ interface FormData {
   schedule_start_time: string
   schedule_end_time: string
   schedule_days: number[]
-  settings?: {
-    langchain_config?: {
-      temperature?: number
-      maxTokens?: number
-      systemPrompt?: string
-    }
-  }
+  max_attempts: number
+  stop_on_reply: boolean
+  stop_on_keyword: string[]
+  manual_messages: any[]
 }
 
 export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
@@ -46,7 +43,7 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
   const { data: followUp, isLoading } = useQuery({
     queryKey: ['follow-up', instanceId],
     queryFn: async () => {
-      console.log('Fetching follow-up config for instance:', instanceId)
+      console.log('Buscando configuração de follow-up para instância:', instanceId)
       const { data, error } = await supabase
         .from('instance_follow_ups')
         .select('*')
@@ -54,7 +51,7 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
         .maybeSingle()
 
       if (error && error.code !== 'PGRST116') {
-        console.error('Error fetching follow-up:', error)
+        console.error('Erro ao buscar follow-up:', error)
         throw error
       }
 
@@ -70,18 +67,15 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
     schedule_start_time: followUp?.schedule_start_time || '09:00',
     schedule_end_time: followUp?.schedule_end_time || '18:00',
     schedule_days: followUp?.schedule_days || [1,2,3,4,5],
-    settings: {
-      langchain_config: followUp?.settings?.langchain_config || {
-        temperature: 0.7,
-        maxTokens: 150,
-        systemPrompt: "Você é um assistente amigável que gera follow-ups personalizados."
-      }
-    }
+    max_attempts: followUp?.max_attempts || 3,
+    stop_on_reply: followUp?.stop_on_reply ?? true,
+    stop_on_keyword: followUp?.stop_on_keyword || [],
+    manual_messages: followUp?.manual_messages || []
   })
 
   const saveMutation = useMutation({
     mutationFn: async (values: FormData) => {
-      console.log('Saving follow-up config:', values)
+      console.log('Salvando configuração de follow-up:', values)
       const operation = followUp
         ? supabase
             .from('instance_follow_ups')
@@ -103,7 +97,7 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
       setIsEditing(false)
     },
     onError: (error) => {
-      console.error('Error saving follow-up:', error)
+      console.error('Erro ao salvar follow-up:', error)
       toast({
         title: "Erro",
         description: "Não foi possível salvar as configurações.",
@@ -152,74 +146,49 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
             <SelectContent>
               <SelectItem value="automatic">Automático</SelectItem>
               <SelectItem value="ai_generated">Gerado por IA</SelectItem>
-              <SelectItem value="template">Template</SelectItem>
-              <SelectItem value="langchain_generated">LangChain</SelectItem>
+              <SelectItem value="manual">Template</SelectItem>
             </SelectContent>
           </Select>
         </div>
 
-        {formData.follow_up_type === 'langchain_generated' && (
-          <div className="space-y-4">
-            <div className="grid gap-2">
-              <Label>Temperatura (Criatividade)</Label>
-              <Input
-                type="number"
-                min="0"
-                max="1"
-                step="0.1"
-                value={formData.settings?.langchain_config?.temperature}
-                onChange={(e) => setFormData(prev => ({
-                  ...prev,
-                  settings: {
-                    ...prev.settings,
-                    langchain_config: {
-                      ...prev.settings?.langchain_config,
-                      temperature: parseFloat(e.target.value)
-                    }
-                  }
-                }))}
-              />
-            </div>
+        <div className="grid gap-2">
+          <Label>Atraso (minutos)</Label>
+          <Input
+            type="number"
+            min="1"
+            value={formData.delay_minutes}
+            onChange={(e) => setFormData(prev => ({ ...prev, delay_minutes: parseInt(e.target.value) }))}
+          />
+        </div>
 
-            <div className="grid gap-2">
-              <Label>Máximo de Tokens</Label>
-              <Input
-                type="number"
-                min="1"
-                max="500"
-                value={formData.settings?.langchain_config?.maxTokens}
-                onChange={(e) => setFormData(prev => ({
-                  ...prev,
-                  settings: {
-                    ...prev.settings,
-                    langchain_config: {
-                      ...prev.settings?.langchain_config,
-                      maxTokens: parseInt(e.target.value)
-                    }
-                  }
-                }))}
-              />
-            </div>
-
-            <div className="grid gap-2">
-              <Label>Prompt do Sistema</Label>
-              <Textarea
-                value={formData.settings?.langchain_config?.systemPrompt}
-                onChange={(e) => setFormData(prev => ({
-                  ...prev,
-                  settings: {
-                    ...prev.settings,
-                    langchain_config: {
-                      ...prev.settings?.langchain_config,
-                      systemPrompt: e.target.value
-                    }
-                  }
-                }))}
-                placeholder="Instruções para o modelo de IA gerar follow-ups"
-              />
-            </div>
+        {formData.follow_up_type === 'manual' && (
+          <div className="grid gap-2">
+            <Label>Mensagem Template</Label>
+            <Textarea
+              value={formData.template_message}
+              onChange={(e) => setFormData(prev => ({ ...prev, template_message: e.target.value }))}
+              placeholder="Digite a mensagem que será enviada"
+            />
           </div>
         )}
+
+        <div className="grid gap-2">
+          <Label>Número Máximo de Tentativas</Label>
+          <Input
+            type="number"
+            min="1"
+            value={formData.max_attempts}
+            onChange={(e) => setFormData(prev => ({ ...prev, max_attempts: parseInt(e.target.value) }))}
+          />
+        </div>
+
+        <div className="flex items-center gap-2">
+          <Switch
+            checked={formData.stop_on_reply}
+            onCheckedChange={(checked) => setFormData(prev => ({ ...prev, stop_on_reply: checked }))}
+          />
+          <Label>Parar ao receber resposta</Label>
+        </div>
 
         <div className="flex justify-end gap-2">
           <Button
@@ -232,13 +201,10 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
               schedule_start_time: followUp?.schedule_start_time || '09:00',
               schedule_end_time: followUp?.schedule_end_time || '18:00',
               schedule_days: followUp?.schedule_days || [1,2,3,4,5],
-              settings: {
-                langchain_config: followUp?.settings?.langchain_config || {
-                  temperature: 0.7,
-                  maxTokens: 150,
-                  systemPrompt: "Você é um assistente amigável que gera follow-ups personalizados."
-                }
-              }
+              max_attempts: followUp?.max_attempts || 3,
+              stop_on_reply: followUp?.stop_on_reply ?? true,
+              stop_on_keyword: followUp?.stop_on_keyword || [],
+              manual_messages: followUp?.manual_messages || []
             })}
           >
             Cancelar

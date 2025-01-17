@@ -188,10 +188,14 @@ export type Database = {
           id: string
           instance_id: string
           is_active: boolean | null
+          manual_messages: Json | null
+          max_attempts: number | null
           schedule_days: number[] | null
           schedule_end_time: string | null
           schedule_start_time: string | null
           settings: Json | null
+          stop_on_keyword: string[] | null
+          stop_on_reply: boolean | null
           template_message: string | null
           updated_at: string
         }
@@ -202,10 +206,14 @@ export type Database = {
           id?: string
           instance_id: string
           is_active?: boolean | null
+          manual_messages?: Json | null
+          max_attempts?: number | null
           schedule_days?: number[] | null
           schedule_end_time?: string | null
           schedule_start_time?: string | null
           settings?: Json | null
+          stop_on_keyword?: string[] | null
+          stop_on_reply?: boolean | null
           template_message?: string | null
           updated_at?: string
         }
@@ -216,10 +224,14 @@ export type Database = {
           id?: string
           instance_id?: string
           is_active?: boolean | null
+          manual_messages?: Json | null
+          max_attempts?: number | null
           schedule_days?: number[] | null
           schedule_end_time?: string | null
           schedule_start_time?: string | null
           settings?: Json | null
+          stop_on_keyword?: string[] | null
+          stop_on_reply?: boolean | null
           template_message?: string | null
           updated_at?: string
         }
@@ -486,11 +498,7 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      follow_up_type:
-        | "automatic"
-        | "ai_generated"
-        | "template"
-        | "langchain_generated"
+      follow_up_type: "automatic" | "ai_generated" | "manual"
       instance_objective:
         | "sales"
         | "support"
