@@ -22,9 +22,6 @@ serve(async (req) => {
       return new Response(null, { headers: corsHeaders })
     }
 
-    // Log request headers for debugging
-    console.log('📋 Request headers:', Object.fromEntries(req.headers.entries()))
-
     const rawBody = await req.text()
     console.log('📦 Raw webhook payload:', rawBody)
 
@@ -43,7 +40,8 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    if (payload.event === 'messages.upsert') {
+    // Processar diferentes tipos de eventos
+    if (payload.event === 'messages.upsert' || payload.event === 'messages.set') {
       console.log('📨 Processing message event:', {
         content: payload.message?.content,
         from: payload.message?.from,
