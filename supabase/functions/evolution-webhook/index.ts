@@ -11,7 +11,8 @@ console.log('⚡ Evolution Webhook function initialized')
 serve(async (req) => {
   console.log('📩 New request received:', {
     method: req.method,
-    url: req.url
+    url: req.url,
+    headers: Object.fromEntries(req.headers.entries())
   })
 
   try {
