@@ -34,11 +34,23 @@ serve(async (req) => {
       throw chatError;
     }
 
+    if (!chatHistory || chatHistory.length === 0) {
+      console.error('❌ No chat history found for instance:', instanceId);
+      throw new Error('No chat history found');
+    }
+
+    // Get the last user message to extract phone number and context
+    const lastUserMessage = chatHistory.find(msg => msg.sender_type === 'user');
+    if (!lastUserMessage) {
+      console.error('❌ No user messages found in chat history');
+      throw new Error('No user messages found');
+    }
+
     // Prepare context for AI
-    const contextMessages = chatHistory?.map(msg => ({
+    const contextMessages = chatHistory.map(msg => ({
       role: msg.sender_type === 'user' ? 'user' : 'assistant',
       content: msg.content
-    })) || [];
+    })).reverse(); // Reverse to get chronological order
 
     // Generate message with OpenAI
     console.log('🤖 Generating AI message...');
@@ -53,14 +65,14 @@ serve(async (req) => {
         messages: [
           { 
             role: 'system', 
-            content: 'Você é um assistente que gera mensagens de follow-up personalizadas e naturais para clientes que não responderam.'
+            content: 'You are an AI assistant generating follow-up messages. Keep responses friendly, professional, and concise.'
           },
           ...contextMessages,
           { 
             role: 'user', 
-            content: `Por favor, gere uma mensagem de follow up para o cliente. 
-                     A mensagem deve ser amigável e profissional, considerando o histórico da conversa.
-                     Mantenha a mensagem curta e direta.`
+            content: `Generate a follow-up message for a customer who hasn't responded. 
+                     Consider the chat history and keep the message engaging but brief.
+                     Do not mention specific times or dates.`
           }
         ],
         temperature: 0.7,
@@ -90,7 +102,7 @@ serve(async (req) => {
         'apikey': Deno.env.get('EVOLUTION_API_KEY') || '',
       },
       body: JSON.stringify({
-        number: chatHistory[0]?.phone_number,
+        number: lastUserMessage.whatsapp_message_id?.split('@')[0], // Extract phone number from message ID
         text: message
       }),
     });
@@ -111,7 +123,8 @@ serve(async (req) => {
         instance_id: instanceId,
         user_id: userId,
         sender_type: 'assistant',
-        content: message
+        content: message,
+        whatsapp_message_id: evolutionData.key?.id
       });
 
     if (chatSaveError) {
