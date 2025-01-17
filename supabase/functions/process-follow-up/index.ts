@@ -12,37 +12,56 @@ serve(async (req) => {
   }
 
   try {
+    console.log('🚀 Iniciando processamento de follow-up')
     const { contact } = await req.json()
-    console.log('📩 Processando follow-up para:', {
-      contato: contact.TelefoneClientes,
+    
+    if (!contact) {
+      console.error('❌ Nenhum contato fornecido na requisição')
+      throw new Error('Contato não fornecido')
+    }
+
+    console.log('📋 Dados do contato recebidos:', {
+      id: contact.id,
+      telefone: contact.TelefoneClientes,
       ultimaMensagem: contact.last_message_time,
-      followUpConfig: contact.followUp,
-      mensagens: contact.followUp.messages
+      configuracaoFollowUp: contact.followUp
     })
 
-    // Verificar qual é a próxima mensagem a ser enviada
+    // Verificar se há configuração de follow-up
+    if (!contact.followUp?.messages?.length) {
+      console.error('❌ Configuração de follow-up inválida:', contact.followUp)
+      throw new Error('Configuração de follow-up inválida')
+    }
+
+    // Calcular tempo desde a última mensagem
     const lastMessageTime = new Date(contact.last_message_time || contact.created_at)
     const now = new Date()
     const minutesSinceLastMessage = (now.getTime() - lastMessageTime.getTime()) / (1000 * 60)
 
-    // Encontrar a próxima mensagem baseada no tempo acumulado e ConversationId
+    console.log('⏰ Tempo desde última mensagem:', {
+      ultimaMensagem: lastMessageTime,
+      agora: now,
+      minutos: minutesSinceLastMessage
+    })
+
+    // Encontrar a próxima mensagem baseada no ConversationId
     let currentMessageIndex = -1
     if (contact.ConversationId && contact.ConversationId.startsWith('follow-up-sent-')) {
       currentMessageIndex = parseInt(contact.ConversationId.split('-').pop() || '-1')
+      console.log('📝 Índice atual recuperado do ConversationId:', currentMessageIndex)
     }
 
     const nextMessageIndex = currentMessageIndex + 1
 
-    console.log('⏰ Calculando próxima mensagem:', {
-      tempoDesdeUltima: minutesSinceLastMessage,
-      mensagensDisponiveis: contact.followUp.messages.length,
+    console.log('🔄 Status da sequência:', {
       indiceAtual: currentMessageIndex,
-      proximoIndice: nextMessageIndex
+      proximoIndice: nextMessageIndex,
+      totalMensagens: contact.followUp.messages.length
     })
 
     // Verificar se há próxima mensagem disponível
     if (nextMessageIndex >= contact.followUp.messages.length) {
-      console.log('⏳ Sequência de mensagens completa')
+      console.log('✅ Sequência de mensagens completa')
       return new Response(
         JSON.stringify({ 
           success: false, 
@@ -55,21 +74,18 @@ serve(async (req) => {
     // Obter a próxima mensagem
     const nextMessage = contact.followUp.messages[nextMessageIndex]
     
-    // Calcular tempo acumulado até a próxima mensagem
-    let accumulatedDelay = 0
-    for (let i = 0; i <= nextMessageIndex; i++) {
-      accumulatedDelay += contact.followUp.messages[i].delay_minutes
-    }
-
-    console.log('⏰ Verificando tempo para próxima mensagem:', {
-      atrasoAcumulado: accumulatedDelay,
-      tempoPassado: minutesSinceLastMessage,
-      deveEnviar: minutesSinceLastMessage >= contact.followUp.messages[nextMessageIndex].delay_minutes
+    console.log('📨 Próxima mensagem:', {
+      indice: nextMessageIndex,
+      mensagem: nextMessage.message,
+      atrasoMinutos: nextMessage.delay_minutes
     })
 
     // Verificar se já passou tempo suficiente
-    if (minutesSinceLastMessage < contact.followUp.messages[nextMessageIndex].delay_minutes) {
-      console.log('⏳ Ainda não é hora de enviar a próxima mensagem')
+    if (minutesSinceLastMessage < nextMessage.delay_minutes) {
+      console.log('⏳ Aguardando tempo necessário para próxima mensagem:', {
+        tempoPassado: minutesSinceLastMessage,
+        tempoNecessario: nextMessage.delay_minutes
+      })
       return new Response(
         JSON.stringify({ 
           success: false, 
@@ -81,35 +97,18 @@ serve(async (req) => {
 
     // Enviar mensagem via Evolution API
     const evolutionApiUrl = (Deno.env.get('EVOLUTION_API_URL') || '').replace(/\/+$/, '')
-    const evolutionApiKey = Deno.env.get('EVOLUTION_API_KEY')
     const evolutionApiEndpoint = `${evolutionApiUrl}/message/sendText/${contact.followUp.instanceName}`
     
-    console.log('🔗 Configuração Evolution API:', {
+    console.log('🔗 Preparando envio via Evolution API:', {
       url: evolutionApiEndpoint,
-      temChave: !!evolutionApiKey,
       instancia: contact.followUp.instanceName
-    })
-
-    if (!nextMessage?.message) {
-      console.error('❌ Mensagem não configurada corretamente')
-      throw new Error('Mensagem não configurada corretamente')
-    }
-
-    console.log('📤 Preparando envio:', {
-      mensagem: nextMessage.message,
-      numero: contact.TelefoneClientes,
-      delay: nextMessage.delay_minutes,
-      headers: {
-        'Content-Type': 'application/json',
-        'apikey': 'PRESENTE' // não logamos a chave real
-      }
     })
 
     const evolutionResponse = await fetch(evolutionApiEndpoint, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'apikey': evolutionApiKey || '',
+        'apikey': Deno.env.get('EVOLUTION_API_KEY') || '',
       },
       body: JSON.stringify({
         number: contact.TelefoneClientes,
@@ -119,7 +118,7 @@ serve(async (req) => {
 
     if (!evolutionResponse.ok) {
       const error = await evolutionResponse.text()
-      console.error('❌ Erro Evolution API:', {
+      console.error('❌ Erro ao enviar mensagem:', {
         status: evolutionResponse.status,
         erro: error
       })
@@ -127,9 +126,9 @@ serve(async (req) => {
     }
 
     const evolutionData = await evolutionResponse.json()
-    console.log('✅ Mensagem enviada:', evolutionData)
+    console.log('✅ Mensagem enviada com sucesso:', evolutionData)
 
-    // Atualizar o horário da última mensagem
+    // Atualizar o registro do contato
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
@@ -138,7 +137,7 @@ serve(async (req) => {
     console.log('📝 Atualizando registro do contato:', {
       id: contact.id,
       novoStatus: `follow-up-sent-${nextMessageIndex}`,
-      mensagemEnviada: nextMessageIndex
+      horarioEnvio: new Date().toISOString()
     })
 
     const { error: updateError } = await supabaseClient
@@ -155,12 +154,7 @@ serve(async (req) => {
     }
 
     // Registrar mensagem no histórico
-    console.log('📝 Registrando mensagem no histórico:', {
-      instancia: contact.NomeDaEmpresa,
-      usuario: contact.followUp.userId,
-      tipo: 'follow_up',
-      sequencia: nextMessageIndex
-    })
+    console.log('📝 Registrando mensagem no histórico')
 
     const { error: chatError } = await supabaseClient
       .from('chat_messages')
@@ -168,7 +162,8 @@ serve(async (req) => {
         instance_id: contact.NomeDaEmpresa,
         user_id: contact.followUp.userId,
         sender_type: 'follow_up',
-        content: nextMessage.message
+        content: nextMessage.message,
+        whatsapp_message_id: evolutionData.key?.id
       })
 
     if (chatError) {

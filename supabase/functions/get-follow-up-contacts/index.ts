@@ -12,110 +12,113 @@ serve(async (req) => {
   }
 
   try {
-    console.log('🔍 Buscando contatos para follow-up')
-
+    console.log('🔍 Iniciando busca de contatos para follow-up')
+    
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    // Buscar configurações de follow-up ativas
+    // Buscar instâncias com follow-up ativo
     const { data: followUps, error: followUpsError } = await supabaseClient
       .from('instance_follow_ups')
       .select(`
         *,
-        evolution_instances (
+        instance:evolution_instances(
+          id,
           name,
-          phone_number,
-          system_prompt
+          user_id
         )
       `)
       .eq('is_active', true)
 
     if (followUpsError) {
-      console.error('❌ Erro ao buscar configurações de follow-up:', followUpsError)
+      console.error('❌ Erro ao buscar follow-ups:', followUpsError)
       throw followUpsError
     }
 
-    // Para cada configuração, buscar contatos elegíveis
-    const contacts = []
-    const now = new Date()
-    const currentDay = now.getDay() // 0-6 (Domingo-Sábado)
-    const currentTime = now.toLocaleTimeString('en-US', { hour12: false })
+    console.log('📋 Follow-ups ativos encontrados:', followUps?.length || 0)
 
-    for (const followUp of followUps) {
-      console.log(`📝 Processando follow-up ${followUp.id} do tipo ${followUp.follow_up_type}`)
-      
-      // Verificar se está dentro do horário permitido
-      if (
-        followUp.schedule_days.includes(currentDay) &&
-        currentTime >= followUp.schedule_start_time &&
-        currentTime <= followUp.schedule_end_time
-      ) {
-        // Calcular o tempo mínimo desde a última mensagem
-        const minLastMessageTime = new Date()
-        minLastMessageTime.setMinutes(minLastMessageTime.getMinutes() - followUp.delay_minutes)
+    // Para cada follow-up ativo, buscar contatos elegíveis
+    const processedContacts = []
+    
+    for (const followUp of followUps || []) {
+      console.log('🔄 Processando follow-up da instância:', followUp.instance?.name)
 
-        console.log(`⏰ Buscando contatos com última mensagem anterior a ${minLastMessageTime.toISOString()}`)
+      const { data: contacts, error: contactsError } = await supabaseClient
+        .from('Users_clientes')
+        .select('*')
+        .eq('NomeDaEmpresa', followUp.instance_id)
+        .is('ConversationId', null)
 
-        // Buscar contatos que não receberam follow-up ainda ou que já passou o tempo de delay
-        const { data: eligibleContacts, error: contactsError } = await supabaseClient
-          .from('Users_clientes')
-          .select('*')
-          .eq('NomeDaEmpresa', followUp.instance_id)
-          .or(`last_message_time.is.null,last_message_time.lt.${minLastMessageTime.toISOString()}`)
-          .limit(10)
+      if (contactsError) {
+        console.error('❌ Erro ao buscar contatos:', contactsError)
+        continue
+      }
 
-        if (contactsError) {
-          console.error('❌ Erro ao buscar contatos:', contactsError)
-          continue
-        }
+      console.log('👥 Contatos encontrados para a instância:', contacts?.length || 0)
 
-        console.log(`✅ Encontrados ${eligibleContacts?.length || 0} contatos elegíveis`)
+      // Processar cada contato
+      for (const contact of contacts || []) {
+        console.log('👤 Processando contato:', contact.TelefoneClientes)
 
-        if (eligibleContacts && eligibleContacts.length > 0) {
-          contacts.push(...eligibleContacts.map(contact => ({
-            ...contact,
-            followUp: {
-              id: followUp.id,
-              type: followUp.follow_up_type,
-              messages: followUp.manual_messages,
-              instanceName: followUp.evolution_instances.name,
-              instancePhone: followUp.evolution_instances.phone_number,
-              maxAttempts: followUp.max_attempts,
-              stopOnReply: followUp.stop_on_reply,
-              stopOnKeyword: followUp.stop_on_keyword
+        try {
+          const processResponse = await fetch(
+            `${Deno.env.get('SUPABASE_URL')}/functions/v1/process-follow-up`,
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+              },
+              body: JSON.stringify({
+                contact: {
+                  ...contact,
+                  followUp: {
+                    ...followUp,
+                    instanceName: followUp.instance?.name,
+                    userId: followUp.instance?.user_id
+                  }
+                }
+              })
             }
-          })))
+          )
+
+          const processResult = await processResponse.json()
+          console.log('✅ Resultado do processamento:', processResult)
+          
+          processedContacts.push({
+            contactId: contact.id,
+            success: processResult.success,
+            message: processResult.message
+          })
+        } catch (error) {
+          console.error('❌ Erro ao processar contato:', {
+            contato: contact.id,
+            erro: error.message
+          })
         }
-      } else {
-        console.log(`⏰ Fora do horário permitido para follow-up ${followUp.id}`)
-        console.log(`Dia atual: ${currentDay}, Horário atual: ${currentTime}`)
-        console.log(`Configuração: dias ${followUp.schedule_days}, início ${followUp.schedule_start_time}, fim ${followUp.schedule_end_time}`)
       }
     }
 
-    console.log(`✅ Total de ${contacts.length} contatos para follow-up`)
+    console.log('✅ Processamento de follow-ups concluído:', {
+      totalProcessado: processedContacts.length
+    })
 
     return new Response(
-      JSON.stringify({ contacts }),
-      { 
-        headers: { 
-          ...corsHeaders,
-          'Content-Type': 'application/json'
-        }
-      }
+      JSON.stringify({ 
+        success: true,
+        processed: processedContacts
+      }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   } catch (error) {
-    console.error('❌ Erro ao processar requisição:', error)
+    console.error('❌ Erro geral no processamento:', error)
     return new Response(
       JSON.stringify({ error: error.message }),
       { 
         status: 500,
-        headers: { 
-          ...corsHeaders,
-          'Content-Type': 'application/json'
-        }
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
       }
     )
   }
