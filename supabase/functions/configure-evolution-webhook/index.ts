@@ -80,39 +80,53 @@ serve(async (req) => {
       "TYPEBOT_CHANGE_STATUS",
       "TYPEBOT_START"
     ]
-    
-    // Primeiro, vamos verificar se o webhook já existe
-    console.log('🔍 Verificando webhook existente...')
-    const checkResponse = await fetch(`${cleanBaseUrl}/webhook/find/${instanceName}`, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-        'apikey': EVOLUTION_API_KEY
-      }
-    })
 
-    console.log('📋 Status da verificação:', {
-      status: checkResponse.status,
-      ok: checkResponse.ok,
-      body: await checkResponse.text()
-    })
-
-    // Se existir, vamos deletar primeiro
-    if (checkResponse.ok) {
-      console.log('🗑️ Deletando webhook existente')
-      const deleteResponse = await fetch(`${cleanBaseUrl}/webhook/delete/${instanceName}`, {
-        method: 'DELETE',
+    try {
+      // Primeiro, vamos verificar se o webhook já existe
+      console.log('🔍 Verificando webhook existente...')
+      const checkResponse = await fetch(`${cleanBaseUrl}/webhook/find/${instanceName}`, {
+        method: 'GET',
         headers: {
           'Content-Type': 'application/json',
           'apikey': EVOLUTION_API_KEY
         }
       })
 
-      if (!deleteResponse.ok) {
-        console.error('❌ Erro ao deletar webhook:', await deleteResponse.text())
-      } else {
-        console.log('✅ Webhook anterior deletado com sucesso')
+      const checkData = await checkResponse.text()
+      console.log('📋 Status da verificação:', {
+        status: checkResponse.status,
+        ok: checkResponse.ok,
+        body: checkData
+      })
+
+      // Se existir, vamos deletar primeiro
+      if (checkResponse.ok && checkData && checkData !== 'null') {
+        console.log('🗑️ Deletando webhook existente')
+        const deleteResponse = await fetch(`${cleanBaseUrl}/webhook/delete/${instanceName}`, {
+          method: 'DELETE',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': EVOLUTION_API_KEY
+          }
+        })
+
+        const deleteData = await deleteResponse.text()
+        console.log('📋 Resposta da deleção:', {
+          status: deleteResponse.status,
+          ok: deleteResponse.ok,
+          body: deleteData
+        })
+
+        if (!deleteResponse.ok) {
+          console.error('❌ Erro ao deletar webhook:', deleteData)
+          // Continuamos mesmo com erro na deleção
+        } else {
+          console.log('✅ Webhook anterior deletado com sucesso')
+        }
       }
+    } catch (error) {
+      console.error('⚠️ Erro ao verificar/deletar webhook existente:', error)
+      // Continuamos mesmo com erro na verificação/deleção
     }
     
     // Configura o webhook na Evolution API com todos os eventos necessários
@@ -138,17 +152,20 @@ serve(async (req) => {
       })
     })
 
-    const responseText = await response.text()
+    const responseData = await response.text()
     console.log('📤 Resposta da Evolution API:', {
       status: response.status,
       ok: response.ok,
-      body: responseText
+      body: responseData
     })
 
     if (!response.ok) {
-      console.error('❌ Erro ao configurar webhook na Evolution API:', responseText)
-      throw new Error(`Erro na Evolution API: ${responseText}`)
+      console.error('❌ Erro ao configurar webhook na Evolution API:', responseData)
+      throw new Error(`Erro na Evolution API: ${responseData}`)
     }
+
+    // Aguarda um momento para o webhook ser configurado
+    await new Promise(resolve => setTimeout(resolve, 1000))
 
     // Verifica se o webhook foi realmente configurado
     console.log('🔍 Verificando configuração final do webhook')
@@ -160,10 +177,11 @@ serve(async (req) => {
       }
     })
 
+    const verifyData = await verifyResponse.text()
     console.log('📋 Status da verificação final:', {
       status: verifyResponse.status,
       ok: verifyResponse.ok,
-      body: await verifyResponse.text()
+      body: verifyData
     })
 
     // Faz uma chamada de teste para o webhook
@@ -182,10 +200,11 @@ serve(async (req) => {
       })
     })
 
+    const testData = await testResponse.text()
     console.log('📋 Resposta do teste do webhook:', {
       status: testResponse.status,
       ok: testResponse.ok,
-      body: await testResponse.text()
+      body: testData
     })
 
     return new Response(
