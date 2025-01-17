@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
 import { ChatOpenAI } from "https://esm.sh/@langchain/openai"
 import { ChatPromptTemplate } from "https://esm.sh/@langchain/core/prompts"
 import { StringOutputParser } from "https://esm.sh/@langchain/core/output_parsers"
