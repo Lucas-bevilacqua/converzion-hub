@@ -30,7 +30,7 @@ serve(async (req) => {
 
     if (instanceError) {
       console.error('❌ Instance error:', instanceError);
-      throw instanceError;
+      throw new Error('Failed to fetch instance data');
     }
 
     // Get chat history
@@ -43,7 +43,7 @@ serve(async (req) => {
 
     if (chatError) {
       console.error('❌ Chat history error:', chatError);
-      throw chatError;
+      throw new Error('Failed to fetch chat history');
     }
 
     // Save user message
@@ -58,7 +58,7 @@ serve(async (req) => {
 
     if (saveError) {
       console.error('❌ Error saving user message:', saveError);
-      throw saveError;
+      throw new Error('Failed to save user message');
     }
 
     // Prepare messages for OpenAI
@@ -91,7 +91,7 @@ serve(async (req) => {
     if (!openaiResponse.ok) {
       const error = await openaiResponse.text();
       console.error('❌ OpenAI API error:', error);
-      throw new Error(`OpenAI API error: ${error}`);
+      throw new Error('OpenAI API error');
     }
 
     const data = await openaiResponse.json();
@@ -110,34 +110,38 @@ serve(async (req) => {
 
     if (saveResponseError) {
       console.error('❌ Error saving AI response:', saveResponseError);
-      throw saveResponseError;
+      throw new Error('Failed to save AI response');
     }
 
     // Send through Evolution API
     console.log('📤 Sending message through Evolution API');
-    const evolutionResponse = await fetch(
-      `${Deno.env.get('EVOLUTION_API_URL')}/message/sendText/${instance.name}`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'apikey': Deno.env.get('EVOLUTION_API_KEY') || '',
-        },
-        body: JSON.stringify({
-          number: phoneNumber,
-          text: aiResponse
-        }),
+    try {
+      const evolutionResponse = await fetch(
+        `${Deno.env.get('EVOLUTION_API_URL')}/message/sendText/${instance.name}`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': Deno.env.get('EVOLUTION_API_KEY') || '',
+          },
+          body: JSON.stringify({
+            number: phoneNumber,
+            text: aiResponse
+          }),
+        }
+      );
+
+      if (!evolutionResponse.ok) {
+        console.error('❌ Evolution API error:', await evolutionResponse.text());
+        // Don't throw here, just log the error and continue
+      } else {
+        const evolutionData = await evolutionResponse.json();
+        console.log('✅ Evolution API response:', evolutionData);
       }
-    );
-
-    if (!evolutionResponse.ok) {
-      const error = await evolutionResponse.text();
+    } catch (error) {
       console.error('❌ Evolution API error:', error);
-      throw new Error(`Evolution API error: ${error}`);
+      // Don't throw here, just log the error and continue
     }
-
-    const evolutionData = await evolutionResponse.json();
-    console.log('✅ Evolution API response:', evolutionData);
 
     return new Response(
       JSON.stringify({ 
@@ -152,7 +156,7 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({ 
         success: false,
-        error: error.message 
+        error: error.message || 'An unexpected error occurred'
       }),
       { 
         status: 500,
