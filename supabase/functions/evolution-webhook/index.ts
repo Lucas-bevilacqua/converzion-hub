@@ -79,6 +79,24 @@ serve(async (req) => {
           from: payload.message.from,
           instanceId: instance.id
         })
+
+        // Registrar o contato para follow-up
+        const { data: existingContact } = await supabaseClient
+          .from('Users_clientes')
+          .select('*')
+          .eq('TelefoneClientes', payload.message.from)
+          .eq('NomeDaEmpresa', instance.id)
+          .maybeSingle()
+
+        if (!existingContact) {
+          console.log('👤 Registrando novo contato para follow-up')
+          await supabaseClient
+            .from('Users_clientes')
+            .insert({
+              TelefoneClientes: payload.message.from,
+              NomeDaEmpresa: instance.id
+            })
+        }
         
         // Call chat-with-openai function to process the message
         console.log('🤖 Calling chat-with-openai function')

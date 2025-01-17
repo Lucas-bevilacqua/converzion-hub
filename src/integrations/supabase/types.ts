@@ -177,6 +177,59 @@ export type Database = {
           },
         ]
       }
+      instance_follow_ups: {
+        Row: {
+          created_at: string
+          delay_minutes: number | null
+          follow_up_type: Database["public"]["Enums"]["follow_up_type"] | null
+          id: string
+          instance_id: string
+          is_active: boolean | null
+          schedule_days: number[] | null
+          schedule_end_time: string | null
+          schedule_start_time: string | null
+          settings: Json | null
+          template_message: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          delay_minutes?: number | null
+          follow_up_type?: Database["public"]["Enums"]["follow_up_type"] | null
+          id?: string
+          instance_id: string
+          is_active?: boolean | null
+          schedule_days?: number[] | null
+          schedule_end_time?: string | null
+          schedule_start_time?: string | null
+          settings?: Json | null
+          template_message?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          delay_minutes?: number | null
+          follow_up_type?: Database["public"]["Enums"]["follow_up_type"] | null
+          id?: string
+          instance_id?: string
+          is_active?: boolean | null
+          schedule_days?: number[] | null
+          schedule_end_time?: string | null
+          schedule_start_time?: string | null
+          settings?: Json | null
+          template_message?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "instance_follow_ups_instance_id_fkey"
+            columns: ["instance_id"]
+            isOneToOne: false
+            referencedRelation: "evolution_instances"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       instance_metrics: {
         Row: {
           connection_time_minutes: number | null
@@ -427,6 +480,7 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
+      follow_up_type: "automatic" | "ai_generated" | "template"
       instance_objective:
         | "sales"
         | "support"
