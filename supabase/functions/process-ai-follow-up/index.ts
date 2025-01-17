@@ -16,6 +16,25 @@ serve(async (req) => {
     const { contact, followUp } = await req.json();
     console.log('📩 Processando follow-up AI para:', contact);
 
+    // Verificar se já passou o tempo de delay configurado
+    const lastMessageTime = new Date(contact.last_message_time || contact.created_at);
+    const now = new Date();
+    const minutesSinceLastMessage = (now.getTime() - lastMessageTime.getTime()) / (1000 * 60);
+
+    console.log('⏰ Tempo desde última mensagem:', minutesSinceLastMessage, 'minutos');
+    console.log('⚙️ Delay configurado:', followUp.delay_minutes, 'minutos');
+
+    if (minutesSinceLastMessage < followUp.delay_minutes) {
+      console.log('⏳ Ainda não é hora de enviar o follow-up');
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          message: 'Waiting for delay time' 
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     // Gerar mensagem com OpenAI
     const openAIResponse = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -40,31 +59,41 @@ serve(async (req) => {
     });
 
     if (!openAIResponse.ok) {
-      throw new Error(`OpenAI API error: ${await openAIResponse.text()}`);
+      const error = await openAIResponse.text();
+      console.error('❌ Erro OpenAI:', error);
+      throw new Error(`OpenAI API error: ${error}`);
     }
 
     const aiData = await openAIResponse.json();
     const message = aiData.choices[0].message.content;
+    console.log('✅ Mensagem gerada:', message);
 
     // Enviar mensagem via Evolution API
-    const evolutionResponse = await fetch(
-      `${Deno.env.get('EVOLUTION_API_URL')}/message/sendText/${followUp.instanceName}`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'apikey': Deno.env.get('EVOLUTION_API_KEY') || '',
-        },
-        body: JSON.stringify({
-          number: contact.TelefoneClientes,
-          text: message
-        }),
-      }
-    );
+    const evolutionApiUrl = (Deno.env.get('EVOLUTION_API_URL') || '').replace(/\/+$/, '');
+    const evolutionApiEndpoint = `${evolutionApiUrl}/message/sendText/${followUp.instanceName}`;
+    
+    console.log('🔗 Evolution API endpoint:', evolutionApiEndpoint);
+    
+    const evolutionResponse = await fetch(evolutionApiEndpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': Deno.env.get('EVOLUTION_API_KEY') || '',
+      },
+      body: JSON.stringify({
+        number: contact.TelefoneClientes,
+        text: message
+      }),
+    });
 
     if (!evolutionResponse.ok) {
-      throw new Error(`Evolution API error: ${await evolutionResponse.text()}`);
+      const error = await evolutionResponse.text();
+      console.error('❌ Erro Evolution API:', error);
+      throw new Error(`Evolution API error: ${error}`);
     }
+
+    const evolutionData = await evolutionResponse.json();
+    console.log('✅ Mensagem enviada:', evolutionData);
 
     // Atualizar status do contato
     const supabaseClient = createClient(
@@ -74,14 +103,18 @@ serve(async (req) => {
 
     const { error: updateError } = await supabaseClient
       .from('Users_clientes')
-      .update({ ConversationId: 'follow-up-sent' })
+      .update({ 
+        ConversationId: 'follow-up-sent',
+        last_message_time: new Date().toISOString()
+      })
       .eq('id', contact.id);
 
     if (updateError) {
+      console.error('❌ Erro ao atualizar contato:', updateError);
       throw updateError;
     }
 
-    console.log('✅ Follow-up AI processado com sucesso');
+    console.log('✅ Follow-up processado com sucesso');
 
     return new Response(
       JSON.stringify({ success: true, message }),

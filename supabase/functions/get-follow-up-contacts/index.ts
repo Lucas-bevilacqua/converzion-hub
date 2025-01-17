@@ -53,16 +53,20 @@ serve(async (req) => {
         currentTime <= followUp.schedule_end_time
       ) {
         // Buscar contatos que não receberam follow-up ainda
+        // ou que já passou o tempo de delay desde a última mensagem
         const { data: eligibleContacts, error: contactsError } = await supabaseClient
           .from('Users_clientes')
           .select('*')
           .eq('NomeDaEmpresa', followUp.instance_id)
-          .is('ConversationId', null)
+          .or(`ConversationId.is.null,and(last_message_time.lt.${new Date(now.getTime() - followUp.delay_minutes * 60000).toISOString()})`)
+          .limit(10) // Limitar a 10 contatos por vez para não sobrecarregar
 
         if (contactsError) {
           console.error('❌ Erro ao buscar contatos:', contactsError)
           continue
         }
+
+        console.log(`✅ Encontrados ${eligibleContacts?.length || 0} contatos elegíveis`)
 
         // Para follow-ups do tipo AI, precisamos incluir o prompt do sistema
         if (followUp.follow_up_type === 'ai_generated') {
@@ -92,7 +96,7 @@ serve(async (req) => {
       }
     }
 
-    console.log(`✅ Encontrados ${contacts.length} contatos para follow-up`)
+    console.log(`✅ Total de ${contacts.length} contatos para follow-up`)
 
     return new Response(
       JSON.stringify({ contacts }),
