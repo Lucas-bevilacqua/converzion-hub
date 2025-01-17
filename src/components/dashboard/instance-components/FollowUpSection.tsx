@@ -122,11 +122,10 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
           // Ensure we have a valid array with correct structure
           data.manual_messages = Array.isArray(parsedMessages) 
             ? parsedMessages.map((msg: Json) => {
-                // Type guard to ensure we're working with an object
                 if (typeof msg === 'object' && msg !== null) {
                   return {
-                    message: typeof msg.message === 'string' ? msg.message : '',
-                    delay_minutes: typeof msg.delay_minutes === 'number' ? msg.delay_minutes : 60
+                    message: typeof (msg as any).message === 'string' ? (msg as any).message : '',
+                    delay_minutes: typeof (msg as any).delay_minutes === 'number' ? (msg as any).delay_minutes : 60
                   }
                 }
                 return { message: '', delay_minutes: 60 }
@@ -156,7 +155,7 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
     stop_on_reply: followUp?.stop_on_reply ?? true,
     stop_on_keyword: followUp?.stop_on_keyword || ['comprou', 'agendou', 'agendado', 'comprado'],
     manual_messages: Array.isArray(followUp?.manual_messages) 
-      ? (followUp.manual_messages as JsonManualMessage[]).map(msg => ({
+      ? (followUp.manual_messages as ManualMessage[]).map(msg => ({
           message: msg.message || '',
           delay_minutes: Number(msg.delay_minutes) || 60
         }))
@@ -166,7 +165,7 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
   useEffect(() => {
     if (followUp) {
       const messages = Array.isArray(followUp.manual_messages)
-        ? (followUp.manual_messages as JsonManualMessage[]).map(msg => ({
+        ? (followUp.manual_messages as ManualMessage[]).map(msg => ({
             message: msg.message || '',
             delay_minutes: Number(msg.delay_minutes) || 60
           }))
@@ -509,7 +508,7 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
             onClick={() => {
               if (followUp) {
                 const messages = Array.isArray(followUp.manual_messages)
-                  ? (followUp.manual_messages as JsonManualMessage[]).map(msg => ({
+                  ? (followUp.manual_messages as ManualMessage[]).map(msg => ({
                       message: msg.message || '',
                       delay_minutes: Number(msg.delay_minutes) || 60
                     }))
