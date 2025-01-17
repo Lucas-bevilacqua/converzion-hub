@@ -18,13 +18,11 @@ serve(async (req) => {
       timestamp: startTime.getTime()
     })
     
-    // Criar cliente Supabase com service role key
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    // Buscar instâncias com follow-up ativo
     console.log('📋 Buscando follow-ups ativos...')
     const { data: followUps, error: followUpsError } = await supabaseClient
       .from('instance_follow_ups')
@@ -69,11 +67,9 @@ serve(async (req) => {
       }))
     })
 
-    // Para cada follow-up ativo, buscar contatos elegíveis
     const processedContacts = []
     
     for (const followUp of followUps) {
-      // Verificar se a instância está conectada
       if (followUp.instance?.connection_status !== 'connected') {
         console.log('⚠️ Instância desconectada, pulando:', {
           instanceId: followUp.instance_id,
@@ -91,7 +87,6 @@ serve(async (req) => {
         mensagens: followUp.manual_messages
       })
 
-      // Buscar contatos que ainda não receberam follow-up ou que estão no meio da sequência
       const { data: contacts, error: contactsError } = await supabaseClient
         .from('Users_clientes')
         .select('*')
@@ -126,7 +121,6 @@ serve(async (req) => {
         }))
       })
 
-      // Processar cada contato
       for (const contact of contacts) {
         console.log('👤 Iniciando processamento do contato:', {
           id: contact.id,
@@ -136,13 +130,11 @@ serve(async (req) => {
         })
 
         try {
-          // Determinar o índice da próxima mensagem
           let currentMessageIndex = -1
           if (contact.ConversationId?.startsWith('follow-up-sent-')) {
             currentMessageIndex = parseInt(contact.ConversationId.split('-').pop() || '-1')
           }
 
-          // Verificar se há mais mensagens para enviar
           const manualMessages = Array.isArray(followUp.manual_messages) ? followUp.manual_messages : []
           
           console.log('📝 Status das mensagens:', {
@@ -156,12 +148,10 @@ serve(async (req) => {
             continue
           }
 
-          // Calcular o tempo desde a última mensagem
           const lastMessageTime = new Date(contact.last_message_time || contact.created_at)
           const now = new Date()
           const minutesSinceLastMessage = Math.floor((now.getTime() - lastMessageTime.getTime()) / (1000 * 60))
 
-          // Obter o delay necessário para a próxima mensagem
           const nextMessage = manualMessages[currentMessageIndex + 1]
           if (!nextMessage) {
             console.error('❌ Próxima mensagem não encontrada:', {
@@ -172,21 +162,22 @@ serve(async (req) => {
             continue
           }
 
+          const minDelay = Math.max(3, nextMessage.delay_minutes || 3) // Changed from 10 to 3
+          
           console.log('⏰ Análise de tempo:', {
             ultimaMensagem: lastMessageTime.toISOString(),
             agora: now.toISOString(),
             minutos: minutesSinceLastMessage,
-            delayNecessario: nextMessage.delay_minutes,
-            podeEnviar: minutesSinceLastMessage >= nextMessage.delay_minutes
+            delayNecessario: minDelay,
+            podeEnviar: minutesSinceLastMessage >= minDelay
           })
 
-          // Verificar se já passou tempo suficiente
-          if (minutesSinceLastMessage < nextMessage.delay_minutes) {
+          if (minutesSinceLastMessage < minDelay) {
             console.log('⏳ Aguardando tempo necessário:', {
               contactId: contact.id,
               minutosPassados: minutesSinceLastMessage,
-              minutosNecessarios: nextMessage.delay_minutes,
-              faltam: nextMessage.delay_minutes - minutesSinceLastMessage
+              minutosNecessarios: minDelay,
+              faltam: minDelay - minutesSinceLastMessage
             })
             continue
           }
@@ -197,7 +188,6 @@ serve(async (req) => {
             mensagem: nextMessage.message
           })
 
-          // Fix URL construction by ensuring SUPABASE_URL is properly formatted
           const supabaseUrl = (Deno.env.get('SUPABASE_URL') || '').replace(/\/$/, '')
           
           const processResponse = await fetch(

@@ -24,13 +24,11 @@ serve(async (req) => {
       instancia: contact.followUp?.instanceName
     })
 
-    // Criar cliente Supabase
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    // Determinar próxima mensagem
     let currentMessageIndex = -1
     if (contact.ConversationId?.startsWith('follow-up-sent-')) {
       currentMessageIndex = parseInt(contact.ConversationId.split('-').pop() || '-1')
@@ -53,8 +51,6 @@ serve(async (req) => {
     }
 
     const nextMessage = manualMessages[nextMessageIndex]
-    
-    // Fix URL construction for Evolution API
     const evolutionApiUrl = (Deno.env.get('EVOLUTION_API_URL') || '').replace(/\/$/, '')
     
     console.log('🚀 Enviando mensagem via Evolution API:', {
@@ -63,7 +59,6 @@ serve(async (req) => {
       mensagem: nextMessage.message
     })
 
-    // Enviar mensagem
     const evolutionResponse = await fetch(
       `${evolutionApiUrl}/message/sendText/${contact.followUp.instanceName}`,
       {
@@ -90,7 +85,6 @@ serve(async (req) => {
 
     const evolutionData = await evolutionResponse.json()
     
-    // Atualizar status do contato
     const { error: updateError } = await supabaseClient
       .from('Users_clientes')
       .update({
@@ -104,7 +98,6 @@ serve(async (req) => {
       throw updateError
     }
 
-    // Registrar mensagem
     const { error: messageError } = await supabaseClient
       .from('chat_messages')
       .insert({
