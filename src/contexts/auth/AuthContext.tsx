@@ -12,29 +12,60 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    console.log("Initializing auth state...");
+    console.log("Inicializando estado de autenticação...");
     
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      console.log("Session retrieved:", session ? "Session found" : "No session");
-      setSession(session);
-      setUser(session?.user ?? null);
+    // Função para recuperar e atualizar a sessão
+    const getInitialSession = async () => {
+      try {
+        console.log("Buscando sessão inicial...");
+        const { data: { session: initialSession }, error } = await supabase.auth.getSession();
+        
+        if (error) {
+          console.error("Erro ao buscar sessão inicial:", error);
+          throw error;
+        }
+
+        console.log("Sessão inicial:", initialSession ? "Encontrada" : "Não encontrada");
+        setSession(initialSession);
+        setUser(initialSession?.user ?? null);
+      } catch (error) {
+        console.error("Erro ao inicializar sessão:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    // Inicializa a sessão
+    getInitialSession();
+
+    // Configura o listener de mudanças de autenticação
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, currentSession) => {
+      console.log("Mudança no estado de autenticação:", event);
+      console.log("Nova sessão:", currentSession ? "Presente" : "Ausente");
+
+      setSession(currentSession);
+      setUser(currentSession?.user ?? null);
       setLoading(false);
+
+      if (event === 'TOKEN_REFRESHED') {
+        console.log("Token atualizado com sucesso");
+      }
+
+      if (event === 'SIGNED_OUT') {
+        console.log("Usuário desconectado, limpando dados locais");
+        localStorage.clear();
+        sessionStorage.clear();
+      }
     });
 
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      console.log("Auth state changed:", _event);
-      setSession(session);
-      setUser(session?.user ?? null);
-      setLoading(false);
-    });
-
-    return () => subscription.unsubscribe();
+    return () => {
+      console.log("Limpando subscription de auth");
+      subscription.unsubscribe();
+    };
   }, []);
 
   const signIn = async (email: string, password: string) => {
-    console.log("Attempting sign in...");
+    console.log("Tentando fazer login...");
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
@@ -42,7 +73,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
 
       if (error) {
-        console.error("Sign in error:", error);
+        console.error("Erro no login:", error);
         const errorMessage = parseAuthError(error);
         throw new Error(errorMessage);
       }
@@ -51,9 +82,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         throw new Error("Erro ao fazer login");
       }
 
-      console.log("Sign in successful");
+      console.log("Login realizado com sucesso");
     } catch (error) {
-      console.error("Sign in catch block error:", error);
+      console.error("Erro no bloco catch do login:", error);
       if (error instanceof Error) {
         throw error;
       }
@@ -63,7 +94,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signUp = async (email: string, password: string, fullName: string) => {
-    console.log("Attempting sign up...");
+    console.log("Tentando criar conta...");
     try {
       const { data, error } = await supabase.auth.signUp({
         email,
@@ -76,7 +107,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
 
       if (error) {
-        console.error("Sign up error:", error);
+        console.error("Erro no cadastro:", error);
         const errorMessage = parseAuthError(error);
         throw new Error(errorMessage);
       }
@@ -85,9 +116,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         throw new Error("Erro ao criar conta");
       }
 
-      console.log("Sign up successful");
+      console.log("Conta criada com sucesso");
     } catch (error) {
-      console.error("Sign up catch block error:", error);
+      console.error("Erro no bloco catch do cadastro:", error);
       if (error instanceof Error) {
         throw error;
       }
@@ -97,40 +128,39 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signOut = async () => {
-    console.log("Attempting sign out...");
-    
-    // First clear local state
-    setSession(null);
-    setUser(null);
+    console.log("Iniciando processo de logout...");
     
     try {
-      // Clear local storage and session storage
+      // Primeiro limpa o estado local
+      setSession(null);
+      setUser(null);
+      
+      // Limpa storages locais
       localStorage.clear();
       sessionStorage.clear();
       
-      // Attempt to clear Supabase session with local scope only
+      // Tenta fazer logout no Supabase com escopo local
       const { error } = await supabase.auth.signOut({ scope: 'local' });
       
       if (error) {
-        console.error("Sign out error:", error);
-        // Don't throw for JWT validation errors
-        if (error.message.includes("JWT") || 
-            error.message.includes("User not found") || 
-            error.status === 403) {
-          console.log("Non-critical sign out error:", error.message);
-          return;
+        console.error("Erro no logout:", error);
+        // Não lança erro para erros de validação JWT
+        if (!error.message.includes("JWT") && 
+            !error.message.includes("User not found") && 
+            error.status !== 403) {
+          throw error;
         }
-        throw error;
+        console.log("Erro não crítico no logout:", error.message);
       }
       
-      console.log("Sign out successful");
+      console.log("Logout realizado com sucesso");
     } catch (error) {
-      console.error("Sign out catch block error:", error);
-      // Only throw for critical errors
+      console.error("Erro no bloco catch do logout:", error);
+      // Só lança erro para erros críticos
       if (error instanceof Error && 
           !error.message.includes("JWT") && 
           !error.message.includes("User not found") &&
-          error.message.includes("403")) {
+          !error.message.includes("403")) {
         throw new Error("Erro ao fazer logout");
       }
     }
@@ -148,7 +178,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 export function useAuth() {
   const context = useContext(AuthContext);
   if (context === undefined) {
-    throw new Error("useAuth must be used within an AuthProvider");
+    throw new Error("useAuth deve ser usado dentro de um AuthProvider");
   }
   return context;
 }
