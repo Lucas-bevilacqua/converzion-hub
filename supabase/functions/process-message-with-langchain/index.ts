@@ -8,7 +8,7 @@ import {
   HumanMessagePromptTemplate,
   SystemMessagePromptTemplate,
   MessagesPlaceholder 
-} from "https://esm.sh/langchain@0.0.214/prompts"
+} from "https://esm.sh/@langchain/core@0.1.63/prompts"
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
