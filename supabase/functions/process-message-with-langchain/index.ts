@@ -1,8 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
-import { ChatOpenAI } from "https://esm.sh/@langchain/openai@0.0.10"
-import { ChatPromptTemplate } from "https://esm.sh/@langchain/core@0.1.10/prompts"
-import { StringOutputParser } from "https://esm.sh/@langchain/core@0.1.10/output_parsers"
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -45,28 +42,34 @@ serve(async (req) => {
 
     console.log('✅ Instance fetched:', instance)
 
-    const model = new ChatOpenAI({
-      openAIApiKey: Deno.env.get('OPENAI_API_KEY'),
-      modelName: 'gpt-4',
-      temperature: 0.7,
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${Deno.env.get('OPENAI_API_KEY')}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        messages: [
+          { 
+            role: 'system', 
+            content: instance.system_prompt || "You are a helpful AI assistant." 
+          },
+          { 
+            role: 'user', 
+            content: message 
+          }
+        ],
+      }),
     })
 
-    const prompt = ChatPromptTemplate.fromMessages([
-      ["system", instance.system_prompt || "You are a helpful AI assistant."],
-      ["human", "{input}"]
-    ])
+    const data = await response.json()
+    console.log('✅ OpenAI response:', data)
 
-    const chain = prompt.pipe(model).pipe(new StringOutputParser())
-
-    console.log('🤖 Processing message with LangChain...')
-    const response = await chain.invoke({
-      input: message,
-    })
-
-    console.log('✅ LangChain response:', response)
+    const aiResponse = data.choices[0].message.content
 
     return new Response(
-      JSON.stringify({ success: true, response }),
+      JSON.stringify({ success: true, response: aiResponse }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   } catch (error) {
