@@ -25,40 +25,55 @@ serve(async (req) => {
     const now = new Date()
     const minutesSinceLastMessage = (now.getTime() - lastMessageTime.getTime()) / (1000 * 60)
 
-    // Encontrar a próxima mensagem baseada no tempo acumulado
-    let accumulatedDelay = 0
-    let nextMessageIndex = -1
-    let nextMessage = null
+    // Encontrar a próxima mensagem baseada no tempo acumulado e ConversationId
+    let currentMessageIndex = -1
+    if (contact.ConversationId && contact.ConversationId.startsWith('follow-up-sent-')) {
+      currentMessageIndex = parseInt(contact.ConversationId.split('-').pop() || '-1')
+    }
+
+    const nextMessageIndex = currentMessageIndex + 1
 
     console.log('⏰ Calculando próxima mensagem:', {
       tempoDesdeUltima: minutesSinceLastMessage,
-      mensagensDisponiveis: contact.followUp.messages.length
+      mensagensDisponiveis: contact.followUp.messages.length,
+      indiceAtual: currentMessageIndex,
+      proximoIndice: nextMessageIndex
     })
 
-    for (let i = 0; i < contact.followUp.messages.length; i++) {
-      accumulatedDelay += contact.followUp.messages[i].delay_minutes
-      if (minutesSinceLastMessage >= accumulatedDelay) {
-        nextMessageIndex = i + 1 // Próxima mensagem
-      }
-    }
-
-    // Se encontrou próxima mensagem e está dentro do limite
-    if (nextMessageIndex >= 0 && nextMessageIndex < contact.followUp.messages.length) {
-      nextMessage = contact.followUp.messages[nextMessageIndex]
-      console.log('✅ Próxima mensagem encontrada:', {
-        indice: nextMessageIndex,
-        atrasoAcumulado: accumulatedDelay,
-        mensagem: nextMessage
-      })
-    } else {
-      console.log('⏳ Nenhuma mensagem disponível para envio:', {
-        indice: nextMessageIndex,
-        totalMensagens: contact.followUp.messages.length
-      })
+    // Verificar se há próxima mensagem disponível
+    if (nextMessageIndex >= contact.followUp.messages.length) {
+      console.log('⏳ Sequência de mensagens completa')
       return new Response(
         JSON.stringify({ 
           success: false, 
-          message: 'Nenhuma mensagem disponível para envio' 
+          message: 'Sequência de mensagens completa' 
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    // Obter a próxima mensagem
+    const nextMessage = contact.followUp.messages[nextMessageIndex]
+    
+    // Calcular tempo acumulado até a próxima mensagem
+    let accumulatedDelay = 0
+    for (let i = 0; i <= nextMessageIndex; i++) {
+      accumulatedDelay += contact.followUp.messages[i].delay_minutes
+    }
+
+    console.log('⏰ Verificando tempo para próxima mensagem:', {
+      atrasoAcumulado: accumulatedDelay,
+      tempoPassado: minutesSinceLastMessage,
+      deveEnviar: minutesSinceLastMessage >= contact.followUp.messages[nextMessageIndex].delay_minutes
+    })
+
+    // Verificar se já passou tempo suficiente
+    if (minutesSinceLastMessage < contact.followUp.messages[nextMessageIndex].delay_minutes) {
+      console.log('⏳ Ainda não é hora de enviar a próxima mensagem')
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          message: 'Aguardando intervalo para próxima mensagem' 
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
@@ -122,7 +137,7 @@ serve(async (req) => {
 
     console.log('📝 Atualizando registro do contato:', {
       id: contact.id,
-      novoStatus: 'follow-up-sent',
+      novoStatus: `follow-up-sent-${nextMessageIndex}`,
       mensagemEnviada: nextMessageIndex
     })
 
