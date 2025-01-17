@@ -101,7 +101,7 @@ serve(async (req) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4o-mini',
+        model: 'gpt-4',
         messages: messages,
         temperature: 0.7,
       }),
@@ -126,7 +126,7 @@ serve(async (req) => {
         'apikey': Deno.env.get('EVOLUTION_API_KEY') || '',
       },
       body: JSON.stringify({
-        number: phoneNumber,
+        number: phoneNumber.includes('@') ? phoneNumber : `${phoneNumber}@s.whatsapp.net`,
         text: aiResponse
       }),
     })
