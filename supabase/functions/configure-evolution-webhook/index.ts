@@ -40,7 +40,7 @@ serve(async (req) => {
     const cleanBaseUrl = EVOLUTION_API_URL.replace(/\/+$/, '')
     
     // URL do webhook da Supabase
-    const webhookUrl = `https://${SUPABASE_PROJECT_ID}.supabase.co/functions/v1/evolution-webhook`
+    const webhookUrl = `https://${SUPABASE_PROJECT_ID}.functions.supabase.co/evolution-webhook`
     
     console.log('Configurando webhook:', {
       baseUrl: cleanBaseUrl,
@@ -84,29 +84,6 @@ serve(async (req) => {
 
     const result = await response.json()
     console.log('Webhook configurado com sucesso:', result)
-
-    // Faz uma chamada de teste para verificar se o webhook está funcionando
-    console.log('Fazendo chamada de teste para o webhook...')
-    const testResponse = await fetch(webhookUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        event: 'TEST',
-        instance: {
-          instanceName: instanceName
-        },
-        data: {
-          test: true
-        }
-      })
-    })
-
-    console.log('Resposta do teste do webhook:', {
-      status: testResponse.status,
-      ok: testResponse.ok
-    })
 
     return new Response(
       JSON.stringify(result),
