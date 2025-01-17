@@ -51,10 +51,26 @@ serve(async (req) => {
 
       const instanceName = payload.instance
       const phoneNumber = payload.data.key.remoteJid
+      const messageId = payload.data.key.id // ID único da mensagem do WhatsApp
       
       if (!instanceName) {
         console.error('❌ Instance name not found in webhook payload')
         throw new Error('Instance name not found in webhook payload')
+      }
+
+      // Verifica se a mensagem já foi processada
+      const { data: existingMessage } = await supabaseClient
+        .from('chat_messages')
+        .select('id')
+        .eq('whatsapp_message_id', messageId)
+        .single()
+
+      if (existingMessage) {
+        console.log('⚠️ Message already processed, skipping:', messageId)
+        return new Response(
+          JSON.stringify({ success: true, skipped: true }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
       }
 
       // Cria uma chave única para este usuário/instância
@@ -80,7 +96,7 @@ serve(async (req) => {
 
           if (instanceError) throw instanceError
 
-          // Salva a mensagem no histórico
+          // Salva a mensagem no histórico com o ID único do WhatsApp
           if (!payload.data.key.fromMe) {
             await supabaseClient
               .from('chat_messages')
@@ -88,7 +104,8 @@ serve(async (req) => {
                 instance_id: instance.id,
                 user_id: instance.user_id,
                 sender_type: 'user',
-                content: payload.data.message.conversation || payload.data.message.text || ''
+                content: payload.data.message.conversation || payload.data.message.text || '',
+                whatsapp_message_id: messageId
               }])
 
             // Processa com LangChain
