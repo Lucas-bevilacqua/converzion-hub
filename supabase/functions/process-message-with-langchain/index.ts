@@ -7,14 +7,29 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Reduced accumulation time to 3 seconds for better responsiveness
-const MESSAGE_ACCUMULATION_TIME = 3000; // 3 seconds
+// Reduced to 1.5 seconds for faster response
+const MESSAGE_ACCUMULATION_TIME = 1500;
+
+// Global cleanup interval to prevent memory leaks
+const CLEANUP_INTERVAL = 60000; // 1 minute
 
 const messageQueue = new Map<string, {
   messages: { role: string; content: string }[];
   lastUpdate: number;
   processing: boolean;
+  attempts: number;
 }>();
+
+// Cleanup old queues periodically
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, queue] of messageQueue.entries()) {
+    if (now - queue.lastUpdate > CLEANUP_INTERVAL) {
+      console.log('🧹 Cleaning up old queue:', key);
+      messageQueue.delete(key);
+    }
+  }
+}, CLEANUP_INTERVAL);
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -25,20 +40,27 @@ serve(async (req) => {
     const { message, instanceId, phoneNumber } = await req.json();
     console.log('📩 Received message:', { message, instanceId, phoneNumber });
 
-    // Create queue key
     const queueKey = `${instanceId}-${phoneNumber}`;
     const now = Date.now();
     
-    // Initialize or update queue
     if (!messageQueue.has(queueKey)) {
       messageQueue.set(queueKey, {
         messages: [],
         lastUpdate: now,
-        processing: false
+        processing: false,
+        attempts: 0
       });
     }
 
     const queue = messageQueue.get(queueKey)!;
+
+    // Reset processing flag if it's been stuck for too long (30 seconds)
+    if (queue.processing && now - queue.lastUpdate > 30000) {
+      console.log('🔄 Resetting stuck processing flag for:', queueKey);
+      queue.processing = false;
+      queue.attempts = 0;
+    }
+
     queue.messages.push({ role: 'user', content: message });
     queue.lastUpdate = now;
 
@@ -47,7 +69,7 @@ serve(async (req) => {
       console.log('⏳ Already processing messages for:', queueKey);
       return new Response(JSON.stringify({ 
         status: 'accumulating',
-        message: 'Messages are being accumulated before processing'
+        message: 'Messages are being accumulated'
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
@@ -56,16 +78,24 @@ serve(async (req) => {
     // Check if enough time has passed since last message
     const timeSinceLastUpdate = now - queue.lastUpdate;
     if (timeSinceLastUpdate < MESSAGE_ACCUMULATION_TIME) {
-      console.log('⏳ Accumulating messages for:', queueKey);
+      console.log('⏳ Accumulating messages for:', queueKey, 'Time left:', MESSAGE_ACCUMULATION_TIME - timeSinceLastUpdate);
       return new Response(JSON.stringify({ 
         status: 'accumulating',
-        message: 'Messages are being accumulated before processing'
+        message: 'Messages are being accumulated'
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
 
-    // Mark as processing to prevent duplicate processing
+    // Increment attempts and check if we've tried too many times
+    queue.attempts++;
+    if (queue.attempts > 3) {
+      console.error('❌ Too many attempts for:', queueKey);
+      messageQueue.delete(queueKey);
+      throw new Error('Too many processing attempts');
+    }
+
+    // Mark as processing
     queue.processing = true;
 
     const supabaseClient = createClient(
@@ -80,7 +110,10 @@ serve(async (req) => {
       .eq('id', instanceId)
       .maybeSingle();
 
-    if (instanceError) throw instanceError;
+    if (instanceError) {
+      console.error('❌ Instance error:', instanceError);
+      throw instanceError;
+    }
 
     // Get chat history
     const { data: chatHistory, error: chatError } = await supabaseClient
@@ -90,7 +123,10 @@ serve(async (req) => {
       .order('created_at', { ascending: true })
       .limit(10);
 
-    if (chatError) throw chatError;
+    if (chatError) {
+      console.error('❌ Chat history error:', chatError);
+      throw chatError;
+    }
 
     // Prepare messages for OpenAI
     const messages = [
@@ -102,10 +138,9 @@ serve(async (req) => {
         role: msg.sender_type === 'user' ? 'user' : 'assistant',
         content: msg.content
       })) || [],
-      ...queue.messages // Add accumulated messages
+      ...queue.messages
     ];
 
-    // Get OpenAI response
     console.log('🤖 Sending request to OpenAI with messages:', messages);
     const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -122,6 +157,7 @@ serve(async (req) => {
 
     if (!openaiResponse.ok) {
       const error = await openaiResponse.text();
+      console.error('❌ OpenAI API error:', error);
       throw new Error(`OpenAI API error: ${error}`);
     }
 
@@ -131,7 +167,7 @@ serve(async (req) => {
 
     // Save all accumulated messages
     for (const queuedMsg of queue.messages) {
-      await supabaseClient
+      const { error: saveError } = await supabaseClient
         .from('chat_messages')
         .insert({
           instance_id: instanceId,
@@ -139,10 +175,15 @@ serve(async (req) => {
           sender_type: 'user',
           content: queuedMsg.content
         });
+
+      if (saveError) {
+        console.error('❌ Error saving user message:', saveError);
+        throw saveError;
+      }
     }
 
     // Save AI response
-    await supabaseClient
+    const { error: saveResponseError } = await supabaseClient
       .from('chat_messages')
       .insert({
         instance_id: instanceId,
@@ -151,7 +192,13 @@ serve(async (req) => {
         content: aiResponse
       });
 
+    if (saveResponseError) {
+      console.error('❌ Error saving AI response:', saveResponseError);
+      throw saveResponseError;
+    }
+
     // Send through Evolution API
+    console.log('📤 Sending message through Evolution API');
     const evolutionResponse = await fetch(
       `${Deno.env.get('EVOLUTION_API_URL')}/message/sendText/${instance.name}`,
       {
@@ -169,8 +216,12 @@ serve(async (req) => {
 
     if (!evolutionResponse.ok) {
       const error = await evolutionResponse.text();
+      console.error('❌ Evolution API error:', error);
       throw new Error(`Evolution API error: ${error}`);
     }
+
+    const evolutionData = await evolutionResponse.json();
+    console.log('✅ Evolution API response:', evolutionData);
 
     // Clear queue after successful processing
     messageQueue.delete(queueKey);
@@ -184,7 +235,7 @@ serve(async (req) => {
     );
 
   } catch (error) {
-    console.error('❌ Error:', error);
+    console.error('❌ Function error:', error);
     return new Response(
       JSON.stringify({ 
         success: false,
