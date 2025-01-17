@@ -30,10 +30,11 @@ serve(async (req) => {
     const EVOLUTION_API_URL = Deno.env.get('EVOLUTION_API_URL')
     const EVOLUTION_API_KEY = Deno.env.get('EVOLUTION_API_KEY')
     const SUPABASE_PROJECT_ID = 'vodexhppkasbulogmcqb'
+    const ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')
 
-    if (!EVOLUTION_API_URL || !EVOLUTION_API_KEY) {
-      console.error('Configuração da Evolution API não encontrada')
-      throw new Error('Configuração da Evolution API não encontrada')
+    if (!EVOLUTION_API_URL || !EVOLUTION_API_KEY || !ANON_KEY) {
+      console.error('Configurações necessárias não encontradas')
+      throw new Error('Configurações necessárias não encontradas')
     }
 
     // Limpa a URL base removendo barras extras
@@ -61,7 +62,8 @@ serve(async (req) => {
           url: webhookUrl,
           base64: true,
           headers: {
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            'apikey': ANON_KEY
           },
           events: [
             "MESSAGES_UPSERT",
