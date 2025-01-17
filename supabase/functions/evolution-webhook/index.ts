@@ -19,7 +19,6 @@ serve(async (req) => {
   }
 
   try {
-    console.log('👉 Starting to process webhook request')
     const payload = await req.json()
     console.log('📦 Webhook payload received:', JSON.stringify(payload, null, 2))
 
@@ -29,7 +28,11 @@ serve(async (req) => {
     )
 
     if (payload.event === 'messages.upsert') {
-      console.log('📨 Received message event:', payload)
+      console.log('📨 Processing message event:', {
+        content: payload.message?.content,
+        from: payload.message?.from,
+        instance: payload.instance
+      })
       
       if (!payload.message) {
         console.error('❌ No message data in payload')
@@ -66,15 +69,25 @@ serve(async (req) => {
         userId: instance.user_id
       })
 
-      if (payload.message?.fromMe === false) {
-        console.log('📥 Processing incoming message:', {
-          content: payload.message.content,
-          from: payload.message.from,
-          instanceId: instance.id
-        })
+      // Salvar a mensagem no histórico
+      if (!payload.message.fromMe) {
+        console.log('💾 Saving incoming message to chat history')
+        const { error: saveError } = await supabaseClient
+          .from('chat_messages')
+          .insert([{
+            instance_id: instance.id,
+            user_id: instance.user_id,
+            sender_type: 'user',
+            content: payload.message.content
+          }])
+
+        if (saveError) {
+          console.error('❌ Error saving message:', saveError)
+          throw saveError
+        }
 
         // Processar mensagem com LangChain
-        console.log('🤖 Calling process-message-with-langchain function')
+        console.log('🤖 Processing message with LangChain')
         const { data: response, error } = await supabaseClient.functions.invoke(
           'process-message-with-langchain',
           {
@@ -91,35 +104,12 @@ serve(async (req) => {
           throw error
         }
 
-        // Enviar resposta via Evolution API
-        console.log('📤 Sending response through Evolution API:', response)
-        const evolutionResponse = await fetch(
-          `${Deno.env.get('EVOLUTION_API_URL')}/message/sendText/${instanceName}`,
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'apikey': Deno.env.get('EVOLUTION_API_KEY') || '',
-            },
-            body: JSON.stringify({
-              number: payload.message.from,
-              text: response.response || "Desculpe, não consegui processar sua mensagem."
-            }),
-          }
-        )
-
-        if (!evolutionResponse.ok) {
-          const error = await evolutionResponse.text()
-          console.error('❌ Evolution API error:', error)
-          throw new Error(`Evolution API error: ${error}`)
-        }
-
-        console.log('✅ Successfully sent response')
+        console.log('✅ Message processed successfully')
       } else {
         console.log('⏭️ Skipping message from bot (fromMe=true)')
       }
     } else if (payload.event === 'connection.update') {
-      console.log('🔌 Received connection update event:', payload)
+      console.log('🔌 Processing connection update:', payload)
       
       const instanceName = payload.instance?.instanceName
       if (instanceName) {
@@ -137,7 +127,7 @@ serve(async (req) => {
           throw updateError
         }
 
-        console.log('✅ Successfully updated instance status')
+        console.log('✅ Connection status updated successfully')
       }
     } else {
       console.log('⚠️ Unhandled event type:', payload.event)
