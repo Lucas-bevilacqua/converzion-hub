@@ -13,38 +13,19 @@ serve(async (req) => {
   }
 
   try {
-    const { contact, followUp } = await req.json();
-    console.log('📩 Processing AI follow-up for:', contact);
+    const { instanceId, instanceName, userId, delayMinutes, maxAttempts, stopOnReply, stopKeywords } = await req.json();
+    console.log('📩 Processing AI follow-up for instance:', instanceId);
 
-    // Verificar se já passou o tempo de delay configurado
-    const lastMessageTime = new Date(contact.last_message_time || contact.created_at);
-    const now = new Date();
-    const minutesSinceLastMessage = (now.getTime() - lastMessageTime.getTime()) / (1000 * 60);
-
-    console.log('⏰ Time since last message:', minutesSinceLastMessage, 'minutes');
-    console.log('⚙️ Configured delay:', followUp.delay_minutes, 'minutes');
-
-    if (minutesSinceLastMessage < followUp.delay_minutes) {
-      console.log('⏳ Not time to send follow-up yet');
-      return new Response(
-        JSON.stringify({ 
-          success: false, 
-          message: 'Waiting for delay time' 
-        }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // Get chat history for context
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
+    // Get chat history for context
     const { data: chatHistory, error: chatError } = await supabaseClient
       .from('chat_messages')
       .select('*')
-      .eq('instance_id', followUp.instance_id)
+      .eq('instance_id', instanceId)
       .order('created_at', { ascending: false })
       .limit(5);
 
@@ -72,12 +53,12 @@ serve(async (req) => {
         messages: [
           { 
             role: 'system', 
-            content: followUp.system_prompt || 'Você é um assistente prestativo que gera mensagens de follow-up personalizadas e naturais.'
+            content: 'Você é um assistente que gera mensagens de follow-up personalizadas e naturais para clientes que não responderam.'
           },
           ...contextMessages,
           { 
             role: 'user', 
-            content: `Por favor, gere uma mensagem de follow up para o cliente ${contact.NomeClientes || 'cliente'}. 
+            content: `Por favor, gere uma mensagem de follow up para o cliente. 
                      A mensagem deve ser amigável e profissional, considerando o histórico da conversa.
                      Mantenha a mensagem curta e direta.`
           }
@@ -98,7 +79,7 @@ serve(async (req) => {
 
     // Send message via Evolution API
     const evolutionApiUrl = (Deno.env.get('EVOLUTION_API_URL') || '').replace(/\/+$/, '');
-    const evolutionApiEndpoint = `${evolutionApiUrl}/message/sendText/${followUp.instance_name}`;
+    const evolutionApiEndpoint = `${evolutionApiUrl}/message/sendText/${instanceName}`;
     
     console.log('🔗 Evolution API endpoint:', evolutionApiEndpoint);
     
@@ -109,7 +90,7 @@ serve(async (req) => {
         'apikey': Deno.env.get('EVOLUTION_API_KEY') || '',
       },
       body: JSON.stringify({
-        number: contact.TelefoneClientes,
+        number: chatHistory[0]?.phone_number,
         text: message
       }),
     });
@@ -123,33 +104,19 @@ serve(async (req) => {
     const evolutionData = await evolutionResponse.json();
     console.log('✅ Message sent:', evolutionData);
 
-    // Update contact status and last message time
-    const { error: updateError } = await supabaseClient
-      .from('Users_clientes')
-      .update({ 
-        ConversationId: 'follow-up-sent',
-        last_message_time: new Date().toISOString()
-      })
-      .eq('id', contact.id);
-
-    if (updateError) {
-      console.error('❌ Error updating contact:', updateError);
-      throw updateError;
-    }
-
     // Save message in chat history
     const { error: chatSaveError } = await supabaseClient
       .from('chat_messages')
       .insert({
-        instance_id: followUp.instance_id,
-        user_id: followUp.user_id,
+        instance_id: instanceId,
+        user_id: userId,
         sender_type: 'assistant',
         content: message
       });
 
     if (chatSaveError) {
       console.error('❌ Error saving message to chat history:', chatSaveError);
-      // Don't throw here, continue as the message was already sent
+      throw chatSaveError;
     }
 
     console.log('✅ AI follow-up processed successfully');

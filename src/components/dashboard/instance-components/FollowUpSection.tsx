@@ -216,6 +216,40 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
           throw chatError
         }
       }
+
+      // Get instance name for AI follow-up
+      if (values.follow_up_type === 'ai_generated') {
+        const { data: instance, error: instanceError } = await supabase
+          .from('evolution_instances')
+          .select('name')
+          .eq('id', instanceId)
+          .single()
+
+        if (instanceError) {
+          console.error('Erro ao buscar nome da instância:', instanceError)
+          throw instanceError
+        }
+
+        // Invoke the process-ai-follow-up function
+        const { data: aiResponse, error: aiError } = await supabase.functions.invoke('process-ai-follow-up', {
+          body: {
+            instanceId,
+            instanceName: instance.name,
+            userId: user?.id,
+            delayMinutes: values.delay_minutes,
+            maxAttempts: values.max_attempts,
+            stopOnReply: values.stop_on_reply,
+            stopKeywords: values.stop_on_keyword
+          }
+        })
+
+        if (aiError) {
+          console.error('Erro ao configurar follow-up de IA:', aiError)
+          throw aiError
+        }
+
+        console.log('AI follow-up response:', aiResponse)
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['follow-up'] })
