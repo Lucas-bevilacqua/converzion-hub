@@ -6,6 +6,9 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+const WAIT_TIME = 5000; // 5 segundos de espera
+const messageQueue = new Map();
+
 console.log('⚡ Evolution Webhook function initialized')
 
 serve(async (req) => {
@@ -26,7 +29,6 @@ serve(async (req) => {
     let payload
     try {
       const webhookData = JSON.parse(rawBody)
-      // Verifica se é um array e pega o primeiro item
       payload = Array.isArray(webhookData) ? webhookData[0].body : webhookData
       console.log('✅ Parsed webhook payload:', JSON.stringify(payload, null, 2))
     } catch (parseError) {
@@ -34,20 +36,13 @@ serve(async (req) => {
       throw new Error('Invalid JSON payload')
     }
 
-    console.log('🔍 Initializing Supabase client')
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    // Processar diferentes tipos de eventos
     if (payload.event === 'messages.upsert' || payload.event === 'messages.set') {
-      console.log('📨 Processing message event:', {
-        instance: payload.instance,
-        sender: payload.sender,
-        messageContent: payload.data?.message?.conversation,
-        messageType: payload.data?.messageType
-      })
+      console.log('📨 Processing message event')
       
       if (!payload.data?.message) {
         console.error('❌ No message data in payload')
@@ -55,115 +50,67 @@ serve(async (req) => {
       }
 
       const instanceName = payload.instance
+      const phoneNumber = payload.data.key.remoteJid
+      
       if (!instanceName) {
         console.error('❌ Instance name not found in webhook payload')
         throw new Error('Instance name not found in webhook payload')
       }
 
-      console.log('🔍 Looking for instance:', instanceName)
-
-      const { data: instance, error: instanceError } = await supabaseClient
-        .from('evolution_instances')
-        .select('*, profiles!inner(*)')
-        .eq('name', instanceName)
-        .single()
-
-      if (instanceError) {
-        console.error('❌ Error fetching instance:', instanceError)
-        throw instanceError
+      // Cria uma chave única para este usuário/instância
+      const queueKey = `${instanceName}-${phoneNumber}`
+      
+      // Limpa qualquer timer existente para este usuário
+      if (messageQueue.has(queueKey)) {
+        clearTimeout(messageQueue.get(queueKey))
       }
+      
+      // Define um novo timer
+      const timer = setTimeout(async () => {
+        console.log(`⏰ Timer expired for ${queueKey}, processing messages...`)
+        messageQueue.delete(queueKey)
+        
+        try {
+          // Processa a mensagem após o tempo de espera
+          const { data: instance, error: instanceError } = await supabaseClient
+            .from('evolution_instances')
+            .select('*, profiles!inner(*)')
+            .eq('name', instanceName)
+            .single()
 
-      if (!instance) {
-        console.error(`❌ Instance not found: ${instanceName}`)
-        throw new Error(`Instance not found: ${instanceName}`)
-      }
+          if (instanceError) throw instanceError
 
-      console.log('✅ Found instance:', {
-        id: instance.id,
-        name: instance.name,
-        userId: instance.user_id
-      })
+          // Salva a mensagem no histórico
+          if (!payload.data.key.fromMe) {
+            await supabaseClient
+              .from('chat_messages')
+              .insert([{
+                instance_id: instance.id,
+                user_id: instance.user_id,
+                sender_type: 'user',
+                content: payload.data.message.conversation || payload.data.message.text || ''
+              }])
 
-      // Salvar a mensagem no histórico
-      if (!payload.data.key.fromMe) {
-        console.log('💾 Saving incoming message to chat history')
-        const { error: saveError } = await supabaseClient
-          .from('chat_messages')
-          .insert([{
-            instance_id: instance.id,
-            user_id: instance.user_id,
-            sender_type: 'user',
-            content: payload.data.message.conversation || payload.data.message.text || ''
-          }])
-
-        if (saveError) {
-          console.error('❌ Error saving message:', saveError)
-          throw saveError
-        }
-
-        console.log('✅ Message saved successfully')
-
-        // Processar mensagem com LangChain
-        console.log('🤖 Processing message with LangChain')
-        const { data: response, error } = await supabaseClient.functions.invoke(
-          'process-message-with-langchain',
-          {
-            body: {
-              message: payload.data.message.conversation || payload.data.message.text || '',
-              instanceId: instance.id,
-              phoneNumber: payload.data.key.remoteJid
-            }
+            // Processa com LangChain
+            await supabaseClient.functions.invoke(
+              'process-message-with-langchain',
+              {
+                body: {
+                  message: payload.data.message.conversation || payload.data.message.text || '',
+                  instanceId: instance.id,
+                  phoneNumber: phoneNumber
+                }
+              }
+            )
           }
-        )
-
-        if (error) {
-          console.error('❌ Error processing message:', error)
-          throw error
+        } catch (error) {
+          console.error('❌ Error processing delayed message:', error)
         }
+      }, WAIT_TIME)
 
-        console.log('✅ LangChain response:', response)
-
-        // Enviar resposta via Evolution API
-        console.log('📤 Sending response through Evolution API')
-        const evolutionApiUrl = Deno.env.get('EVOLUTION_API_URL')
-        const evolutionApiKey = Deno.env.get('EVOLUTION_API_KEY')
-
-        if (!evolutionApiUrl || !evolutionApiKey) {
-          console.error('❌ Missing Evolution API configuration')
-          throw new Error('Missing Evolution API configuration')
-        }
-
-        const evolutionResponse = await fetch(
-          `${evolutionApiUrl}/message/sendText/${instanceName}`,
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'apikey': evolutionApiKey,
-            },
-            body: JSON.stringify({
-              number: payload.data.key.remoteJid,
-              text: response.response || "Desculpe, não consegui processar sua mensagem."
-            }),
-          }
-        )
-
-        const evolutionResponseText = await evolutionResponse.text()
-        console.log('📨 Evolution API response:', {
-          status: evolutionResponse.status,
-          ok: evolutionResponse.ok,
-          text: evolutionResponseText
-        })
-
-        if (!evolutionResponse.ok) {
-          console.error('❌ Evolution API error:', evolutionResponseText)
-          throw new Error(`Evolution API error: ${evolutionResponseText}`)
-        }
-
-        console.log('✅ Message processed and response sent successfully')
-      } else {
-        console.log('⏭️ Skipping message from bot (fromMe=true)')
-      }
+      messageQueue.set(queueKey, timer)
+      
+      console.log(`⏳ Message queued for ${queueKey}, waiting ${WAIT_TIME}ms for more messages...`)
     } else if (payload.event === 'connection.update') {
       console.log('🔌 Processing connection update:', payload)
       
