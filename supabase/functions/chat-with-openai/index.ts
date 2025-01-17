@@ -117,7 +117,11 @@ serve(async (req) => {
     const aiResponse = data.choices[0].message.content
     console.log('Generated response:', aiResponse)
 
-    // Send response back through Evolution API
+    // Format phone number for Evolution API
+    const formattedPhoneNumber = phoneNumber.includes('@') ? phoneNumber : `${phoneNumber}@s.whatsapp.net`
+    console.log('Sending message to:', formattedPhoneNumber)
+
+    // Send response through Evolution API with correct format
     console.log('Sending response through Evolution API')
     const evolutionResponse = await fetch(`${Deno.env.get('EVOLUTION_API_URL')}/message/sendText/${instance.name}`, {
       method: 'POST',
@@ -126,7 +130,7 @@ serve(async (req) => {
         'apikey': Deno.env.get('EVOLUTION_API_KEY') || '',
       },
       body: JSON.stringify({
-        number: phoneNumber.includes('@') ? phoneNumber : `${phoneNumber}@s.whatsapp.net`,
+        number: formattedPhoneNumber,
         text: aiResponse
       }),
     })
