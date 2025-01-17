@@ -1,14 +1,14 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { ChatOpenAI } from "https://esm.sh/langchain/chat_models/openai"
-import { ConversationChain } from "https://esm.sh/langchain/chains"
-import { BufferMemory } from "https://esm.sh/langchain/memory"
+import { ChatOpenAI } from "https://esm.sh/@langchain/openai@0.0.14"
+import { ConversationChain } from "https://esm.sh/langchain@0.0.214/chains"
+import { BufferMemory } from "https://esm.sh/langchain@0.0.214/memory"
 import { 
   ChatPromptTemplate, 
   HumanMessagePromptTemplate,
   SystemMessagePromptTemplate,
   MessagesPlaceholder 
-} from "https://esm.sh/langchain/prompts"
+} from "https://esm.sh/langchain@0.0.214/prompts"
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
