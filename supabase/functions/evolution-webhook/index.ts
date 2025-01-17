@@ -6,22 +6,37 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-console.log('🚀 Evolution Webhook function started')
+console.log('⚡ Evolution Webhook function initialized')
 
 serve(async (req) => {
+  console.log('📩 New request received:', {
+    method: req.method,
+    url: req.url
+  })
+
   try {
     // Handle CORS preflight requests
     if (req.method === 'OPTIONS') {
-      console.log('👉 Handling CORS preflight request')
+      console.log('🔄 Handling CORS preflight request')
       return new Response(null, { headers: corsHeaders })
     }
 
+    // Log request headers for debugging
+    console.log('📋 Request headers:', Object.fromEntries(req.headers.entries()))
+
     const rawBody = await req.text()
-    console.log('📥 Raw webhook payload:', rawBody)
+    console.log('📦 Raw webhook payload:', rawBody)
 
-    const payload = JSON.parse(rawBody)
-    console.log('📦 Parsed webhook payload:', JSON.stringify(payload, null, 2))
+    let payload
+    try {
+      payload = JSON.parse(rawBody)
+      console.log('✅ Successfully parsed webhook payload:', JSON.stringify(payload, null, 2))
+    } catch (parseError) {
+      console.error('❌ Failed to parse webhook payload:', parseError)
+      throw new Error('Invalid JSON payload')
+    }
 
+    console.log('🔍 Initializing Supabase client')
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
@@ -31,7 +46,7 @@ serve(async (req) => {
       console.log('📨 Processing message event:', {
         content: payload.message?.content,
         from: payload.message?.from,
-        instance: payload.instance
+        instance: payload.instance?.instanceName
       })
       
       if (!payload.message) {
@@ -113,6 +128,14 @@ serve(async (req) => {
         const evolutionApiUrl = Deno.env.get('EVOLUTION_API_URL')
         const evolutionApiKey = Deno.env.get('EVOLUTION_API_KEY')
 
+        if (!evolutionApiUrl || !evolutionApiKey) {
+          console.error('❌ Missing Evolution API configuration:', { 
+            hasUrl: !!evolutionApiUrl,
+            hasKey: !!evolutionApiKey
+          })
+          throw new Error('Missing Evolution API configuration')
+        }
+
         console.log('📡 Evolution API config:', { 
           url: evolutionApiUrl,
           hasKey: !!evolutionApiKey,
@@ -125,7 +148,7 @@ serve(async (req) => {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              'apikey': evolutionApiKey || '',
+              'apikey': evolutionApiKey,
             },
             body: JSON.stringify({
               number: payload.message.from,
