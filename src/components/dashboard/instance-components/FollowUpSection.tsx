@@ -15,12 +15,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { useAuth } from "@/contexts/auth/AuthContext"
 
 interface FollowUpSectionProps {
   instanceId: string
 }
 
-type FollowUpType = "ai_generated" | "manual";
+type FollowUpType = "ai_generated" | "manual" | "automatic";
 
 interface ManualMessage {
   message: string;
@@ -42,6 +43,7 @@ interface FormData {
 }
 
 export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
+  const { user } = useAuth()
   const { toast } = useToast()
   const queryClient = useQueryClient()
   const [isEditing, setIsEditing] = useState(false)
@@ -76,23 +78,46 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
     max_attempts: followUp?.max_attempts || 3,
     stop_on_reply: followUp?.stop_on_reply ?? true,
     stop_on_keyword: followUp?.stop_on_keyword || ['comprou', 'agendou', 'agendado', 'comprado'],
-    manual_messages: followUp?.manual_messages || []
+    manual_messages: (followUp?.manual_messages as ManualMessage[]) || []
   })
 
   const saveMutation = useMutation({
     mutationFn: async (values: FormData) => {
       console.log('Salvando configuração de follow-up:', values)
+      
+      // Primeiro salva a configuração do follow-up
       const operation = followUp
         ? supabase
             .from('instance_follow_ups')
-            .update(values)
+            .update({
+              ...values,
+              manual_messages: JSON.stringify(values.manual_messages)
+            })
             .eq('id', followUp.id)
         : supabase
             .from('instance_follow_ups')
-            .insert({ ...values, instance_id: instanceId })
+            .insert({
+              ...values,
+              instance_id: instanceId,
+              manual_messages: JSON.stringify(values.manual_messages)
+            })
 
       const { error } = await operation
       if (error) throw error
+
+      // Registra as mensagens no histórico
+      if (user && values.manual_messages.length > 0) {
+        const { error: chatError } = await supabase
+          .from('chat_messages')
+          .insert(values.manual_messages.map(msg => ({
+            instance_id: instanceId,
+            user_id: user.id,
+            sender_type: 'follow_up',
+            content: msg.message
+          })))
+
+        if (chatError) throw chatError
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['follow-up'] })
