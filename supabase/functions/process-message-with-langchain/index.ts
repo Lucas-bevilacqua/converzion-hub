@@ -1,8 +1,8 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
-import { ChatOpenAI } from "https://esm.sh/@langchain/openai"
-import { ChatPromptTemplate } from "https://esm.sh/@langchain/core/prompts"
-import { StringOutputParser } from "https://esm.sh/@langchain/core/output_parsers"
+import { ChatOpenAI } from "https://esm.sh/@langchain/openai@0.0.10"
+import { ChatPromptTemplate } from "https://esm.sh/@langchain/core@0.1.10/prompts"
+import { StringOutputParser } from "https://esm.sh/@langchain/core@0.1.10/output_parsers"
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
