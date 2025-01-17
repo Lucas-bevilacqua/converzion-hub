@@ -53,6 +53,7 @@ export type Database = {
           sender_type: string
           updated_at: string
           user_id: string
+          whatsapp_message_id: string | null
         }
         Insert: {
           content: string
@@ -62,6 +63,7 @@ export type Database = {
           sender_type: string
           updated_at?: string
           user_id: string
+          whatsapp_message_id?: string | null
         }
         Update: {
           content?: string
@@ -71,6 +73,7 @@ export type Database = {
           sender_type?: string
           updated_at?: string
           user_id?: string
+          whatsapp_message_id?: string | null
         }
         Relationships: [
           {
