@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { useToast } from "@/components/ui/use-toast"
-import { Calendar, Clock, MessageSquare } from "lucide-react"
 import {
   Select,
   SelectContent,
@@ -18,6 +17,18 @@ import {
 
 interface FollowUpSectionProps {
   instanceId: string
+}
+
+type FollowUpType = "automatic" | "ai_generated" | "template"
+
+interface FormData {
+  is_active: boolean
+  follow_up_type: FollowUpType
+  delay_minutes: number
+  template_message: string
+  schedule_start_time: string
+  schedule_end_time: string
+  schedule_days: number[]
 }
 
 export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
@@ -35,7 +46,7 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
         .eq('instance_id', instanceId)
         .single()
 
-      if (error && error.code !== 'PGRST116') { // PGRST116 is "no rows returned"
+      if (error && error.code !== 'PGRST116') {
         console.error('Error fetching follow-up:', error)
         throw error
       }
@@ -45,7 +56,7 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
   })
 
   const mutation = useMutation({
-    mutationFn: async (values: any) => {
+    mutationFn: async (values: FormData) => {
       console.log('Saving follow-up config:', values)
       const operation = followUp
         ? supabase
@@ -77,9 +88,9 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
     }
   })
 
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<FormData>({
     is_active: followUp?.is_active || false,
-    follow_up_type: followUp?.follow_up_type || 'automatic',
+    follow_up_type: (followUp?.follow_up_type as FollowUpType) || "automatic",
     delay_minutes: followUp?.delay_minutes || 60,
     template_message: followUp?.template_message || '',
     schedule_start_time: followUp?.schedule_start_time || '09:00',
@@ -98,16 +109,6 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
   const handleSave = () => {
     mutation.mutateAsync(formData)
   }
-
-  const weekDays = [
-    { value: 0, label: "Domingo" },
-    { value: 1, label: "Segunda" },
-    { value: 2, label: "Terça" },
-    { value: 3, label: "Quarta" },
-    { value: 4, label: "Quinta" },
-    { value: 5, label: "Sexta" },
-    { value: 6, label: "Sábado" }
-  ]
 
   return (
     <div className="space-y-6">
@@ -129,7 +130,7 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
           <Label>Tipo de Follow-up</Label>
           <Select
             value={formData.follow_up_type}
-            onValueChange={(value) => setFormData(prev => ({ ...prev, follow_up_type: value }))}
+            onValueChange={(value: FollowUpType) => setFormData(prev => ({ ...prev, follow_up_type: value }))}
           >
             <SelectTrigger>
               <SelectValue />
@@ -185,7 +186,7 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
             variant="outline"
             onClick={() => setFormData({
               is_active: followUp?.is_active || false,
-              follow_up_type: followUp?.follow_up_type || 'automatic',
+              follow_up_type: (followUp?.follow_up_type as FollowUpType) || "automatic",
               delay_minutes: followUp?.delay_minutes || 60,
               template_message: followUp?.template_message || '',
               schedule_start_time: followUp?.schedule_start_time || '09:00',
