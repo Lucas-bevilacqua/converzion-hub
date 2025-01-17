@@ -11,9 +11,6 @@ const supabaseClient = createClient(
   SUPABASE_SERVICE_ROLE_KEY!
 )
 
-// Cache para armazenar as mensagens em espera
-const pendingMessages = new Map()
-
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
