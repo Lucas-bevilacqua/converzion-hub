@@ -1,3 +1,4 @@
 project_id = "vodexhppkasbulogmcqb"
+
 [functions.process-ai-follow-up]
 verify_jwt = false
