@@ -17,17 +17,12 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
+    // 1. Buscar follow-ups ativos
     const { data: followUps, error: followUpsError } = await supabaseClient
       .from('instance_follow_ups')
       .select(`
         *,
-        instance:evolution_instances(
-          id,
-          name,
-          user_id,
-          connection_status,
-          phone_number
-        )
+        instance:evolution_instances(id, name, user_id, connection_status, phone_number)
       `)
       .eq('is_active', true)
 
@@ -41,72 +36,79 @@ serve(async (req) => {
     }
 
     const processedContacts = []
-    
+
     for (const followUp of followUps) {
+      // Pular instâncias desconectadas
       if (!followUp.instance || followUp.instance.connection_status !== 'connected') {
         continue
       }
 
+      // 2. Buscar contatos que precisam de follow-up
       const { data: contacts } = await supabaseClient
         .from('Users_clientes')
         .select('*')
         .eq('NomeDaEmpresa', followUp.instance_id)
-        .or('ConversationId.is.null,ConversationId.like.follow-up-sent-%')
-        .order('last_message_time', { ascending: true })
+        .is('ConversationId', null)
+        .order('created_at', { ascending: true })
+        .limit(5) // Processa poucos por vez para evitar sobrecarga
 
       if (!contacts?.length) continue
 
+      const evolutionApiUrl = (Deno.env.get('EVOLUTION_API_URL') || '').replace(/\/$/, '')
+      const manualMessages = Array.isArray(followUp.manual_messages) ? followUp.manual_messages : []
+      
+      if (!manualMessages.length) continue
+
       for (const contact of contacts) {
         try {
-          let currentMessageIndex = -1
-          if (contact.ConversationId?.startsWith('follow-up-sent-')) {
-            currentMessageIndex = parseInt(contact.ConversationId.split('-').pop() || '-1')
-          }
-
-          const manualMessages = Array.isArray(followUp.manual_messages) ? followUp.manual_messages : []
+          // 3. Enviar primeira mensagem do follow-up
+          const firstMessage = manualMessages[0]
           
-          if (currentMessageIndex + 1 >= manualMessages.length) continue
-
-          const lastMessageTime = new Date(contact.last_message_time || contact.created_at)
-          const now = new Date()
-          const minutesSinceLastMessage = Math.floor((now.getTime() - lastMessageTime.getTime()) / (1000 * 60))
-          const nextMessage = manualMessages[currentMessageIndex + 1]
-          const minDelay = Math.max(3, nextMessage.delay_minutes || 3)
-
-          if (minutesSinceLastMessage < minDelay) continue
-
-          const supabaseUrl = (Deno.env.get('SUPABASE_URL') || '').replace(/\/$/, '')
-          
-          const processResponse = await fetch(
-            `${supabaseUrl}/functions/v1/process-follow-up`,
+          const evolutionResponse = await fetch(
+            `${evolutionApiUrl}/message/sendText/${followUp.instance.name}`,
             {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+                'apikey': Deno.env.get('EVOLUTION_API_KEY') || '',
               },
               body: JSON.stringify({
-                contact: {
-                  ...contact,
-                  followUp: {
-                    ...followUp,
-                    instanceName: followUp.instance.name,
-                    userId: followUp.instance.user_id
-                  }
-                }
+                number: contact.TelefoneClientes,
+                text: firstMessage.message
               })
             }
           )
 
-          if (!processResponse.ok) {
-            throw new Error(await processResponse.text())
+          if (!evolutionResponse.ok) {
+            throw new Error(await evolutionResponse.text())
           }
 
-          const processResult = await processResponse.json()
+          const evolutionData = await evolutionResponse.json()
+
+          // 4. Atualizar status do contato
+          await supabaseClient
+            .from('Users_clientes')
+            .update({
+              ConversationId: 'follow-up-sent-0',
+              last_message_time: new Date().toISOString()
+            })
+            .eq('id', contact.id)
+
+          // 5. Registrar mensagem enviada
+          await supabaseClient
+            .from('chat_messages')
+            .insert({
+              instance_id: followUp.instance_id,
+              user_id: followUp.instance.user_id,
+              sender_type: 'follow_up',
+              content: firstMessage.message,
+              whatsapp_message_id: evolutionData.key?.id
+            })
+
           processedContacts.push({
             contactId: contact.id,
-            success: processResult.success,
-            message: processResult.message
+            success: true,
+            message: 'Primeira mensagem enviada com sucesso'
           })
 
         } catch (error) {
@@ -123,6 +125,7 @@ serve(async (req) => {
       JSON.stringify({ success: true, processed: processedContacts }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
+
   } catch (error) {
     return new Response(
       JSON.stringify({ error: error.message }),
