@@ -12,6 +12,8 @@ serve(async (req) => {
   }
 
   try {
+    console.log('Iniciando processamento de follow-ups')
+    
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
@@ -31,7 +33,12 @@ serve(async (req) => {
       `)
       .eq('is_active', true)
 
-    if (followUpsError) throw followUpsError
+    if (followUpsError) {
+      console.error('Erro ao buscar follow-ups:', followUpsError)
+      throw followUpsError
+    }
+
+    console.log(`Encontrados ${followUps?.length || 0} follow-ups ativos`)
 
     if (!followUps?.length) {
       return new Response(
@@ -43,7 +50,10 @@ serve(async (req) => {
     const processedContacts = []
     
     for (const followUp of followUps) {
+      console.log(`Processando follow-up para instância ${followUp.instance?.name}`)
+      
       if (followUp.instance?.connection_status !== 'connected') {
+        console.log(`Instância ${followUp.instance?.name} não está conectada, pulando...`)
         continue
       }
 
@@ -54,11 +64,22 @@ serve(async (req) => {
         .or('ConversationId.is.null,ConversationId.like.follow-up-sent-%')
         .order('last_message_time', { ascending: true })
 
-      if (contactsError) continue
-      if (!contacts?.length) continue
+      if (contactsError) {
+        console.error('Erro ao buscar contatos:', contactsError)
+        continue
+      }
+
+      console.log(`Encontrados ${contacts?.length || 0} contatos para processamento`)
+
+      if (!contacts?.length) {
+        console.log('Nenhum contato encontrado para processamento')
+        continue
+      }
 
       for (const contact of contacts) {
         try {
+          console.log(`Processando contato ${contact.id}`)
+          
           let currentMessageIndex = -1
           if (contact.ConversationId?.startsWith('follow-up-sent-')) {
             currentMessageIndex = parseInt(contact.ConversationId.split('-').pop() || '-1')
@@ -67,6 +88,7 @@ serve(async (req) => {
           const manualMessages = Array.isArray(followUp.manual_messages) ? followUp.manual_messages : []
           
           if (currentMessageIndex + 1 >= manualMessages.length) {
+            console.log('Todas as mensagens já foram enviadas para este contato')
             continue
           }
 
@@ -76,11 +98,21 @@ serve(async (req) => {
           const nextMessage = manualMessages[currentMessageIndex + 1]
           const minDelay = Math.max(3, nextMessage.delay_minutes || 3)
 
+          console.log('Análise de tempo:', {
+            ultimaMensagem: lastMessageTime,
+            agora: now,
+            minutosDesdeDaUltima: minutesSinceLastMessage,
+            atrasoMinimo: minDelay
+          })
+
           if (minutesSinceLastMessage < minDelay) {
+            console.log(`Aguardando tempo mínimo (${minDelay} minutos) desde a última mensagem`)
             continue
           }
 
           const supabaseUrl = (Deno.env.get('SUPABASE_URL') || '').replace(/\/$/, '')
+          
+          console.log('Enviando mensagem para processamento')
           
           const processResponse = await fetch(
             `${supabaseUrl}/functions/v1/process-follow-up`,
@@ -105,10 +137,13 @@ serve(async (req) => {
 
           if (!processResponse.ok) {
             const errorText = await processResponse.text()
+            console.error('Erro na resposta do processamento:', errorText)
             throw new Error(`Error processing follow-up: ${errorText}`)
           }
 
           const processResult = await processResponse.json()
+          console.log('Resultado do processamento:', processResult)
+          
           processedContacts.push({
             contactId: contact.id,
             success: processResult.success,
@@ -123,6 +158,11 @@ serve(async (req) => {
         }
       }
     }
+
+    console.log('Processamento concluído:', {
+      totalProcessados: processedContacts.length,
+      resultados: processedContacts
+    })
 
     return new Response(
       JSON.stringify({ 
