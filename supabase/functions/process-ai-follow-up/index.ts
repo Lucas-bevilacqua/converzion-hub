@@ -72,9 +72,9 @@ serve(async (req) => {
       )
     }
 
+    const openAiKey = Deno.env.get('OPENAI_API_KEY')
     const evolutionApiUrl = (Deno.env.get('EVOLUTION_API_URL') || '').replace(/\/$/, '')
     const evolutionApiKey = Deno.env.get('EVOLUTION_API_KEY')
-    const openAiKey = Deno.env.get('OPENAI_API_KEY')
 
     if (!evolutionApiUrl || !evolutionApiKey || !openAiKey) {
       throw new Error('Configurações de API ausentes')
@@ -149,7 +149,7 @@ serve(async (req) => {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            model: 'gpt-4',
+            model: 'gpt-4o-mini',
             messages,
             temperature: 0.7,
           }),
@@ -174,70 +174,60 @@ serve(async (req) => {
         console.log('📤 Enviando mensagem via Evolution API')
         const fullUrl = `${evolutionApiUrl}/message/sendText/${followUp.instance.name}`
         
-        try {
-          const evolutionResponse = await fetch(fullUrl, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'apikey': evolutionApiKey,
-            },
-            body: JSON.stringify({
-              number: followUp.instance.phone_number,
-              text: followUpMessage
-            })
+        const evolutionResponse = await fetch(fullUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': evolutionApiKey,
+          },
+          body: JSON.stringify({
+            number: followUp.instance.phone_number,
+            text: followUpMessage
           })
+        })
 
-          const evolutionData = await evolutionResponse.json()
-          console.log('✅ Resposta da Evolution API:', evolutionData)
+        const evolutionData = await evolutionResponse.json()
+        console.log('✅ Resposta da Evolution API:', evolutionData)
 
-          if (!evolutionResponse.ok || !evolutionData?.key?.id) {
-            const errorText = JSON.stringify(evolutionData)
-            console.error('❌ Falha ao enviar mensagem:', {
-              status: evolutionResponse.status,
-              error: errorText
-            })
-            errors.push({
-              type: 'evolution_api_error',
-              followUpId: followUp.id,
-              error: errorText
-            })
-            continue
-          }
-
-          // Salvar mensagem no histórico
-          const { error: saveError } = await supabaseClient
-            .from('chat_messages')
-            .insert({
-              instance_id: followUp.instance_id,
-              user_id: followUp.instance.user_id,
-              sender_type: 'follow_up',
-              content: followUpMessage,
-              whatsapp_message_id: evolutionData.key?.id
-            })
-
-          if (saveError) {
-            console.error('❌ Erro ao salvar mensagem:', saveError)
-            errors.push({
-              type: 'save_message_error',
-              followUpId: followUp.id,
-              error: saveError
-            })
-            continue
-          }
-
-          processedFollowUps.push({
-            id: followUp.id,
-            messageId: evolutionData.key?.id
+        if (!evolutionResponse.ok || !evolutionData?.key?.id) {
+          const errorText = JSON.stringify(evolutionData)
+          console.error('❌ Falha ao enviar mensagem:', {
+            status: evolutionResponse.status,
+            error: errorText
           })
-
-        } catch (error) {
-          console.error('❌ Erro ao enviar mensagem:', error)
           errors.push({
             type: 'evolution_api_error',
             followUpId: followUp.id,
-            error: error.message
+            error: errorText
           })
+          continue
         }
+
+        // Salvar mensagem no histórico
+        const { error: saveError } = await supabaseClient
+          .from('chat_messages')
+          .insert({
+            instance_id: followUp.instance_id,
+            user_id: followUp.instance.user_id,
+            sender_type: 'follow_up',
+            content: followUpMessage,
+            whatsapp_message_id: evolutionData.key?.id
+          })
+
+        if (saveError) {
+          console.error('❌ Erro ao salvar mensagem:', saveError)
+          errors.push({
+            type: 'save_message_error',
+            followUpId: followUp.id,
+            error: saveError
+          })
+          continue
+        }
+
+        processedFollowUps.push({
+          id: followUp.id,
+          messageId: evolutionData.key?.id
+        })
 
       } catch (error) {
         console.error('❌ Erro ao processar follow-up:', error)
