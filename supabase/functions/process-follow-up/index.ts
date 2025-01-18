@@ -18,12 +18,6 @@ serve(async (req) => {
       throw new Error('Dados do contato não fornecidos')
     }
 
-    console.log('📨 Processando follow-up para contato:', {
-      id: contact.id,
-      telefone: contact.TelefoneClientes,
-      instancia: contact.followUp?.instanceName
-    })
-
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
@@ -40,12 +34,8 @@ serve(async (req) => {
       : []
 
     if (nextMessageIndex >= manualMessages.length) {
-      console.log('✅ Sequência de mensagens completa para o contato:', contact.id)
       return new Response(
-        JSON.stringify({ 
-          success: true, 
-          message: 'Sequência completa' 
-        }),
+        JSON.stringify({ success: true, message: 'Sequência completa' }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
@@ -53,12 +43,6 @@ serve(async (req) => {
     const nextMessage = manualMessages[nextMessageIndex]
     const evolutionApiUrl = (Deno.env.get('EVOLUTION_API_URL') || '').replace(/\/$/, '')
     
-    console.log('🚀 Enviando mensagem via Evolution API:', {
-      url: `${evolutionApiUrl}/message/sendText/${contact.followUp.instanceName}`,
-      telefone: contact.TelefoneClientes,
-      mensagem: nextMessage.message
-    })
-
     const evolutionResponse = await fetch(
       `${evolutionApiUrl}/message/sendText/${contact.followUp.instanceName}`,
       {
@@ -75,17 +59,12 @@ serve(async (req) => {
     )
 
     if (!evolutionResponse.ok) {
-      const error = await evolutionResponse.text()
-      console.error('❌ Erro ao enviar mensagem:', {
-        status: evolutionResponse.status,
-        erro: error
-      })
-      throw new Error(`Evolution API error: ${error}`)
+      throw new Error(await evolutionResponse.text())
     }
 
     const evolutionData = await evolutionResponse.json()
     
-    const { error: updateError } = await supabaseClient
+    await supabaseClient
       .from('Users_clientes')
       .update({
         ConversationId: `follow-up-sent-${nextMessageIndex}`,
@@ -93,12 +72,7 @@ serve(async (req) => {
       })
       .eq('id', contact.id)
 
-    if (updateError) {
-      console.error('❌ Erro ao atualizar contato:', updateError)
-      throw updateError
-    }
-
-    const { error: messageError } = await supabaseClient
+    await supabaseClient
       .from('chat_messages')
       .insert({
         instance_id: contact.followUp.instance_id,
@@ -107,17 +81,6 @@ serve(async (req) => {
         content: nextMessage.message,
         whatsapp_message_id: evolutionData.key?.id
       })
-
-    if (messageError) {
-      console.error('❌ Erro ao registrar mensagem:', messageError)
-      throw messageError
-    }
-
-    console.log('✅ Follow-up processado com sucesso:', {
-      contactId: contact.id,
-      messageIndex: nextMessageIndex,
-      messageId: evolutionData.key?.id
-    })
 
     return new Response(
       JSON.stringify({ 
@@ -128,10 +91,6 @@ serve(async (req) => {
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   } catch (error) {
-    console.error('❌ Erro ao processar follow-up:', {
-      mensagem: error.message,
-      stack: error.stack
-    })
     return new Response(
       JSON.stringify({ error: error.message }),
       { 
