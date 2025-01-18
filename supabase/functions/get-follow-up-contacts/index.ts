@@ -25,6 +25,7 @@ serve(async (req) => {
         instance:evolution_instances(id, name, user_id, connection_status, phone_number)
       `)
       .eq('is_active', true)
+      .limit(1)
 
     if (followUpsError) throw followUpsError
 
@@ -35,94 +36,93 @@ serve(async (req) => {
       )
     }
 
-    const processedContacts = []
-
-    for (const followUp of followUps) {
-      // Pular instâncias desconectadas
-      if (!followUp.instance || followUp.instance.connection_status !== 'connected') {
-        continue
-      }
-
-      // 2. Buscar contatos que precisam de follow-up
-      const { data: contacts } = await supabaseClient
-        .from('Users_clientes')
-        .select('*')
-        .eq('NomeDaEmpresa', followUp.instance_id)
-        .is('ConversationId', null)
-        .order('created_at', { ascending: true })
-        .limit(5) // Processa poucos por vez para evitar sobrecarga
-
-      if (!contacts?.length) continue
-
-      const evolutionApiUrl = (Deno.env.get('EVOLUTION_API_URL') || '').replace(/\/$/, '')
-      const manualMessages = Array.isArray(followUp.manual_messages) ? followUp.manual_messages : []
-      
-      if (!manualMessages.length) continue
-
-      for (const contact of contacts) {
-        try {
-          // 3. Enviar primeira mensagem do follow-up
-          const firstMessage = manualMessages[0]
-          
-          const evolutionResponse = await fetch(
-            `${evolutionApiUrl}/message/sendText/${followUp.instance.name}`,
-            {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'apikey': Deno.env.get('EVOLUTION_API_KEY') || '',
-              },
-              body: JSON.stringify({
-                number: contact.TelefoneClientes,
-                text: firstMessage.message
-              })
-            }
-          )
-
-          if (!evolutionResponse.ok) {
-            throw new Error(await evolutionResponse.text())
-          }
-
-          const evolutionData = await evolutionResponse.json()
-
-          // 4. Atualizar status do contato
-          await supabaseClient
-            .from('Users_clientes')
-            .update({
-              ConversationId: 'follow-up-sent-0',
-              last_message_time: new Date().toISOString()
-            })
-            .eq('id', contact.id)
-
-          // 5. Registrar mensagem enviada
-          await supabaseClient
-            .from('chat_messages')
-            .insert({
-              instance_id: followUp.instance_id,
-              user_id: followUp.instance.user_id,
-              sender_type: 'follow_up',
-              content: firstMessage.message,
-              whatsapp_message_id: evolutionData.key?.id
-            })
-
-          processedContacts.push({
-            contactId: contact.id,
-            success: true,
-            message: 'Primeira mensagem enviada com sucesso'
-          })
-
-        } catch (error) {
-          processedContacts.push({
-            contactId: contact.id,
-            success: false,
-            message: error.message
-          })
-        }
-      }
+    const followUp = followUps[0]
+    
+    // Pular instâncias desconectadas
+    if (!followUp.instance || followUp.instance.connection_status !== 'connected') {
+      return new Response(
+        JSON.stringify({ success: true, message: 'Instância não está conectada' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
     }
 
+    // 2. Buscar apenas 1 contato que precisa de follow-up
+    const { data: contacts } = await supabaseClient
+      .from('Users_clientes')
+      .select('*')
+      .eq('NomeDaEmpresa', followUp.instance_id)
+      .is('ConversationId', null)
+      .order('created_at', { ascending: true })
+      .limit(1)
+
+    if (!contacts?.length) {
+      return new Response(
+        JSON.stringify({ success: true, message: 'Nenhum contato para follow-up' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    const contact = contacts[0]
+    const manualMessages = Array.isArray(followUp.manual_messages) ? followUp.manual_messages : []
+    
+    if (!manualMessages.length) {
+      return new Response(
+        JSON.stringify({ success: true, message: 'Nenhuma mensagem configurada' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    const firstMessage = manualMessages[0]
+    const evolutionApiUrl = (Deno.env.get('EVOLUTION_API_URL') || '').replace(/\/$/, '')
+    
+    // 3. Enviar primeira mensagem
+    const evolutionResponse = await fetch(
+      `${evolutionApiUrl}/message/sendText/${followUp.instance.name}`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': Deno.env.get('EVOLUTION_API_KEY') || '',
+        },
+        body: JSON.stringify({
+          number: contact.TelefoneClientes,
+          text: firstMessage.message
+        })
+      }
+    )
+
+    if (!evolutionResponse.ok) {
+      throw new Error(await evolutionResponse.text())
+    }
+
+    const evolutionData = await evolutionResponse.json()
+
+    // 4. Atualizar status do contato
+    await supabaseClient
+      .from('Users_clientes')
+      .update({
+        ConversationId: 'follow-up-sent-0',
+        last_message_time: new Date().toISOString()
+      })
+      .eq('id', contact.id)
+
+    // 5. Registrar mensagem enviada
+    await supabaseClient
+      .from('chat_messages')
+      .insert({
+        instance_id: followUp.instance_id,
+        user_id: followUp.instance.user_id,
+        sender_type: 'follow_up',
+        content: firstMessage.message,
+        whatsapp_message_id: evolutionData.key?.id
+      })
+
     return new Response(
-      JSON.stringify({ success: true, processed: processedContacts }),
+      JSON.stringify({ 
+        success: true, 
+        message: 'Mensagem enviada com sucesso',
+        contact: contact.TelefoneClientes
+      }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
 
