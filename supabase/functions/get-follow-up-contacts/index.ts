@@ -55,7 +55,8 @@ serve(async (req) => {
 
     console.log('Follow-ups query result:', { 
       followUpsCount: followUps?.length || 0, 
-      error: followUpsError 
+      error: followUpsError,
+      followUps: followUps 
     })
 
     if (followUpsError) {
@@ -87,7 +88,8 @@ serve(async (req) => {
       console.log('📝 Processing follow-up:', {
         id: followUp.id,
         instanceId: followUp.instance_id,
-        instanceStatus: followUp.instance?.connection_status
+        instanceStatus: followUp.instance?.connection_status,
+        followUp: followUp
       })
 
       if (!followUp.instance || followUp.instance.connection_status !== 'connected') {
@@ -108,7 +110,8 @@ serve(async (req) => {
         console.log('👥 Contacts query result:', {
           instanceId: followUp.instance_id,
           contactsFound: contacts?.length,
-          error: contactsError
+          error: contactsError,
+          contacts: contacts
         })
 
         if (contactsError) {
@@ -154,7 +157,8 @@ serve(async (req) => {
             console.log('📤 Sending message via Evolution API:', {
               instance: followUp.instance.name,
               contact: contact.TelefoneClientes,
-              apiUrl: evolutionApiUrl
+              apiUrl: evolutionApiUrl,
+              message: firstMessage.message
             })
 
             const evolutionResponse = await fetch(
@@ -173,6 +177,7 @@ serve(async (req) => {
             )
 
             const evolutionData = await evolutionResponse.json()
+            console.log('Evolution API response:', evolutionData)
             
             if (!evolutionResponse.ok) {
               console.error('❌ Evolution API error:', evolutionData)
@@ -184,8 +189,6 @@ serve(async (req) => {
               })
               continue
             }
-
-            console.log('✅ Evolution API response:', evolutionData)
 
             // Atualizar status do contato
             const { error: updateError } = await supabaseClient
