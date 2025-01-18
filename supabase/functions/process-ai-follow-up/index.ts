@@ -10,7 +10,8 @@ const corsHeaders = {
 console.log('🚀 Function process-ai-follow-up is starting...');
 
 serve(async (req) => {
-  console.log('📥 Received request:', req.method);
+  // Log request details
+  console.log(`📥 Received ${req.method} request at ${new Date().toISOString()}`);
   
   if (req.method === 'OPTIONS') {
     console.log('👋 Handling CORS preflight request');
@@ -18,24 +19,27 @@ serve(async (req) => {
   }
 
   try {
+    // Initialize Supabase client with detailed logging
     console.log('🔄 Initializing Supabase client...');
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 
     if (!supabaseUrl || !supabaseKey) {
+      console.error('❌ Missing Supabase configuration');
       throw new Error('Missing Supabase configuration');
     }
 
     const supabaseClient = createClient(supabaseUrl, supabaseKey);
     console.log('✅ Supabase client initialized');
 
-    // Log execution start
+    // Create execution log
     console.log('📝 Creating execution log...');
     const { data: logData, error: logError } = await supabaseClient
-      .from('cron_logs')
+      .from('cron_execution_logs')
       .insert({
         job_name: 'process-ai-follow-up',
-        status: 'started'
+        status: 'started',
+        response: { start_time: new Date().toISOString() }
       })
       .select()
       .single();
@@ -47,7 +51,7 @@ serve(async (req) => {
 
     console.log('✅ Execution log created:', logData);
 
-    // Buscar follow-ups ativos do tipo AI
+    // Fetch active follow-ups
     console.log('🔍 Fetching active AI follow-ups...');
     const { data: activeFollowUps, error: followUpsError } = await supabaseClient
       .from('instance_follow_ups')
@@ -66,6 +70,16 @@ serve(async (req) => {
 
     if (followUpsError) {
       console.error('❌ Error fetching follow-ups:', followUpsError);
+      
+      // Update log with error
+      await supabaseClient
+        .from('cron_execution_logs')
+        .update({ 
+          status: 'error',
+          response: { error: followUpsError.message }
+        })
+        .eq('id', logData?.id);
+      
       throw followUpsError;
     }
 
@@ -73,11 +87,13 @@ serve(async (req) => {
 
     if (!activeFollowUps?.length) {
       console.log('ℹ️ No active AI follow-ups found');
+      
+      // Update log for no follow-ups case
       await supabaseClient
-        .from('cron_logs')
+        .from('cron_execution_logs')
         .update({ 
           status: 'completed - no active follow-ups',
-          execution_time: new Date().toISOString()
+          response: { message: 'No active follow-ups found' }
         })
         .eq('id', logData?.id);
 
@@ -87,17 +103,20 @@ serve(async (req) => {
       );
     }
 
+    // Get required API keys
     const openAiKey = Deno.env.get('OPENAI_API_KEY');
     const evolutionApiUrl = (Deno.env.get('EVOLUTION_API_URL') || '').replace(/\/$/, '');
     const evolutionApiKey = Deno.env.get('EVOLUTION_API_KEY');
 
     if (!evolutionApiUrl || !evolutionApiKey || !openAiKey) {
+      console.error('❌ Missing API configuration');
       throw new Error('Missing API configuration');
     }
 
     const processedFollowUps = [];
     const errors = [];
 
+    // Process each follow-up
     for (const followUp of activeFollowUps) {
       try {
         console.log('📝 Processing follow-up:', {
@@ -165,7 +184,7 @@ serve(async (req) => {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            model: 'gpt-4o-mini',
+            model: 'gpt-4',
             messages,
             temperature: 0.7,
           }),
@@ -258,10 +277,14 @@ serve(async (req) => {
       : 'completed successfully';
 
     await supabaseClient
-      .from('cron_logs')
+      .from('cron_execution_logs')
       .update({ 
         status: finalStatus,
-        execution_time: new Date().toISOString()
+        response: { 
+          processed: processedFollowUps,
+          errors,
+          end_time: new Date().toISOString()
+        }
       })
       .eq('id', logData?.id);
 
