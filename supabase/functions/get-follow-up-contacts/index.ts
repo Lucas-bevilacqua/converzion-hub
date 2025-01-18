@@ -33,6 +33,7 @@ serve(async (req) => {
 
     if (logError) {
       console.error('Error logging cron start:', logError)
+      throw logError
     }
 
     console.log('Fetching active follow-ups...')
@@ -66,7 +67,10 @@ serve(async (req) => {
       console.log('No active follow-ups found')
       await supabaseClient
         .from('cron_logs')
-        .update({ status: 'completed - no active follow-ups' })
+        .update({ 
+          status: 'completed - no active follow-ups',
+          execution_time: new Date().toISOString()
+        })
         .eq('id', logData?.id)
 
       return new Response(
@@ -137,9 +141,15 @@ serve(async (req) => {
             const evolutionApiUrl = (Deno.env.get('EVOLUTION_API_URL') || '').replace(/\/$/, '')
             const evolutionApiKey = Deno.env.get('EVOLUTION_API_KEY')
 
+            if (!evolutionApiUrl || !evolutionApiKey) {
+              console.error('Missing Evolution API configuration')
+              throw new Error('Missing Evolution API configuration')
+            }
+
             console.log('Sending message via Evolution API:', {
               instance: followUp.instance.name,
-              contact: contact.TelefoneClientes
+              contact: contact.TelefoneClientes,
+              apiUrl: evolutionApiUrl
             })
 
             const evolutionResponse = await fetch(
@@ -148,7 +158,7 @@ serve(async (req) => {
                 method: 'POST',
                 headers: {
                   'Content-Type': 'application/json',
-                  'apikey': evolutionApiKey || '',
+                  'apikey': evolutionApiKey,
                 },
                 body: JSON.stringify({
                   number: contact.TelefoneClientes,
@@ -157,19 +167,19 @@ serve(async (req) => {
               }
             )
 
+            const evolutionData = await evolutionResponse.json()
+            
             if (!evolutionResponse.ok) {
-              const error = await evolutionResponse.text()
-              console.error('Evolution API error:', error)
+              console.error('Evolution API error:', evolutionData)
               errors.push({
                 type: 'evolution_api',
                 instanceId: followUp.instance_id,
                 contactId: contact.id,
-                error
+                error: evolutionData
               })
               continue
             }
 
-            const evolutionData = await evolutionResponse.json()
             console.log('Evolution API response:', evolutionData)
 
             // Atualizar status do contato
