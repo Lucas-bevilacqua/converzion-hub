@@ -13,6 +13,8 @@ serve(async (req) => {
   }
 
   try {
+    console.log('🚀 Iniciando função de follow-up')
+    
     const { 
       instanceId, 
       instanceName, 
@@ -25,7 +27,7 @@ serve(async (req) => {
       systemPrompt
     } = await req.json()
 
-    console.log('Iniciando processamento de follow-up de IA:', {
+    console.log('📥 Dados recebidos:', {
       instanceId,
       instanceName,
       userId,
@@ -38,9 +40,11 @@ serve(async (req) => {
     })
 
     if (!contact?.TelefoneClientes) {
-      console.error('Erro: Número de telefone do contato não fornecido')
+      console.error('❌ Erro: Número de telefone do contato não fornecido')
       throw new Error('Número de telefone do contato não fornecido')
     }
+
+    console.log('📱 Número do contato:', contact.TelefoneClientes)
 
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
@@ -48,7 +52,7 @@ serve(async (req) => {
     )
 
     // Buscar histórico de mensagens
-    console.log('Buscando histórico de mensagens para:', instanceId)
+    console.log('🔍 Buscando histórico de mensagens para instância:', instanceId)
     const { data: chatHistory, error: chatError } = await supabaseClient
       .from('chat_messages')
       .select('*')
@@ -57,11 +61,12 @@ serve(async (req) => {
       .limit(10)
 
     if (chatError) {
-      console.error('Erro ao buscar histórico:', chatError)
+      console.error('❌ Erro ao buscar histórico:', chatError)
       throw chatError
     }
 
-    console.log('Histórico encontrado:', chatHistory?.length || 0, 'mensagens')
+    console.log('✅ Histórico encontrado:', chatHistory?.length || 0, 'mensagens')
+    console.log('📝 Últimas mensagens:', chatHistory?.slice(-3))
 
     // Preparar mensagens para a IA
     const messages = [
@@ -87,13 +92,20 @@ serve(async (req) => {
       content: 'Por favor, gere uma mensagem de follow-up apropriada para esta conversa. A mensagem deve ser natural e contextualizada com base no histórico.'
     })
 
-    console.log('Enviando requisição para OpenAI com', messages.length, 'mensagens')
+    console.log('🤖 Enviando requisição para OpenAI com', messages.length, 'mensagens')
+    console.log('📝 Prompt do sistema:', systemPrompt)
+
+    const openAiKey = Deno.env.get('OPENAI_API_KEY')
+    if (!openAiKey) {
+      console.error('❌ Chave da OpenAI não encontrada')
+      throw new Error('OpenAI API key não configurada')
+    }
 
     // Gerar resposta com OpenAI
     const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${Deno.env.get('OPENAI_API_KEY')}`,
+        'Authorization': `Bearer ${openAiKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
@@ -105,24 +117,34 @@ serve(async (req) => {
 
     if (!openaiResponse.ok) {
       const error = await openaiResponse.text()
-      console.error('Erro na API da OpenAI:', error)
+      console.error('❌ Erro na API da OpenAI:', error)
       throw new Error(`OpenAI API error: ${error}`)
     }
 
     const data = await openaiResponse.json()
     const followUpMessage = data.choices[0].message.content
-
-    console.log('Mensagem de follow-up gerada:', followUpMessage)
+    console.log('✅ Mensagem de follow-up gerada:', followUpMessage)
 
     // Enviar mensagem via Evolution API
-    console.log('Enviando mensagem via Evolution API para:', contact.TelefoneClientes)
+    const evolutionApiUrl = Deno.env.get('EVOLUTION_API_URL')
+    const evolutionApiKey = Deno.env.get('EVOLUTION_API_KEY')
+
+    if (!evolutionApiUrl || !evolutionApiKey) {
+      console.error('❌ Configuração da Evolution API não encontrada')
+      throw new Error('Evolution API não configurada corretamente')
+    }
+
+    console.log('📤 Enviando mensagem via Evolution API')
+    console.log('URL:', `${evolutionApiUrl}/message/sendText/${instanceName}`)
+    console.log('Número:', contact.TelefoneClientes)
+    
     const evolutionResponse = await fetch(
-      `${Deno.env.get('EVOLUTION_API_URL')}/message/sendText/${instanceName}`,
+      `${evolutionApiUrl}/message/sendText/${instanceName}`,
       {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'apikey': Deno.env.get('EVOLUTION_API_KEY') || '',
+          'apikey': evolutionApiKey,
         },
         body: JSON.stringify({
           number: contact.TelefoneClientes,
@@ -133,15 +155,15 @@ serve(async (req) => {
 
     if (!evolutionResponse.ok) {
       const error = await evolutionResponse.text()
-      console.error('Erro ao enviar mensagem:', error)
+      console.error('❌ Erro ao enviar mensagem:', error)
       throw new Error(`Evolution API error: ${error}`)
     }
 
     const evolutionData = await evolutionResponse.json()
-    console.log('Resposta da Evolution API:', evolutionData)
+    console.log('✅ Resposta da Evolution API:', evolutionData)
 
     // Salvar mensagem no histórico
-    console.log('Salvando mensagem no histórico')
+    console.log('💾 Salvando mensagem no histórico')
     const { error: saveError } = await supabaseClient
       .from('chat_messages')
       .insert({
@@ -152,11 +174,11 @@ serve(async (req) => {
       })
 
     if (saveError) {
-      console.error('Erro ao salvar mensagem:', saveError)
+      console.error('❌ Erro ao salvar mensagem:', saveError)
       throw saveError
     }
 
-    console.log('Follow-up processado com sucesso')
+    console.log('✅ Follow-up processado com sucesso')
     return new Response(
       JSON.stringify({ 
         success: true, 
@@ -167,7 +189,7 @@ serve(async (req) => {
     )
 
   } catch (error) {
-    console.error('Erro ao processar follow-up:', error)
+    console.error('❌ Erro ao processar follow-up:', error)
     return new Response(
       JSON.stringify({ 
         success: false,
