@@ -26,14 +26,17 @@ serve(async (req) => {
     const evolutionApiKey = Deno.env.get('EVOLUTION_API_KEY');
 
     if (!supabaseUrl || !supabaseKey) {
+      console.error(`[${executionId}] ❌ Missing Supabase configuration`);
       throw new Error('Missing Supabase configuration');
     }
 
     if (!openAiKey) {
+      console.error(`[${executionId}] ❌ Missing OpenAI API key`);
       throw new Error('Missing OpenAI API key');
     }
 
     if (!evolutionApiUrl || !evolutionApiKey) {
+      console.error(`[${executionId}] ❌ Missing Evolution API configuration`);
       throw new Error('Missing Evolution API configuration');
     }
 
@@ -44,11 +47,10 @@ serve(async (req) => {
 
     // Log execution start
     const { data: logEntry, error: logError } = await supabase
-      .from('cron_execution_logs')
+      .from('ai_follow_up_logs')
       .insert({
-        job_name: 'process-ai-follow-up',
         status: 'started',
-        response: { 
+        details: { 
           execution_id: executionId,
           start_time: new Date().toISOString()
         }
@@ -84,10 +86,10 @@ serve(async (req) => {
     if (followUpsError) {
       console.error(`[${executionId}] ❌ Error fetching follow-ups:`, followUpsError);
       await supabase
-        .from('cron_execution_logs')
+        .from('ai_follow_up_logs')
         .update({ 
           status: 'error',
-          response: { 
+          details: { 
             execution_id: executionId,
             error: followUpsError.message,
             end_time: new Date().toISOString()
@@ -103,10 +105,10 @@ serve(async (req) => {
     if (!activeFollowUps?.length) {
       console.log(`[${executionId}] ℹ️ No active follow-ups to process`);
       await supabase
-        .from('cron_execution_logs')
+        .from('ai_follow_up_logs')
         .update({ 
           status: 'completed - no active follow-ups',
-          response: { 
+          details: { 
             execution_id: executionId,
             message: 'No active follow-ups found',
             end_time: new Date().toISOString()
@@ -187,7 +189,10 @@ serve(async (req) => {
           content: 'Please generate an appropriate follow-up message for this conversation.' 
         });
 
-        console.log(`[${executionId}] 🤖 Generating message with OpenAI...`);
+        console.log(`[${executionId}] 🤖 Generating message with OpenAI...`, {
+          systemPrompt: messages[0].content,
+          historyLength: chatHistory?.length || 0
+        });
         
         const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
           method: 'POST',
@@ -220,6 +225,9 @@ serve(async (req) => {
         // Send message via Evolution API
         console.log(`[${executionId}] 📤 Sending message via Evolution API...`);
         const fullUrl = `${evolutionApiUrl}/message/sendText/${followUp.instance.name}`;
+        
+        console.log(`[${executionId}] 🔗 Evolution API URL:`, fullUrl);
+        console.log(`[${executionId}] 📱 Phone number:`, followUp.instance.phone_number);
         
         const evolutionResponse = await fetch(fullUrl, {
           method: 'POST',
@@ -289,10 +297,10 @@ serve(async (req) => {
       : 'completed successfully';
 
     await supabase
-      .from('cron_execution_logs')
+      .from('ai_follow_up_logs')
       .update({ 
         status: finalStatus,
-        response: { 
+        details: { 
           execution_id: executionId,
           processed: processedFollowUps,
           errors,
