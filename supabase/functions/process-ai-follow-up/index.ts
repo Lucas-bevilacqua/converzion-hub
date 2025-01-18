@@ -8,7 +8,6 @@ const corsHeaders = {
 }
 
 serve(async (req) => {
-  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
   }
@@ -135,7 +134,6 @@ serve(async (req) => {
 
     // Enviar mensagem via Evolution API
     let evolutionApiUrl = Deno.env.get('EVOLUTION_API_URL') || ''
-    // Remove trailing slash if present
     evolutionApiUrl = evolutionApiUrl.replace(/\/+$/, '')
     const evolutionApiKey = Deno.env.get('EVOLUTION_API_KEY')
 
@@ -149,61 +147,71 @@ serve(async (req) => {
     console.log('URL:', fullUrl)
     console.log('Número:', phoneNumber)
     
-    const evolutionResponse = await fetch(
-      fullUrl,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'apikey': evolutionApiKey,
-        },
-        body: JSON.stringify({
-          number: phoneNumber,
-          text: followUpMessage
+    try {
+      const evolutionResponse = await fetch(
+        fullUrl,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': evolutionApiKey,
+          },
+          body: JSON.stringify({
+            number: phoneNumber,
+            text: followUpMessage
+          }),
+        }
+      )
+
+      const evolutionData = await evolutionResponse.json()
+      console.log('✅ Resposta da Evolution API:', evolutionData)
+
+      if (!evolutionResponse.ok || !evolutionData?.key?.id) {
+        const errorText = JSON.stringify(evolutionData)
+        console.error('❌ Falha ao enviar mensagem:', {
+          status: evolutionResponse.status,
+          error: errorText
+        })
+        throw new Error(`Evolution API error: ${errorText}`)
+      }
+
+      // Salvar mensagem no histórico
+      console.log('💾 Salvando mensagem no histórico')
+      const { error: saveError } = await supabaseClient
+        .from('chat_messages')
+        .insert({
+          instance_id: instanceId,
+          user_id: userId,
+          sender_type: 'follow_up',
+          content: followUpMessage,
+          whatsapp_message_id: evolutionData.key?.id
+        })
+
+      if (saveError) {
+        console.error('❌ Erro ao salvar mensagem:', saveError)
+        throw saveError
+      }
+
+      console.log('✅ Follow-up processado com sucesso')
+      return new Response(
+        JSON.stringify({ 
+          success: true, 
+          message: 'Follow-up processado e enviado com sucesso',
+          followUpMessage,
+          messageId: evolutionData.key?.id
         }),
-      }
-    )
+        { 
+          headers: { 
+            ...corsHeaders, 
+            'Content-Type': 'application/json' 
+          } 
+        }
+      )
 
-    if (!evolutionResponse.ok) {
-      const error = await evolutionResponse.text()
+    } catch (error) {
       console.error('❌ Erro ao enviar mensagem:', error)
-      throw new Error(`Evolution API error: ${error}`)
+      throw error
     }
-
-    const evolutionData = await evolutionResponse.json()
-    console.log('✅ Resposta da Evolution API:', evolutionData)
-
-    // Salvar mensagem no histórico
-    console.log('💾 Salvando mensagem no histórico')
-    const { error: saveError } = await supabaseClient
-      .from('chat_messages')
-      .insert({
-        instance_id: instanceId,
-        user_id: userId,
-        sender_type: 'follow_up',
-        content: followUpMessage,
-        whatsapp_message_id: evolutionData.key?.id
-      })
-
-    if (saveError) {
-      console.error('❌ Erro ao salvar mensagem:', saveError)
-      throw saveError
-    }
-
-    console.log('✅ Follow-up processado com sucesso')
-    return new Response(
-      JSON.stringify({ 
-        success: true, 
-        message: 'Follow-up processado e enviado com sucesso',
-        followUpMessage 
-      }),
-      { 
-        headers: { 
-          ...corsHeaders, 
-          'Content-Type': 'application/json' 
-        } 
-      }
-    )
 
   } catch (error) {
     console.error('❌ Erro ao processar follow-up:', error)
