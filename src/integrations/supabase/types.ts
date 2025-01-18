@@ -9,6 +9,27 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      ai_follow_up_logs: {
+        Row: {
+          details: Json | null
+          execution_time: string | null
+          id: number
+          status: string | null
+        }
+        Insert: {
+          details?: Json | null
+          execution_time?: string | null
+          id?: number
+          status?: string | null
+        }
+        Update: {
+          details?: Json | null
+          execution_time?: string | null
+          id?: number
+          status?: string | null
+        }
+        Relationships: []
+      }
       ai_settings: {
         Row: {
           created_at: string
