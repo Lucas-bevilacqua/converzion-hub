@@ -38,6 +38,14 @@ serve(async (req) => {
 
     console.log('🔍 Fetching active follow-ups...')
 
+    // First check instance connection status
+    const evolutionApiUrl = (Deno.env.get('EVOLUTION_API_URL') || '').replace(/\/$/, '')
+    const evolutionApiKey = Deno.env.get('EVOLUTION_API_KEY')
+
+    if (!evolutionApiUrl || !evolutionApiKey) {
+      throw new Error('Missing Evolution API configuration')
+    }
+
     // Buscar follow-ups ativos com informações da instância
     const { data: followUps, error: followUpsError } = await supabaseClient
       .from('instance_follow_ups')
@@ -88,12 +96,58 @@ serve(async (req) => {
       console.log('📝 Processing follow-up:', {
         id: followUp.id,
         instanceId: followUp.instance_id,
-        instanceStatus: followUp.instance?.connection_status,
-        followUp: followUp
+        instanceName: followUp.instance?.name,
+        instanceStatus: followUp.instance?.connection_status
       })
 
-      if (!followUp.instance || followUp.instance.connection_status !== 'connected') {
-        console.log('⚠️ Instance not connected, skipping:', followUp.instance_id)
+      // Check instance connection status with Evolution API
+      try {
+        const stateResponse = await fetch(
+          `${evolutionApiUrl}/instance/connectionState/${followUp.instance.name}`,
+          {
+            headers: {
+              'Content-Type': 'application/json',
+              'apikey': evolutionApiKey,
+            }
+          }
+        )
+
+        const stateData = await stateResponse.json()
+        console.log('Instance state check:', {
+          instance: followUp.instance.name,
+          status: stateData?.state,
+          response: stateData
+        })
+
+        if (stateData?.state !== 'open') {
+          console.log('⚠️ Instance not connected, updating status:', followUp.instance.id)
+          
+          // Update instance status in database
+          await supabaseClient
+            .from('evolution_instances')
+            .update({
+              connection_status: 'disconnected',
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', followUp.instance.id)
+
+          console.warn('⚠️ Instance not connected, skipping:', followUp.instance.id)
+          continue
+        }
+
+        // Update instance as connected if needed
+        if (followUp.instance.connection_status !== 'connected') {
+          await supabaseClient
+            .from('evolution_instances')
+            .update({
+              connection_status: 'connected',
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', followUp.instance.id)
+        }
+
+      } catch (error) {
+        console.error('❌ Error checking instance state:', error)
         continue
       }
 
@@ -146,13 +200,6 @@ serve(async (req) => {
             }
 
             const firstMessage = manualMessages[0]
-            const evolutionApiUrl = (Deno.env.get('EVOLUTION_API_URL') || '').replace(/\/$/, '')
-            const evolutionApiKey = Deno.env.get('EVOLUTION_API_KEY')
-
-            if (!evolutionApiUrl || !evolutionApiKey) {
-              console.error('❌ Missing Evolution API configuration')
-              throw new Error('Missing Evolution API configuration')
-            }
 
             // Validate phone number format
             const phoneNumber = contact.TelefoneClientes?.replace(/\D/g, '')
