@@ -114,6 +114,7 @@ serve(async (req) => {
             success: processResult.success,
             message: processResult.message
           })
+
         } catch (error) {
           console.error('Erro ao processar contato:', {
             contato: contact.id,
@@ -131,6 +132,7 @@ serve(async (req) => {
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   } catch (error) {
+    console.error('Erro ao processar follow-ups:', error)
     return new Response(
       JSON.stringify({ error: error.message }),
       { 
