@@ -45,6 +45,13 @@ serve(async (req) => {
     }
 
     console.log('📱 Número do contato:', phoneNumber)
+    console.log('⏰ Aguardando delay de', delayMinutes, 'minutos')
+
+    // Convert minutes to milliseconds and wait
+    const delayMs = delayMinutes * 60 * 1000
+    await new Promise(resolve => setTimeout(resolve, delayMs))
+
+    console.log('⏰ Delay concluído, prosseguindo com o follow-up')
 
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
