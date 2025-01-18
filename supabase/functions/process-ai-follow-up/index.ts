@@ -8,6 +8,7 @@ const corsHeaders = {
 }
 
 serve(async (req) => {
+  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
   }
@@ -116,7 +117,7 @@ serve(async (req) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4o-mini',
+        model: 'gpt-4',
         messages,
         temperature: 0.7,
       }),
@@ -133,7 +134,7 @@ serve(async (req) => {
     console.log('✅ Mensagem de follow-up gerada:', followUpMessage)
 
     // Enviar mensagem via Evolution API
-    const evolutionApiUrl = Deno.env.get('EVOLUTION_API_URL')
+    const evolutionApiUrl = (Deno.env.get('EVOLUTION_API_URL') || '').replace(/\/$/, '')
     const evolutionApiKey = Deno.env.get('EVOLUTION_API_KEY')
 
     if (!evolutionApiUrl || !evolutionApiKey) {
@@ -193,7 +194,12 @@ serve(async (req) => {
         message: 'Follow-up processado e enviado com sucesso',
         followUpMessage 
       }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { 
+        headers: { 
+          ...corsHeaders, 
+          'Content-Type': 'application/json' 
+        } 
+      }
     )
 
   } catch (error) {
@@ -205,7 +211,10 @@ serve(async (req) => {
       }),
       { 
         status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        headers: { 
+          ...corsHeaders, 
+          'Content-Type': 'application/json' 
+        } 
       }
     )
   }
