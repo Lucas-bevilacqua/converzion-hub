@@ -146,7 +146,7 @@ serve(async (req) => {
     const fullUrl = `${evolutionApiUrl}/message/sendText/${instanceName}`
     console.log('URL:', fullUrl)
     console.log('Número:', phoneNumber)
-    
+
     try {
       const evolutionResponse = await fetch(
         fullUrl,
