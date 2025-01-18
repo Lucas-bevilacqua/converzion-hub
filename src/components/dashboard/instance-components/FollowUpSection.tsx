@@ -113,7 +113,7 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
           
           const typedMessages = parsedMessages.map((msg: any) => ({
             message: String(msg?.message || ''),
-            delay_minutes: Number(msg?.delay_minutes || 3) // Changed from 10 to 3
+            delay_minutes: Number(msg?.delay_minutes || 3)
           }))
 
           data.manual_messages = typedMessages
@@ -172,7 +172,7 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
       const manualMessages = Array.isArray(values.manual_messages) 
         ? values.manual_messages.map(msg => ({
             message: msg.message || '',
-            delay_minutes: Math.max(3, Number(msg.delay_minutes) || 3) // Changed from 10 to 3
+            delay_minutes: Math.max(3, Number(msg.delay_minutes) || 3)
           }))
         : []
 
@@ -180,7 +180,7 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
         instance_id: instanceId,
         is_active: values.is_active,
         follow_up_type: values.follow_up_type,
-        delay_minutes: Math.max(3, values.delay_minutes), // Changed from 10 to 3
+        delay_minutes: Math.max(3, values.delay_minutes),
         template_message: values.template_message,
         schedule_start_time: values.schedule_start_time,
         schedule_end_time: values.schedule_end_time,
@@ -214,12 +214,12 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
       if (values.follow_up_type === 'ai_generated') {
         const { data: instance, error: instanceError } = await supabase
           .from('evolution_instances')
-          .select('name')
+          .select('name, phone_number')
           .eq('id', instanceId)
           .single()
 
         if (instanceError) {
-          console.error('Erro ao buscar nome da instância:', instanceError)
+          console.error('Erro ao buscar dados da instância:', instanceError)
           throw instanceError
         }
 
@@ -230,6 +230,7 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
             instanceId,
             instanceName: instance.name,
             userId: user?.id,
+            phoneNumber: instance.phone_number,
             delayMinutes: values.delay_minutes,
             maxAttempts: values.max_attempts,
             stopOnReply: values.stop_on_reply,

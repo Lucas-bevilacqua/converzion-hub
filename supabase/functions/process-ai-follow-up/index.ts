@@ -17,9 +17,9 @@ serve(async (req) => {
     
     const { 
       instanceId, 
-      instanceName, 
+      instanceName,
       userId,
-      contact,
+      phoneNumber,
       delayMinutes, 
       maxAttempts, 
       stopOnReply, 
@@ -31,7 +31,7 @@ serve(async (req) => {
       instanceId,
       instanceName,
       userId,
-      contact,
+      phoneNumber,
       delayMinutes,
       maxAttempts,
       stopOnReply,
@@ -39,12 +39,12 @@ serve(async (req) => {
       systemPrompt
     })
 
-    if (!contact?.TelefoneClientes) {
-      console.error('❌ Erro: Número de telefone do contato não fornecido')
-      throw new Error('Número de telefone do contato não fornecido')
+    if (!phoneNumber) {
+      console.error('❌ Erro: Número de telefone não fornecido')
+      throw new Error('Número de telefone não fornecido')
     }
 
-    console.log('📱 Número do contato:', contact.TelefoneClientes)
+    console.log('📱 Número do contato:', phoneNumber)
 
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
@@ -136,7 +136,7 @@ serve(async (req) => {
 
     console.log('📤 Enviando mensagem via Evolution API')
     console.log('URL:', `${evolutionApiUrl}/message/sendText/${instanceName}`)
-    console.log('Número:', contact.TelefoneClientes)
+    console.log('Número:', phoneNumber)
     
     const evolutionResponse = await fetch(
       `${evolutionApiUrl}/message/sendText/${instanceName}`,
@@ -147,7 +147,7 @@ serve(async (req) => {
           'apikey': evolutionApiKey,
         },
         body: JSON.stringify({
-          number: contact.TelefoneClientes,
+          number: phoneNumber,
           text: followUpMessage
         }),
       }
@@ -170,7 +170,8 @@ serve(async (req) => {
         instance_id: instanceId,
         user_id: userId,
         sender_type: 'follow_up',
-        content: followUpMessage
+        content: followUpMessage,
+        whatsapp_message_id: evolutionData.key?.id
       })
 
     if (saveError) {
