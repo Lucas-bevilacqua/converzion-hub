@@ -10,7 +10,6 @@ const corsHeaders = {
 console.log('🚀 Function process-ai-follow-up is starting...');
 
 serve(async (req) => {
-  // Log request details
   console.log(`📥 Received ${req.method} request at ${new Date().toISOString()}`);
   
   if (req.method === 'OPTIONS') {
@@ -19,7 +18,7 @@ serve(async (req) => {
   }
 
   try {
-    // Initialize Supabase client with detailed logging
+    // Initialize Supabase client
     console.log('🔄 Initializing Supabase client...');
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
@@ -71,7 +70,6 @@ serve(async (req) => {
     if (followUpsError) {
       console.error('❌ Error fetching follow-ups:', followUpsError);
       
-      // Update log with error
       await supabaseClient
         .from('cron_execution_logs')
         .update({ 
@@ -88,7 +86,6 @@ serve(async (req) => {
     if (!activeFollowUps?.length) {
       console.log('ℹ️ No active AI follow-ups found');
       
-      // Update log for no follow-ups case
       await supabaseClient
         .from('cron_execution_logs')
         .update({ 
