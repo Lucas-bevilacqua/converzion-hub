@@ -7,6 +7,8 @@ import { parseAuthError } from "./utils";
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
+  console.log("Iniciando AuthProvider");
+  
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
@@ -166,10 +168,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const contextValue: AuthContextType = {
+    session,
+    user,
+    signIn,
+    signUp,
+    signOut,
+    loading
+  };
+
+  console.log("Renderizando AuthProvider com valores:", {
+    temSessao: !!session,
+    temUsuario: !!user,
+    estaCarregando: loading
+  });
+
   return (
-    <AuthContext.Provider
-      value={{ session, user, signIn, signUp, signOut, loading }}
-    >
+    <AuthContext.Provider value={contextValue}>
       {children}
     </AuthContext.Provider>
   );
