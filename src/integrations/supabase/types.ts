@@ -92,6 +92,27 @@ export type Database = {
           },
         ]
       }
+      cron_logs: {
+        Row: {
+          execution_time: string | null
+          id: number
+          job_name: string | null
+          status: string | null
+        }
+        Insert: {
+          execution_time?: string | null
+          id?: number
+          job_name?: string | null
+          status?: string | null
+        }
+        Update: {
+          execution_time?: string | null
+          id?: number
+          job_name?: string | null
+          status?: string | null
+        }
+        Relationships: []
+      }
       evolution_instances: {
         Row: {
           connection_status: string | null
