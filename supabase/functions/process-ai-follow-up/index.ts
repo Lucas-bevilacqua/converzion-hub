@@ -35,6 +35,8 @@ serve(async (req) => {
       throw logError
     }
 
+    console.log('✅ Log de execução criado:', logData)
+
     // Buscar follow-ups ativos do tipo AI
     console.log('🔍 Buscando follow-ups ativos do tipo AI')
     const { data: activeFollowUps, error: followUpsError } = await supabaseClient
