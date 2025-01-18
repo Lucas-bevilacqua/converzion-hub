@@ -16,25 +16,30 @@ serve(async (req) => {
     const { 
       instanceId, 
       instanceName, 
-      userId, 
+      userId,
+      contact,
       delayMinutes, 
       maxAttempts, 
       stopOnReply, 
       stopKeywords, 
-      systemPrompt,
-      skipInitialMessage 
+      systemPrompt
     } = await req.json()
 
-    console.log('Configurando follow-up de IA:', {
+    console.log('Processando follow-up de IA:', {
       instanceId,
       instanceName,
       userId,
+      contact,
       delayMinutes,
       maxAttempts,
       stopOnReply,
       stopKeywords,
       systemPrompt
     })
+
+    if (!contact?.TelefoneClientes) {
+      throw new Error('Número de telefone do contato não fornecido')
+    }
 
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
@@ -115,7 +120,7 @@ serve(async (req) => {
           'apikey': Deno.env.get('EVOLUTION_API_KEY') || '',
         },
         body: JSON.stringify({
-          number: phoneNumber,
+          number: contact.TelefoneClientes,
           text: followUpMessage
         }),
       }
