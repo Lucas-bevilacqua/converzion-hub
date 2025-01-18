@@ -98,79 +98,6 @@ serve(async (req) => {
           continue
         }
 
-        // Check instance connection state
-        try {
-          console.log('🔄 Checking instance state:', followUp.instance.name)
-          
-          const stateResponse = await fetch(
-            `${evolutionApiUrl}/instance/connectionState/${followUp.instance.name}`,
-            {
-              headers: {
-                'Content-Type': 'application/json',
-                'apikey': evolutionApiKey,
-              }
-            }
-          )
-
-          if (!stateResponse.ok) {
-            const errorText = await stateResponse.text()
-            console.error('❌ Instance state check failed:', {
-              status: stateResponse.status,
-              error: errorText
-            })
-            errors.push({
-              type: 'instance_state_check_failed',
-              instanceId: followUp.instance_id,
-              error: errorText
-            })
-            continue
-          }
-
-          const stateData = await stateResponse.json()
-          console.log('Instance state:', {
-            instance: followUp.instance.name,
-            status: stateData?.state
-          })
-
-          if (stateData?.state !== 'open') {
-            console.warn('⚠️ Instance not connected:', followUp.instance.id)
-            
-            await supabaseClient
-              .from('evolution_instances')
-              .update({
-                connection_status: 'disconnected',
-                updated_at: new Date().toISOString()
-              })
-              .eq('id', followUp.instance.id)
-
-            errors.push({
-              type: 'instance_not_connected',
-              instanceId: followUp.instance_id
-            })
-            continue
-          }
-
-          // Update connected status if needed
-          if (followUp.instance.connection_status !== 'connected') {
-            await supabaseClient
-              .from('evolution_instances')
-              .update({
-                connection_status: 'connected',
-                updated_at: new Date().toISOString()
-              })
-              .eq('id', followUp.instance.id)
-          }
-
-        } catch (error) {
-          console.error('❌ Instance state check error:', error)
-          errors.push({
-            type: 'instance_state_check_error',
-            instanceId: followUp.instance_id,
-            error: error.message
-          })
-          continue
-        }
-
         // Fetch pending contacts
         const { data: contacts, error: contactsError } = await supabaseClient
           .from('Users_clientes')
@@ -250,8 +177,11 @@ serve(async (req) => {
               }
             )
 
-            if (!evolutionResponse.ok) {
-              const errorText = await evolutionResponse.text()
+            const evolutionData = await evolutionResponse.json()
+            console.log('✅ Evolution API response:', evolutionData)
+
+            if (!evolutionResponse.ok || !evolutionData?.key?.id) {
+              const errorText = JSON.stringify(evolutionData)
               console.error('❌ Message send failed:', {
                 status: evolutionResponse.status,
                 error: errorText
@@ -261,20 +191,6 @@ serve(async (req) => {
                 instanceId: followUp.instance_id,
                 contactId: contact.id,
                 error: errorText
-              })
-              continue
-            }
-
-            const evolutionData = await evolutionResponse.json()
-            console.log('✅ Evolution API response:', evolutionData)
-
-            if (!evolutionData?.key?.id) {
-              console.error('❌ Invalid Evolution API response:', evolutionData)
-              errors.push({
-                type: 'invalid_evolution_response',
-                instanceId: followUp.instance_id,
-                contactId: contact.id,
-                response: evolutionData
               })
               continue
             }
