@@ -25,7 +25,7 @@ serve(async (req) => {
       systemPrompt
     } = await req.json()
 
-    console.log('Processando follow-up de IA:', {
+    console.log('Iniciando processamento de follow-up de IA:', {
       instanceId,
       instanceName,
       userId,
@@ -38,6 +38,7 @@ serve(async (req) => {
     })
 
     if (!contact?.TelefoneClientes) {
+      console.error('Erro: Número de telefone do contato não fornecido')
       throw new Error('Número de telefone do contato não fornecido')
     }
 
@@ -47,6 +48,7 @@ serve(async (req) => {
     )
 
     // Buscar histórico de mensagens
+    console.log('Buscando histórico de mensagens para:', instanceId)
     const { data: chatHistory, error: chatError } = await supabaseClient
       .from('chat_messages')
       .select('*')
@@ -58,6 +60,8 @@ serve(async (req) => {
       console.error('Erro ao buscar histórico:', chatError)
       throw chatError
     }
+
+    console.log('Histórico encontrado:', chatHistory?.length || 0, 'mensagens')
 
     // Preparar mensagens para a IA
     const messages = [
@@ -83,7 +87,7 @@ serve(async (req) => {
       content: 'Por favor, gere uma mensagem de follow-up apropriada para esta conversa. A mensagem deve ser natural e contextualizada com base no histórico.'
     })
 
-    console.log('Enviando requisição para OpenAI com mensagens:', messages)
+    console.log('Enviando requisição para OpenAI com', messages.length, 'mensagens')
 
     // Gerar resposta com OpenAI
     const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -111,6 +115,7 @@ serve(async (req) => {
     console.log('Mensagem de follow-up gerada:', followUpMessage)
 
     // Enviar mensagem via Evolution API
+    console.log('Enviando mensagem via Evolution API para:', contact.TelefoneClientes)
     const evolutionResponse = await fetch(
       `${Deno.env.get('EVOLUTION_API_URL')}/message/sendText/${instanceName}`,
       {
@@ -136,6 +141,7 @@ serve(async (req) => {
     console.log('Resposta da Evolution API:', evolutionData)
 
     // Salvar mensagem no histórico
+    console.log('Salvando mensagem no histórico')
     const { error: saveError } = await supabaseClient
       .from('chat_messages')
       .insert({
