@@ -20,6 +20,21 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
+    // Log execution start
+    const { data: logData, error: logError } = await supabaseClient
+      .from('cron_logs')
+      .insert({
+        job_name: 'process-ai-follow-up',
+        status: 'started'
+      })
+      .select()
+      .single()
+
+    if (logError) {
+      console.error('❌ Erro ao registrar início do job:', logError)
+      throw logError
+    }
+
     // Buscar follow-ups ativos do tipo AI
     console.log('🔍 Buscando follow-ups ativos do tipo AI')
     const { data: activeFollowUps, error: followUpsError } = await supabaseClient
@@ -43,13 +58,19 @@ serve(async (req) => {
 
     if (!activeFollowUps?.length) {
       console.log('ℹ️ Nenhum follow-up ativo do tipo AI encontrado')
+      await supabaseClient
+        .from('cron_logs')
+        .update({ 
+          status: 'completed - no active follow-ups',
+          execution_time: new Date().toISOString()
+        })
+        .eq('id', logData?.id)
+
       return new Response(
         JSON.stringify({ success: true, message: 'Nenhum follow-up ativo' }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
-
-    console.log('✅ Follow-ups encontrados:', activeFollowUps.length)
 
     const evolutionApiUrl = (Deno.env.get('EVOLUTION_API_URL') || '').replace(/\/$/, '')
     const evolutionApiKey = Deno.env.get('EVOLUTION_API_KEY')
@@ -227,6 +248,19 @@ serve(async (req) => {
         })
       }
     }
+
+    // Atualizar status final no log
+    const finalStatus = errors.length > 0 
+      ? `completed with ${errors.length} errors` 
+      : 'completed successfully'
+
+    await supabaseClient
+      .from('cron_logs')
+      .update({ 
+        status: finalStatus,
+        execution_time: new Date().toISOString()
+      })
+      .eq('id', logData?.id)
 
     console.log('🏁 Processamento concluído:', {
       processed: processedFollowUps.length,
