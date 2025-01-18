@@ -12,10 +12,22 @@ serve(async (req) => {
   }
 
   try {
+    console.log('Edge function started - get-follow-up-contacts')
+    
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
+
+    console.log('Supabase client created')
+
+    // Log cron execution
+    await supabaseClient
+      .from('cron_logs')
+      .insert({
+        job_name: 'get-follow-up-contacts',
+        status: 'started'
+      })
 
     // Buscar follow-ups ativos
     const { data: followUps, error: followUpsError } = await supabaseClient
@@ -27,8 +39,11 @@ serve(async (req) => {
       .eq('is_active', true)
       .limit(1)
 
+    console.log('Follow-ups query result:', { followUps, error: followUpsError })
+
     if (followUpsError) throw followUpsError
     if (!followUps?.length) {
+      console.log('No active follow-ups found')
       return new Response(
         JSON.stringify({ success: true, message: 'No active follow-ups' }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -36,7 +51,10 @@ serve(async (req) => {
     }
 
     const followUp = followUps[0]
+    console.log('Processing follow-up:', followUp)
+
     if (!followUp.instance || followUp.instance.connection_status !== 'connected') {
+      console.log('Instance not connected:', followUp.instance)
       return new Response(
         JSON.stringify({ success: true, message: 'Instance not connected' }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -52,8 +70,11 @@ serve(async (req) => {
       .order('created_at', { ascending: true })
       .limit(1)
 
+    console.log('Contacts query result:', { contacts, error: contactsError })
+
     if (contactsError) throw contactsError
     if (!contacts?.length) {
+      console.log('No contacts found for follow-up')
       return new Response(
         JSON.stringify({ success: true, message: 'No contacts for follow-up' }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -64,6 +85,7 @@ serve(async (req) => {
     const manualMessages = Array.isArray(followUp.manual_messages) ? followUp.manual_messages : []
     
     if (!manualMessages.length) {
+      console.log('No messages configured for follow-up')
       return new Response(
         JSON.stringify({ success: true, message: 'No messages configured' }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -72,7 +94,13 @@ serve(async (req) => {
 
     const firstMessage = manualMessages[0]
     const evolutionApiUrl = (Deno.env.get('EVOLUTION_API_URL') || '').replace(/\/$/, '')
+    const evolutionApiKey = Deno.env.get('EVOLUTION_API_KEY')
     
+    console.log('Sending message via Evolution API:', {
+      instance: followUp.instance.name,
+      contact: contact.TelefoneClientes
+    })
+
     // Enviar mensagem via Evolution API
     const evolutionResponse = await fetch(
       `${evolutionApiUrl}/message/sendText/${followUp.instance.name}`,
@@ -80,7 +108,7 @@ serve(async (req) => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'apikey': Deno.env.get('EVOLUTION_API_KEY') || '',
+          'apikey': evolutionApiKey || '',
         },
         body: JSON.stringify({
           number: contact.TelefoneClientes,
@@ -91,10 +119,12 @@ serve(async (req) => {
 
     if (!evolutionResponse.ok) {
       const error = await evolutionResponse.text()
+      console.error('Evolution API error:', error)
       throw new Error(error)
     }
 
     const evolutionData = await evolutionResponse.json()
+    console.log('Evolution API response:', evolutionData)
 
     // Atualizar status do contato
     await supabaseClient
@@ -116,13 +146,15 @@ serve(async (req) => {
         whatsapp_message_id: evolutionData.key?.id
       })
 
-    // Registrar execução no log
+    // Log success
     await supabaseClient
       .from('cron_logs')
       .insert({
         job_name: 'get-follow-up-contacts',
         status: 'success'
       })
+
+    console.log('Follow-up process completed successfully')
 
     return new Response(
       JSON.stringify({ 
@@ -134,6 +166,14 @@ serve(async (req) => {
     )
 
   } catch (error) {
+    console.error('Error in get-follow-up-contacts:', error)
+
+    // Log error
+    const supabaseClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    )
+
     await supabaseClient
       .from('cron_logs')
       .insert({
