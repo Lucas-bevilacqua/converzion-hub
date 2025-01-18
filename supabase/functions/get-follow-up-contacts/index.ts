@@ -154,9 +154,16 @@ serve(async (req) => {
               throw new Error('Missing Evolution API configuration')
             }
 
+            // Validate phone number format
+            const phoneNumber = contact.TelefoneClientes?.replace(/\D/g, '')
+            if (!phoneNumber || phoneNumber.length < 10) {
+              console.error('❌ Invalid phone number:', contact.TelefoneClientes)
+              continue
+            }
+
             console.log('📤 Sending message via Evolution API:', {
               instance: followUp.instance.name,
-              contact: contact.TelefoneClientes,
+              contact: phoneNumber,
               apiUrl: evolutionApiUrl,
               message: firstMessage.message
             })
@@ -170,7 +177,7 @@ serve(async (req) => {
                   'apikey': evolutionApiKey,
                 },
                 body: JSON.stringify({
-                  number: contact.TelefoneClientes,
+                  number: phoneNumber,
                   text: firstMessage.message
                 })
               }
@@ -179,7 +186,7 @@ serve(async (req) => {
             const evolutionData = await evolutionResponse.json()
             console.log('Evolution API response:', evolutionData)
             
-            if (!evolutionResponse.ok) {
+            if (!evolutionResponse.ok || !evolutionData?.key?.id) {
               console.error('❌ Evolution API error:', evolutionData)
               errors.push({
                 type: 'evolution_api',
@@ -233,14 +240,14 @@ serve(async (req) => {
 
             processedContacts.push({
               id: contact.id,
-              phone: contact.TelefoneClientes,
+              phone: phoneNumber,
               status: 'message_sent',
               messageId: evolutionData.key?.id
             })
 
             console.log('✅ Successfully processed contact:', {
               id: contact.id,
-              phone: contact.TelefoneClientes
+              phone: phoneNumber
             })
 
           } catch (error) {
