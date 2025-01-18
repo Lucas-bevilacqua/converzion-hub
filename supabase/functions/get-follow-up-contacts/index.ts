@@ -162,92 +162,103 @@ serve(async (req) => {
               messageLength: firstMessage.message.length
             })
 
-            const evolutionResponse = await fetch(
-              `${evolutionApiUrl}/message/sendText/${followUp.instance.name}`,
-              {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                  'apikey': evolutionApiKey,
-                },
-                body: JSON.stringify({
-                  number: phoneNumber,
-                  text: firstMessage.message
+            try {
+              const evolutionResponse = await fetch(
+                `${evolutionApiUrl}/message/sendText/${followUp.instance.name}`,
+                {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'apikey': evolutionApiKey,
+                  },
+                  body: JSON.stringify({
+                    number: phoneNumber,
+                    text: firstMessage.message
+                  })
+                }
+              )
+
+              const evolutionData = await evolutionResponse.json()
+              console.log('✅ Evolution API response:', evolutionData)
+
+              if (!evolutionResponse.ok || !evolutionData?.key?.id) {
+                const errorText = JSON.stringify(evolutionData)
+                console.error('❌ Message send failed:', {
+                  status: evolutionResponse.status,
+                  error: errorText
                 })
+                errors.push({
+                  type: 'message_send_failed',
+                  instanceId: followUp.instance_id,
+                  contactId: contact.id,
+                  error: errorText
+                })
+                continue
               }
-            )
 
-            const evolutionData = await evolutionResponse.json()
-            console.log('✅ Evolution API response:', evolutionData)
+              // Update contact status
+              const { error: updateError } = await supabaseClient
+                .from('Users_clientes')
+                .update({
+                  ConversationId: 'follow-up-sent-0',
+                  last_message_time: new Date().toISOString()
+                })
+                .eq('id', contact.id)
 
-            if (!evolutionResponse.ok || !evolutionData?.key?.id) {
-              const errorText = JSON.stringify(evolutionData)
-              console.error('❌ Message send failed:', {
-                status: evolutionResponse.status,
-                error: errorText
+              if (updateError) {
+                console.error('❌ Error updating contact:', updateError)
+                errors.push({
+                  type: 'contact_update_failed',
+                  instanceId: followUp.instance_id,
+                  contactId: contact.id,
+                  error: updateError
+                })
+                continue
+              }
+
+              // Log message
+              const { error: messageLogError } = await supabaseClient
+                .from('chat_messages')
+                .insert({
+                  instance_id: followUp.instance_id,
+                  user_id: followUp.instance.user_id,
+                  sender_type: 'follow_up',
+                  content: firstMessage.message,
+                  whatsapp_message_id: evolutionData.key?.id
+                })
+
+              if (messageLogError) {
+                console.error('❌ Error logging message:', messageLogError)
+                errors.push({
+                  type: 'message_log_failed',
+                  instanceId: followUp.instance_id,
+                  contactId: contact.id,
+                  error: messageLogError
+                })
+                continue
+              }
+
+              processedContacts.push({
+                id: contact.id,
+                phone: phoneNumber,
+                status: 'message_sent',
+                messageId: evolutionData.key?.id
               })
+
+              console.log('✅ Contact processed:', {
+                id: contact.id,
+                phone: phoneNumber
+              })
+
+            } catch (error) {
+              console.error('❌ Error sending message:', error)
               errors.push({
-                type: 'message_send_failed',
+                type: 'message_send_error',
                 instanceId: followUp.instance_id,
                 contactId: contact.id,
-                error: errorText
+                error: error.message
               })
-              continue
             }
-
-            // Update contact status
-            const { error: updateError } = await supabaseClient
-              .from('Users_clientes')
-              .update({
-                ConversationId: 'follow-up-sent-0',
-                last_message_time: new Date().toISOString()
-              })
-              .eq('id', contact.id)
-
-            if (updateError) {
-              console.error('❌ Error updating contact:', updateError)
-              errors.push({
-                type: 'contact_update_failed',
-                instanceId: followUp.instance_id,
-                contactId: contact.id,
-                error: updateError
-              })
-              continue
-            }
-
-            // Log message
-            const { error: messageLogError } = await supabaseClient
-              .from('chat_messages')
-              .insert({
-                instance_id: followUp.instance_id,
-                user_id: followUp.instance.user_id,
-                sender_type: 'follow_up',
-                content: firstMessage.message,
-                whatsapp_message_id: evolutionData.key?.id
-              })
-
-            if (messageLogError) {
-              console.error('❌ Error logging message:', messageLogError)
-              errors.push({
-                type: 'message_log_failed',
-                instanceId: followUp.instance_id,
-                contactId: contact.id,
-                error: messageLogError
-              })
-              continue
-            }
-
-            processedContacts.push({
-              id: contact.id,
-              phone: phoneNumber,
-              status: 'message_sent',
-              messageId: evolutionData.key?.id
-            })
-
-            console.log('✅ Contact processed:', {
-              id: contact.id,
-              phone: phoneNumber
-            })
 
           } catch (error) {
             console.error('❌ Contact processing error:', error)
