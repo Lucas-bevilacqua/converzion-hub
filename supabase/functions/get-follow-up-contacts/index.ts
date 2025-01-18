@@ -17,7 +17,6 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    // Busca follow-ups ativos
     const { data: followUps, error: followUpsError } = await supabaseClient
       .from('instance_follow_ups')
       .select(`
@@ -48,7 +47,6 @@ serve(async (req) => {
         continue
       }
 
-      // Busca contatos que não têm follow-up ou que já receberam alguma mensagem
       const { data: contacts, error: contactsError } = await supabaseClient
         .from('Users_clientes')
         .select('*')
@@ -74,49 +72,11 @@ serve(async (req) => {
 
           const lastMessageTime = new Date(contact.last_message_time || contact.created_at)
           const now = new Date()
-          
-          // Converte para UTC para garantir comparação correta
-          const utcNow = new Date(Date.UTC(
-            now.getUTCFullYear(),
-            now.getUTCMonth(),
-            now.getUTCDate(),
-            now.getUTCHours(),
-            now.getUTCMinutes()
-          ))
-
-          const utcLastMessage = new Date(Date.UTC(
-            lastMessageTime.getUTCFullYear(),
-            lastMessageTime.getUTCMonth(),
-            lastMessageTime.getUTCDate(),
-            lastMessageTime.getUTCHours(),
-            lastMessageTime.getUTCMinutes()
-          ))
-
-          const minutesSinceLastMessage = Math.floor((utcNow.getTime() - utcLastMessage.getTime()) / (1000 * 60))
+          const minutesSinceLastMessage = Math.floor((now.getTime() - lastMessageTime.getTime()) / (1000 * 60))
           const nextMessage = manualMessages[currentMessageIndex + 1]
           const minDelay = Math.max(3, nextMessage.delay_minutes || 3)
 
           if (minutesSinceLastMessage < minDelay) {
-            continue
-          }
-
-          // Verifica horário de funcionamento
-          const currentHour = utcNow.getUTCHours()
-          const currentMinute = utcNow.getUTCMinutes()
-          const currentTime = `${currentHour.toString().padStart(2, '0')}:${currentMinute.toString().padStart(2, '0')}`
-          
-          const startTime = followUp.schedule_start_time || '09:00'
-          const endTime = followUp.schedule_end_time || '18:00'
-          
-          if (currentTime < startTime || currentTime > endTime) {
-            continue
-          }
-
-          // Verifica dias da semana (0 = Domingo, 6 = Sábado)
-          const currentDay = utcNow.getUTCDay() + 1 // Converte para 1-7 para match com o banco
-          const scheduleDays = followUp.schedule_days || [1,2,3,4,5]
-          
-          if (!scheduleDays.includes(currentDay)) {
             continue
           }
 
