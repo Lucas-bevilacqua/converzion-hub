@@ -79,7 +79,6 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
   const { data: followUp, isLoading } = useQuery({
     queryKey: ['follow-up', instanceId],
     queryFn: async () => {
-      console.log('Buscando configuração de follow-up para instância:', instanceId)
       const { data, error } = await supabase
         .from('instance_follow_ups')
         .select('*')
@@ -87,38 +86,32 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
         .maybeSingle()
 
       if (error && error.code !== 'PGRST116') {
-        console.error('Erro ao buscar follow-up:', error)
         throw error
       }
 
       if (data?.manual_messages) {
-        try {
-          console.log('Raw manual_messages:', data.manual_messages)
-          
+        try {          
           let parsedMessages = data.manual_messages
           
           if (typeof parsedMessages === 'string') {
             try {
               parsedMessages = JSON.parse(parsedMessages)
             } catch (e) {
-              console.error('Error parsing manual_messages string:', e)
               parsedMessages = []
             }
           }
           
           if (!Array.isArray(parsedMessages)) {
-            console.error('manual_messages is not an array:', parsedMessages)
             parsedMessages = []
           }
           
           const typedMessages = parsedMessages.map((msg: any) => ({
             message: String(msg?.message || ''),
-            delay_minutes: Number(msg?.delay_minutes || 3)
+            delay_minutes: Number(msg?.delay_minutes || 1) // Changed default from 3 to 1
           }))
 
           data.manual_messages = typedMessages
         } catch (e) {
-          console.error('Error processing manual_messages:', e)
           data.manual_messages = []
         }
       }
@@ -130,7 +123,7 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
   const [formData, setFormData] = useState<FormData>({
     is_active: followUp?.is_active || false,
     follow_up_type: followUp?.follow_up_type || "manual",
-    delay_minutes: followUp?.delay_minutes || 3, // Changed from 10 to 3
+    delay_minutes: followUp?.delay_minutes || 1, // Changed from 3 to 1
     template_message: followUp?.template_message || '',
     schedule_start_time: followUp?.schedule_start_time || '09:00',
     schedule_end_time: followUp?.schedule_end_time || '18:00',
@@ -147,7 +140,7 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
       setFormData({
         is_active: followUp.is_active || false,
         follow_up_type: followUp.follow_up_type || "manual",
-        delay_minutes: followUp.delay_minutes || 3, // Changed from 10 to 3
+        delay_minutes: followUp.delay_minutes || 1, // Changed from 3 to 1
         template_message: followUp.template_message || '',
         schedule_start_time: followUp.schedule_start_time || '09:00',
         schedule_end_time: followUp.schedule_end_time || '18:00',
@@ -162,17 +155,11 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
   }, [followUp])
 
   const saveMutation = useMutation({
-    mutationFn: async (values: FormData) => {
-      console.log('Salvando configuração de follow-up:', {
-        formData,
-        instanceId,
-        userId: user?.id
-      })
-      
+    mutationFn: async (values: FormData) => {      
       const manualMessages = Array.isArray(values.manual_messages) 
         ? values.manual_messages.map(msg => ({
             message: msg.message || '',
-            delay_minutes: Math.max(3, Number(msg.delay_minutes) || 3)
+            delay_minutes: Math.max(1, Number(msg.delay_minutes) || 1) // Changed from 3 to 1
           }))
         : []
 
@@ -180,7 +167,7 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
         instance_id: instanceId,
         is_active: values.is_active,
         follow_up_type: values.follow_up_type,
-        delay_minutes: Math.max(3, values.delay_minutes),
+        delay_minutes: Math.max(1, values.delay_minutes), // Changed from 3 to 1
         template_message: values.template_message,
         schedule_start_time: values.schedule_start_time,
         schedule_end_time: values.schedule_end_time,
@@ -192,8 +179,6 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
         system_prompt: values.system_prompt,
         updated_at: new Date().toISOString()
       }
-
-      console.log('Dados sendo salvos:', dataToSave)
       
       const operation = followUp
         ? supabase
@@ -206,11 +191,9 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
 
       const { error } = await operation
       if (error) {
-        console.error('Erro ao salvar follow-up:', error)
         throw error
       }
 
-      // Configurar follow-up de IA se necessário
       if (values.follow_up_type === 'ai_generated') {
         const { data: instance, error: instanceError } = await supabase
           .from('evolution_instances')
@@ -219,11 +202,8 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
           .single()
 
         if (instanceError) {
-          console.error('Erro ao buscar dados da instância:', instanceError)
           throw instanceError
         }
-
-        console.log('Configurando follow-up de IA para instância:', instance.name)
         
         const { error: aiError } = await supabase.functions.invoke('process-ai-follow-up', {
           body: {
@@ -240,11 +220,8 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
         })
 
         if (aiError) {
-          console.error('Erro ao configurar follow-up de IA:', aiError)
           throw aiError
         }
-
-        console.log('Follow-up de IA configurado com sucesso')
       }
     },
     onSuccess: () => {
@@ -255,7 +232,6 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
       })
     },
     onError: (error) => {
-      console.error('Erro ao salvar follow-up:', error)
       toast({
         title: "Erro",
         description: "Não foi possível salvar as configurações.",
