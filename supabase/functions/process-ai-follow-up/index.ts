@@ -117,7 +117,7 @@ serve(async (req) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4',
+        model: 'gpt-4o-mini',
         messages,
         temperature: 0.7,
       }),
@@ -134,7 +134,9 @@ serve(async (req) => {
     console.log('✅ Mensagem de follow-up gerada:', followUpMessage)
 
     // Enviar mensagem via Evolution API
-    const evolutionApiUrl = (Deno.env.get('EVOLUTION_API_URL') || '').replace(/\/$/, '')
+    let evolutionApiUrl = Deno.env.get('EVOLUTION_API_URL') || ''
+    // Remove trailing slash if present
+    evolutionApiUrl = evolutionApiUrl.replace(/\/+$/, '')
     const evolutionApiKey = Deno.env.get('EVOLUTION_API_KEY')
 
     if (!evolutionApiUrl || !evolutionApiKey) {
@@ -143,11 +145,12 @@ serve(async (req) => {
     }
 
     console.log('📤 Enviando mensagem via Evolution API')
-    console.log('URL:', `${evolutionApiUrl}/message/sendText/${instanceName}`)
+    const fullUrl = `${evolutionApiUrl}/message/sendText/${instanceName}`
+    console.log('URL:', fullUrl)
     console.log('Número:', phoneNumber)
     
     const evolutionResponse = await fetch(
-      `${evolutionApiUrl}/message/sendText/${instanceName}`,
+      fullUrl,
       {
         method: 'POST',
         headers: {
