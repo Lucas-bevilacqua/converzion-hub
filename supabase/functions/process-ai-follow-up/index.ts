@@ -56,6 +56,8 @@ serve(async (req) => {
       throw followUpsError
     }
 
+    console.log(`✅ Encontrados ${activeFollowUps?.length || 0} follow-ups ativos do tipo AI`)
+
     if (!activeFollowUps?.length) {
       console.log('ℹ️ Nenhum follow-up ativo do tipo AI encontrado')
       await supabaseClient
