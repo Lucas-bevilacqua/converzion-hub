@@ -16,11 +16,10 @@ serve(async (req) => {
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
   )
 
-  // Log início da execução
-  console.log('🚀 Iniciando processamento de follow-ups')
+  console.log('🚀 Starting follow-up processing')
   
   try {
-    // Log execução
+    // Log execution start
     const { data: logData, error: logError } = await supabaseClient
       .from('cron_logs')
       .insert({
@@ -31,11 +30,11 @@ serve(async (req) => {
       .single()
 
     if (logError) {
-      console.error('❌ Erro ao registrar início do job:', logError)
+      console.error('❌ Error logging job start:', logError)
       throw logError
     }
 
-    // Buscar follow-ups ativos
+    // Fetch active follow-ups
     const { data: followUps, error: followUpsError } = await supabaseClient
       .from('instance_follow_ups')
       .select(`
@@ -51,12 +50,12 @@ serve(async (req) => {
       .eq('is_active', true)
 
     if (followUpsError) {
-      console.error('❌ Erro ao buscar follow-ups:', followUpsError)
+      console.error('❌ Error fetching follow-ups:', followUpsError)
       throw followUpsError
     }
 
     if (!followUps?.length) {
-      console.log('ℹ️ Nenhum follow-up ativo encontrado')
+      console.log('ℹ️ No active follow-ups found')
       await supabaseClient
         .from('cron_logs')
         .update({ 
@@ -75,29 +74,33 @@ serve(async (req) => {
     const evolutionApiKey = Deno.env.get('EVOLUTION_API_KEY')
 
     if (!evolutionApiUrl || !evolutionApiKey) {
-      throw new Error('Configuração da Evolution API ausente')
+      throw new Error('Evolution API configuration missing')
     }
 
     const processedContacts = []
     const errors = []
 
-    // Processar cada follow-up
+    // Process each follow-up
     for (const followUp of followUps) {
       try {
-        console.log('📝 Processando follow-up:', {
+        console.log('📝 Processing follow-up:', {
           id: followUp.id,
           instanceId: followUp.instance_id,
           instanceName: followUp.instance?.name
         })
 
         if (!followUp.instance?.name) {
-          console.error('❌ Nome da instância não encontrado:', followUp.instance_id)
+          console.error('❌ Instance name not found:', followUp.instance_id)
+          errors.push({
+            type: 'instance_not_found',
+            instanceId: followUp.instance_id
+          })
           continue
         }
 
-        // Verificar estado da conexão
+        // Check instance connection state
         try {
-          console.log('🔄 Verificando estado da instância:', followUp.instance.name)
+          console.log('🔄 Checking instance state:', followUp.instance.name)
           
           const stateResponse = await fetch(
             `${evolutionApiUrl}/instance/connectionState/${followUp.instance.name}`,
@@ -111,21 +114,26 @@ serve(async (req) => {
 
           if (!stateResponse.ok) {
             const errorText = await stateResponse.text()
-            console.error('❌ Erro ao verificar estado da instância:', {
+            console.error('❌ Instance state check failed:', {
               status: stateResponse.status,
+              error: errorText
+            })
+            errors.push({
+              type: 'instance_state_check_failed',
+              instanceId: followUp.instance_id,
               error: errorText
             })
             continue
           }
 
           const stateData = await stateResponse.json()
-          console.log('Estado da instância:', {
+          console.log('Instance state:', {
             instance: followUp.instance.name,
             status: stateData?.state
           })
 
           if (stateData?.state !== 'open') {
-            console.warn('⚠️ Instância não conectada, atualizando status:', followUp.instance.id)
+            console.warn('⚠️ Instance not connected:', followUp.instance.id)
             
             await supabaseClient
               .from('evolution_instances')
@@ -135,10 +143,14 @@ serve(async (req) => {
               })
               .eq('id', followUp.instance.id)
 
+            errors.push({
+              type: 'instance_not_connected',
+              instanceId: followUp.instance_id
+            })
             continue
           }
 
-          // Atualizar status como conectado se necessário
+          // Update connected status if needed
           if (followUp.instance.connection_status !== 'connected') {
             await supabaseClient
               .from('evolution_instances')
@@ -150,11 +162,16 @@ serve(async (req) => {
           }
 
         } catch (error) {
-          console.error('❌ Erro ao verificar estado da instância:', error)
+          console.error('❌ Instance state check error:', error)
+          errors.push({
+            type: 'instance_state_check_error',
+            instanceId: followUp.instance_id,
+            error: error.message
+          })
           continue
         }
 
-        // Buscar contatos pendentes
+        // Fetch pending contacts
         const { data: contacts, error: contactsError } = await supabaseClient
           .from('Users_clientes')
           .select('*')
@@ -164,9 +181,9 @@ serve(async (req) => {
           .limit(10)
 
         if (contactsError) {
-          console.error('❌ Erro ao buscar contatos:', contactsError)
+          console.error('❌ Error fetching contacts:', contactsError)
           errors.push({
-            type: 'contacts_query',
+            type: 'contacts_query_error',
             instanceId: followUp.instance_id,
             error: contactsError
           })
@@ -174,16 +191,16 @@ serve(async (req) => {
         }
 
         if (!contacts?.length) {
-          console.log('ℹ️ Nenhum contato pendente encontrado para instância:', followUp.instance_id)
+          console.log('ℹ️ No pending contacts for instance:', followUp.instance_id)
           continue
         }
 
-        console.log('👥 Contatos encontrados:', contacts.length)
+        console.log('👥 Found contacts:', contacts.length)
 
-        // Processar cada contato
+        // Process contacts
         for (const contact of contacts) {
           try {
-            console.log('📱 Processando contato:', {
+            console.log('📱 Processing contact:', {
               id: contact.id,
               phone: contact.TelefoneClientes
             })
@@ -193,23 +210,29 @@ serve(async (req) => {
               : []
 
             if (!manualMessages.length) {
-              console.log('⚠️ Nenhuma mensagem configurada para follow-up:', followUp.id)
+              console.log('⚠️ No messages configured for follow-up:', followUp.id)
               continue
             }
 
             const firstMessage = manualMessages[0]
 
-            // Validar número de telefone
+            // Validate phone number
             const phoneNumber = contact.TelefoneClientes?.replace(/\D/g, '')
             if (!phoneNumber || phoneNumber.length < 10) {
-              console.error('❌ Número de telefone inválido:', contact.TelefoneClientes)
+              console.error('❌ Invalid phone number:', contact.TelefoneClientes)
+              errors.push({
+                type: 'invalid_phone_number',
+                instanceId: followUp.instance_id,
+                contactId: contact.id,
+                phone: contact.TelefoneClientes
+              })
               continue
             }
 
-            console.log('📤 Enviando mensagem:', {
+            console.log('📤 Sending message:', {
               instance: followUp.instance.name,
               phone: phoneNumber,
-              message: firstMessage.message
+              messageLength: firstMessage.message.length
             })
 
             const evolutionResponse = await fetch(
@@ -229,23 +252,35 @@ serve(async (req) => {
 
             if (!evolutionResponse.ok) {
               const errorText = await evolutionResponse.text()
-              console.error('❌ Erro ao enviar mensagem:', {
+              console.error('❌ Message send failed:', {
                 status: evolutionResponse.status,
+                error: errorText
+              })
+              errors.push({
+                type: 'message_send_failed',
+                instanceId: followUp.instance_id,
+                contactId: contact.id,
                 error: errorText
               })
               continue
             }
 
             const evolutionData = await evolutionResponse.json()
-            console.log('✅ Resposta da Evolution API:', evolutionData)
+            console.log('✅ Evolution API response:', evolutionData)
 
             if (!evolutionData?.key?.id) {
-              console.error('❌ Resposta inválida da Evolution API:', evolutionData)
+              console.error('❌ Invalid Evolution API response:', evolutionData)
+              errors.push({
+                type: 'invalid_evolution_response',
+                instanceId: followUp.instance_id,
+                contactId: contact.id,
+                response: evolutionData
+              })
               continue
             }
 
-            // Atualizar status do contato
-            await supabaseClient
+            // Update contact status
+            const { error: updateError } = await supabaseClient
               .from('Users_clientes')
               .update({
                 ConversationId: 'follow-up-sent-0',
@@ -253,8 +288,19 @@ serve(async (req) => {
               })
               .eq('id', contact.id)
 
-            // Registrar mensagem enviada
-            await supabaseClient
+            if (updateError) {
+              console.error('❌ Error updating contact:', updateError)
+              errors.push({
+                type: 'contact_update_failed',
+                instanceId: followUp.instance_id,
+                contactId: contact.id,
+                error: updateError
+              })
+              continue
+            }
+
+            // Log message
+            const { error: messageLogError } = await supabaseClient
               .from('chat_messages')
               .insert({
                 instance_id: followUp.instance_id,
@@ -264,6 +310,17 @@ serve(async (req) => {
                 whatsapp_message_id: evolutionData.key?.id
               })
 
+            if (messageLogError) {
+              console.error('❌ Error logging message:', messageLogError)
+              errors.push({
+                type: 'message_log_failed',
+                instanceId: followUp.instance_id,
+                contactId: contact.id,
+                error: messageLogError
+              })
+              continue
+            }
+
             processedContacts.push({
               id: contact.id,
               phone: phoneNumber,
@@ -271,32 +328,32 @@ serve(async (req) => {
               messageId: evolutionData.key?.id
             })
 
-            console.log('✅ Contato processado com sucesso:', {
+            console.log('✅ Contact processed:', {
               id: contact.id,
               phone: phoneNumber
             })
 
           } catch (error) {
-            console.error('❌ Erro ao processar contato:', error)
+            console.error('❌ Contact processing error:', error)
             errors.push({
-              type: 'contact_processing',
+              type: 'contact_processing_error',
               instanceId: followUp.instance_id,
               contactId: contact.id,
-              error
+              error: error.message
             })
           }
         }
       } catch (error) {
-        console.error('❌ Erro ao processar follow-up:', error)
+        console.error('❌ Follow-up processing error:', error)
         errors.push({
-          type: 'follow_up_processing',
+          type: 'follow_up_processing_error',
           instanceId: followUp.instance_id,
-          error
+          error: error.message
         })
       }
     }
 
-    // Atualizar log com status final
+    // Update final status
     const finalStatus = errors.length > 0 
       ? `completed with ${errors.length} errors` 
       : 'completed successfully'
@@ -309,7 +366,7 @@ serve(async (req) => {
       })
       .eq('id', logData?.id)
 
-    console.log('🏁 Processamento concluído:', {
+    console.log('🏁 Processing complete:', {
       processed: processedContacts.length,
       errors: errors.length
     })
@@ -325,7 +382,7 @@ serve(async (req) => {
     )
 
   } catch (error) {
-    console.error('❌ Erro crítico:', error)
+    console.error('❌ Critical error:', error)
 
     await supabaseClient
       .from('cron_logs')
