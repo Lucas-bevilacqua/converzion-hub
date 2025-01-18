@@ -13,208 +13,238 @@ serve(async (req) => {
   }
 
   try {
-    console.log('🚀 Iniciando função de follow-up')
+    console.log('🚀 Iniciando processamento de follow-ups de IA')
     
-    const { 
-      instanceId, 
-      instanceName,
-      userId,
-      phoneNumber,
-      delayMinutes, 
-      maxAttempts, 
-      stopOnReply, 
-      stopKeywords, 
-      systemPrompt
-    } = await req.json()
-
-    console.log('📥 Dados recebidos:', {
-      instanceId,
-      instanceName,
-      userId,
-      phoneNumber,
-      delayMinutes,
-      maxAttempts,
-      stopOnReply,
-      stopKeywords,
-      systemPrompt
-    })
-
-    if (!phoneNumber) {
-      console.error('❌ Erro: Número de telefone não fornecido')
-      throw new Error('Número de telefone não fornecido')
-    }
-
-    console.log('📱 Número do contato:', phoneNumber)
-    console.log('⏰ Aguardando delay de', delayMinutes, 'minutos')
-
-    // Convert minutes to milliseconds and wait
-    const delayMs = delayMinutes * 60 * 1000
-    await new Promise(resolve => setTimeout(resolve, delayMs))
-
-    console.log('⏰ Delay concluído, prosseguindo com o follow-up')
-
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    // Buscar histórico de mensagens
-    console.log('🔍 Buscando histórico de mensagens para instância:', instanceId)
-    const { data: chatHistory, error: chatError } = await supabaseClient
-      .from('chat_messages')
-      .select('*')
-      .eq('instance_id', instanceId)
-      .order('created_at', { ascending: true })
-      .limit(10)
+    // Buscar follow-ups ativos do tipo AI
+    console.log('🔍 Buscando follow-ups ativos do tipo AI')
+    const { data: activeFollowUps, error: followUpsError } = await supabaseClient
+      .from('instance_follow_ups')
+      .select(`
+        *,
+        instance:evolution_instances(
+          id,
+          name,
+          user_id,
+          phone_number
+        )
+      `)
+      .eq('is_active', true)
+      .eq('follow_up_type', 'ai_generated')
 
-    if (chatError) {
-      console.error('❌ Erro ao buscar histórico:', chatError)
-      throw chatError
+    if (followUpsError) {
+      console.error('❌ Erro ao buscar follow-ups:', followUpsError)
+      throw followUpsError
     }
 
-    console.log('✅ Histórico encontrado:', chatHistory?.length || 0, 'mensagens')
-    console.log('📝 Últimas mensagens:', chatHistory?.slice(-3))
-
-    // Preparar mensagens para a IA
-    const messages = [
-      { 
-        role: 'system', 
-        content: systemPrompt || "Você é um assistente prestativo que gera mensagens de follow-up naturais e contextualizadas." 
-      }
-    ]
-
-    // Adicionar histórico de conversa
-    if (chatHistory) {
-      chatHistory.forEach(msg => {
-        messages.push({
-          role: msg.sender_type === 'user' ? 'user' : 'assistant',
-          content: msg.content
-        })
-      })
+    if (!activeFollowUps?.length) {
+      console.log('ℹ️ Nenhum follow-up ativo do tipo AI encontrado')
+      return new Response(
+        JSON.stringify({ success: true, message: 'Nenhum follow-up ativo' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
     }
 
-    // Adicionar instrução específica para follow-up
-    messages.push({ 
-      role: 'user', 
-      content: 'Por favor, gere uma mensagem de follow-up apropriada para esta conversa. A mensagem deve ser natural e contextualizada com base no histórico.'
-    })
+    console.log('✅ Follow-ups encontrados:', activeFollowUps.length)
 
-    console.log('🤖 Enviando requisição para OpenAI com', messages.length, 'mensagens')
-    console.log('📝 Prompt do sistema:', systemPrompt)
-
-    const openAiKey = Deno.env.get('OPENAI_API_KEY')
-    if (!openAiKey) {
-      console.error('❌ Chave da OpenAI não encontrada')
-      throw new Error('OpenAI API key não configurada')
-    }
-
-    // Gerar resposta com OpenAI
-    const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${openAiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        messages,
-        temperature: 0.7,
-      }),
-    })
-
-    if (!openaiResponse.ok) {
-      const error = await openaiResponse.text()
-      console.error('❌ Erro na API da OpenAI:', error)
-      throw new Error(`OpenAI API error: ${error}`)
-    }
-
-    const data = await openaiResponse.json()
-    const followUpMessage = data.choices[0].message.content
-    console.log('✅ Mensagem de follow-up gerada:', followUpMessage)
-
-    // Enviar mensagem via Evolution API
-    let evolutionApiUrl = Deno.env.get('EVOLUTION_API_URL') || ''
-    evolutionApiUrl = evolutionApiUrl.replace(/\/+$/, '')
+    const evolutionApiUrl = (Deno.env.get('EVOLUTION_API_URL') || '').replace(/\/$/, '')
     const evolutionApiKey = Deno.env.get('EVOLUTION_API_KEY')
+    const openAiKey = Deno.env.get('OPENAI_API_KEY')
 
-    if (!evolutionApiUrl || !evolutionApiKey) {
-      console.error('❌ Configuração da Evolution API não encontrada')
-      throw new Error('Evolution API não configurada corretamente')
+    if (!evolutionApiUrl || !evolutionApiKey || !openAiKey) {
+      throw new Error('Configurações de API ausentes')
     }
 
-    console.log('📤 Enviando mensagem via Evolution API')
-    const fullUrl = `${evolutionApiUrl}/message/sendText/${instanceName}`
-    console.log('URL:', fullUrl)
-    console.log('Número:', phoneNumber)
+    const processedFollowUps = []
+    const errors = []
 
-    try {
-      const evolutionResponse = await fetch(
-        fullUrl,
-        {
+    for (const followUp of activeFollowUps) {
+      try {
+        console.log('📝 Processando follow-up:', {
+          id: followUp.id,
+          instanceId: followUp.instance_id,
+          instanceName: followUp.instance?.name
+        })
+
+        if (!followUp.instance?.name || !followUp.instance?.phone_number) {
+          console.error('❌ Dados da instância incompletos:', followUp.instance_id)
+          errors.push({
+            type: 'missing_instance_data',
+            followUpId: followUp.id
+          })
+          continue
+        }
+
+        // Buscar histórico de mensagens
+        const { data: chatHistory, error: chatError } = await supabaseClient
+          .from('chat_messages')
+          .select('*')
+          .eq('instance_id', followUp.instance_id)
+          .order('created_at', { ascending: true })
+          .limit(10)
+
+        if (chatError) {
+          console.error('❌ Erro ao buscar histórico:', chatError)
+          errors.push({
+            type: 'chat_history_error',
+            followUpId: followUp.id,
+            error: chatError
+          })
+          continue
+        }
+
+        // Preparar mensagens para a IA
+        const messages = [
+          { 
+            role: 'system', 
+            content: followUp.system_prompt || "Você é um assistente prestativo que gera mensagens de follow-up naturais e contextualizadas." 
+          }
+        ]
+
+        if (chatHistory?.length) {
+          chatHistory.forEach(msg => {
+            messages.push({
+              role: msg.sender_type === 'user' ? 'user' : 'assistant',
+              content: msg.content
+            })
+          })
+        }
+
+        messages.push({ 
+          role: 'user', 
+          content: 'Por favor, gere uma mensagem de follow-up apropriada para esta conversa.'
+        })
+
+        console.log('🤖 Gerando mensagem com OpenAI')
+        
+        const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
           method: 'POST',
           headers: {
+            'Authorization': `Bearer ${openAiKey}`,
             'Content-Type': 'application/json',
-            'apikey': evolutionApiKey,
           },
           body: JSON.stringify({
-            number: phoneNumber,
-            text: followUpMessage
+            model: 'gpt-4',
+            messages,
+            temperature: 0.7,
           }),
-        }
-      )
-
-      const evolutionData = await evolutionResponse.json()
-      console.log('✅ Resposta da Evolution API:', evolutionData)
-
-      if (!evolutionResponse.ok || !evolutionData?.key?.id) {
-        const errorText = JSON.stringify(evolutionData)
-        console.error('❌ Falha ao enviar mensagem:', {
-          status: evolutionResponse.status,
-          error: errorText
-        })
-        throw new Error(`Evolution API error: ${errorText}`)
-      }
-
-      // Salvar mensagem no histórico
-      console.log('💾 Salvando mensagem no histórico')
-      const { error: saveError } = await supabaseClient
-        .from('chat_messages')
-        .insert({
-          instance_id: instanceId,
-          user_id: userId,
-          sender_type: 'follow_up',
-          content: followUpMessage,
-          whatsapp_message_id: evolutionData.key?.id
         })
 
-      if (saveError) {
-        console.error('❌ Erro ao salvar mensagem:', saveError)
-        throw saveError
-      }
-
-      console.log('✅ Follow-up processado com sucesso')
-      return new Response(
-        JSON.stringify({ 
-          success: true, 
-          message: 'Follow-up processado e enviado com sucesso',
-          followUpMessage,
-          messageId: evolutionData.key?.id
-        }),
-        { 
-          headers: { 
-            ...corsHeaders, 
-            'Content-Type': 'application/json' 
-          } 
+        if (!openaiResponse.ok) {
+          const error = await openaiResponse.text()
+          console.error('❌ Erro na API da OpenAI:', error)
+          errors.push({
+            type: 'openai_api_error',
+            followUpId: followUp.id,
+            error
+          })
+          continue
         }
-      )
 
-    } catch (error) {
-      console.error('❌ Erro ao enviar mensagem:', error)
-      throw error
+        const data = await openaiResponse.json()
+        const followUpMessage = data.choices[0].message.content
+        console.log('✅ Mensagem gerada:', followUpMessage)
+
+        // Enviar mensagem via Evolution API
+        console.log('📤 Enviando mensagem via Evolution API')
+        const fullUrl = `${evolutionApiUrl}/message/sendText/${followUp.instance.name}`
+        
+        try {
+          const evolutionResponse = await fetch(fullUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'apikey': evolutionApiKey,
+            },
+            body: JSON.stringify({
+              number: followUp.instance.phone_number,
+              text: followUpMessage
+            })
+          })
+
+          const evolutionData = await evolutionResponse.json()
+          console.log('✅ Resposta da Evolution API:', evolutionData)
+
+          if (!evolutionResponse.ok || !evolutionData?.key?.id) {
+            const errorText = JSON.stringify(evolutionData)
+            console.error('❌ Falha ao enviar mensagem:', {
+              status: evolutionResponse.status,
+              error: errorText
+            })
+            errors.push({
+              type: 'evolution_api_error',
+              followUpId: followUp.id,
+              error: errorText
+            })
+            continue
+          }
+
+          // Salvar mensagem no histórico
+          const { error: saveError } = await supabaseClient
+            .from('chat_messages')
+            .insert({
+              instance_id: followUp.instance_id,
+              user_id: followUp.instance.user_id,
+              sender_type: 'follow_up',
+              content: followUpMessage,
+              whatsapp_message_id: evolutionData.key?.id
+            })
+
+          if (saveError) {
+            console.error('❌ Erro ao salvar mensagem:', saveError)
+            errors.push({
+              type: 'save_message_error',
+              followUpId: followUp.id,
+              error: saveError
+            })
+            continue
+          }
+
+          processedFollowUps.push({
+            id: followUp.id,
+            messageId: evolutionData.key?.id
+          })
+
+        } catch (error) {
+          console.error('❌ Erro ao enviar mensagem:', error)
+          errors.push({
+            type: 'evolution_api_error',
+            followUpId: followUp.id,
+            error: error.message
+          })
+        }
+
+      } catch (error) {
+        console.error('❌ Erro ao processar follow-up:', error)
+        errors.push({
+          type: 'follow_up_processing_error',
+          followUpId: followUp.id,
+          error: error.message
+        })
+      }
     }
 
+    console.log('🏁 Processamento concluído:', {
+      processed: processedFollowUps.length,
+      errors: errors.length
+    })
+
+    return new Response(
+      JSON.stringify({ 
+        success: true, 
+        message: 'Follow-ups processados',
+        processed: processedFollowUps,
+        errors
+      }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    )
+
   } catch (error) {
-    console.error('❌ Erro ao processar follow-up:', error)
+    console.error('❌ Erro crítico:', error)
     return new Response(
       JSON.stringify({ 
         success: false,
@@ -222,10 +252,7 @@ serve(async (req) => {
       }),
       { 
         status: 500,
-        headers: { 
-          ...corsHeaders, 
-          'Content-Type': 'application/json' 
-        } 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
       }
     )
   }
