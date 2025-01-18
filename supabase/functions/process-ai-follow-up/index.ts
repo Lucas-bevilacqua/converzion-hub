@@ -7,52 +7,66 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-console.log('🚀 Function process-ai-follow-up is starting...');
+console.log('🚀 Starting process-ai-follow-up function');
 
 serve(async (req) => {
-  console.log(`📥 Received ${req.method} request at ${new Date().toISOString()}`);
+  const executionId = crypto.randomUUID();
+  console.log(`[${executionId}] 📥 Received ${req.method} request`);
   
   if (req.method === 'OPTIONS') {
-    console.log('👋 Handling CORS preflight request');
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
     // Initialize Supabase client
-    console.log('🔄 Initializing Supabase client...');
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    const openAiKey = Deno.env.get('OPENAI_API_KEY');
+    const evolutionApiUrl = Deno.env.get('EVOLUTION_API_URL')?.replace(/\/$/, '');
+    const evolutionApiKey = Deno.env.get('EVOLUTION_API_KEY');
 
     if (!supabaseUrl || !supabaseKey) {
-      console.error('❌ Missing Supabase configuration');
       throw new Error('Missing Supabase configuration');
     }
 
-    const supabaseClient = createClient(supabaseUrl, supabaseKey);
-    console.log('✅ Supabase client initialized');
+    if (!openAiKey) {
+      throw new Error('Missing OpenAI API key');
+    }
 
-    // Create execution log
-    console.log('📝 Creating execution log...');
-    const { data: logData, error: logError } = await supabaseClient
+    if (!evolutionApiUrl || !evolutionApiKey) {
+      throw new Error('Missing Evolution API configuration');
+    }
+
+    console.log(`[${executionId}] ✅ Configuration validated`);
+    
+    const supabase = createClient(supabaseUrl, supabaseKey);
+    console.log(`[${executionId}] ✅ Supabase client initialized`);
+
+    // Log execution start
+    const { data: logEntry, error: logError } = await supabase
       .from('cron_execution_logs')
       .insert({
         job_name: 'process-ai-follow-up',
         status: 'started',
-        response: { start_time: new Date().toISOString() }
+        response: { 
+          execution_id: executionId,
+          start_time: new Date().toISOString()
+        }
       })
       .select()
       .single();
 
     if (logError) {
-      console.error('❌ Error creating execution log:', logError);
+      console.error(`[${executionId}] ❌ Error creating log entry:`, logError);
       throw logError;
     }
 
-    console.log('✅ Execution log created:', logData);
+    console.log(`[${executionId}] ✅ Created execution log:`, logEntry);
 
     // Fetch active follow-ups
-    console.log('🔍 Fetching active AI follow-ups...');
-    const { data: activeFollowUps, error: followUpsError } = await supabaseClient
+    console.log(`[${executionId}] 🔍 Fetching active AI follow-ups...`);
+    
+    const { data: activeFollowUps, error: followUpsError } = await supabase
       .from('instance_follow_ups')
       .select(`
         *,
@@ -68,46 +82,46 @@ serve(async (req) => {
       .eq('follow_up_type', 'ai_generated');
 
     if (followUpsError) {
-      console.error('❌ Error fetching follow-ups:', followUpsError);
-      
-      await supabaseClient
+      console.error(`[${executionId}] ❌ Error fetching follow-ups:`, followUpsError);
+      await supabase
         .from('cron_execution_logs')
         .update({ 
           status: 'error',
-          response: { error: followUpsError.message }
+          response: { 
+            execution_id: executionId,
+            error: followUpsError.message,
+            end_time: new Date().toISOString()
+          }
         })
-        .eq('id', logData?.id);
+        .eq('id', logEntry.id);
       
       throw followUpsError;
     }
 
-    console.log(`✅ Found ${activeFollowUps?.length || 0} active AI follow-ups`);
+    console.log(`[${executionId}] ✅ Found ${activeFollowUps?.length || 0} active follow-ups`);
 
     if (!activeFollowUps?.length) {
-      console.log('ℹ️ No active AI follow-ups found');
-      
-      await supabaseClient
+      console.log(`[${executionId}] ℹ️ No active follow-ups to process`);
+      await supabase
         .from('cron_execution_logs')
         .update({ 
           status: 'completed - no active follow-ups',
-          response: { message: 'No active follow-ups found' }
+          response: { 
+            execution_id: executionId,
+            message: 'No active follow-ups found',
+            end_time: new Date().toISOString()
+          }
         })
-        .eq('id', logData?.id);
+        .eq('id', logEntry.id);
 
       return new Response(
-        JSON.stringify({ success: true, message: 'No active follow-ups' }),
+        JSON.stringify({ 
+          success: true, 
+          message: 'No active follow-ups',
+          execution_id: executionId
+        }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
-    }
-
-    // Get required API keys
-    const openAiKey = Deno.env.get('OPENAI_API_KEY');
-    const evolutionApiUrl = (Deno.env.get('EVOLUTION_API_URL') || '').replace(/\/$/, '');
-    const evolutionApiKey = Deno.env.get('EVOLUTION_API_KEY');
-
-    if (!evolutionApiUrl || !evolutionApiKey || !openAiKey) {
-      console.error('❌ Missing API configuration');
-      throw new Error('Missing API configuration');
     }
 
     const processedFollowUps = [];
@@ -116,14 +130,14 @@ serve(async (req) => {
     // Process each follow-up
     for (const followUp of activeFollowUps) {
       try {
-        console.log('📝 Processing follow-up:', {
+        console.log(`[${executionId}] 📝 Processing follow-up:`, {
           id: followUp.id,
           instanceId: followUp.instance_id,
           instanceName: followUp.instance?.name
         });
 
         if (!followUp.instance?.name || !followUp.instance?.phone_number) {
-          console.error('❌ Incomplete instance data:', followUp.instance_id);
+          console.error(`[${executionId}] ❌ Incomplete instance data:`, followUp.instance_id);
           errors.push({
             type: 'missing_instance_data',
             followUpId: followUp.id
@@ -132,8 +146,8 @@ serve(async (req) => {
         }
 
         // Fetch message history
-        console.log('📚 Fetching chat history...');
-        const { data: chatHistory, error: chatError } = await supabaseClient
+        console.log(`[${executionId}] 📚 Fetching chat history...`);
+        const { data: chatHistory, error: chatError } = await supabase
           .from('chat_messages')
           .select('*')
           .eq('instance_id', followUp.instance_id)
@@ -141,7 +155,7 @@ serve(async (req) => {
           .limit(10);
 
         if (chatError) {
-          console.error('❌ Error fetching chat history:', chatError);
+          console.error(`[${executionId}] ❌ Error fetching chat history:`, chatError);
           errors.push({
             type: 'chat_history_error',
             followUpId: followUp.id,
@@ -154,7 +168,8 @@ serve(async (req) => {
         const messages = [
           { 
             role: 'system', 
-            content: followUp.system_prompt || followUp.instance.system_prompt || "You are a helpful assistant that generates natural and contextualized follow-up messages." 
+            content: followUp.system_prompt || followUp.instance.system_prompt || 
+              "You are a helpful assistant that generates natural and contextualized follow-up messages." 
           }
         ];
 
@@ -172,7 +187,7 @@ serve(async (req) => {
           content: 'Please generate an appropriate follow-up message for this conversation.' 
         });
 
-        console.log('🤖 Generating message with OpenAI...');
+        console.log(`[${executionId}] 🤖 Generating message with OpenAI...`);
         
         const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
           method: 'POST',
@@ -181,7 +196,7 @@ serve(async (req) => {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            model: 'gpt-4',
+            model: 'gpt-4o-mini',
             messages,
             temperature: 0.7,
           }),
@@ -189,7 +204,7 @@ serve(async (req) => {
 
         if (!openaiResponse.ok) {
           const error = await openaiResponse.text();
-          console.error('❌ OpenAI API error:', error);
+          console.error(`[${executionId}] ❌ OpenAI API error:`, error);
           errors.push({
             type: 'openai_api_error',
             followUpId: followUp.id,
@@ -200,10 +215,10 @@ serve(async (req) => {
 
         const data = await openaiResponse.json();
         const followUpMessage = data.choices[0].message.content;
-        console.log('✅ Message generated:', followUpMessage);
+        console.log(`[${executionId}] ✅ Message generated:`, followUpMessage);
 
         // Send message via Evolution API
-        console.log('📤 Sending message via Evolution API...');
+        console.log(`[${executionId}] 📤 Sending message via Evolution API...`);
         const fullUrl = `${evolutionApiUrl}/message/sendText/${followUp.instance.name}`;
         
         const evolutionResponse = await fetch(fullUrl, {
@@ -220,7 +235,7 @@ serve(async (req) => {
 
         if (!evolutionResponse.ok) {
           const error = await evolutionResponse.text();
-          console.error('❌ Evolution API error:', error);
+          console.error(`[${executionId}] ❌ Evolution API error:`, error);
           errors.push({
             type: 'evolution_api_error',
             followUpId: followUp.id,
@@ -230,10 +245,10 @@ serve(async (req) => {
         }
 
         const evolutionData = await evolutionResponse.json();
-        console.log('✅ Evolution API response:', evolutionData);
+        console.log(`[${executionId}] ✅ Evolution API response:`, evolutionData);
 
         // Save message to history
-        const { error: saveError } = await supabaseClient
+        const { error: saveError } = await supabase
           .from('chat_messages')
           .insert({
             instance_id: followUp.instance_id,
@@ -244,7 +259,7 @@ serve(async (req) => {
           });
 
         if (saveError) {
-          console.error('❌ Error saving message:', saveError);
+          console.error(`[${executionId}] ❌ Error saving message:`, saveError);
           errors.push({
             type: 'save_message_error',
             followUpId: followUp.id,
@@ -259,7 +274,7 @@ serve(async (req) => {
         });
 
       } catch (error) {
-        console.error('❌ Error processing follow-up:', error);
+        console.error(`[${executionId}] ❌ Error processing follow-up:`, error);
         errors.push({
           type: 'follow_up_processing_error',
           followUpId: followUp.id,
@@ -273,19 +288,20 @@ serve(async (req) => {
       ? `completed with ${errors.length} errors` 
       : 'completed successfully';
 
-    await supabaseClient
+    await supabase
       .from('cron_execution_logs')
       .update({ 
         status: finalStatus,
         response: { 
+          execution_id: executionId,
           processed: processedFollowUps,
           errors,
           end_time: new Date().toISOString()
         }
       })
-      .eq('id', logData?.id);
+      .eq('id', logEntry.id);
 
-    console.log('🏁 Processing completed:', {
+    console.log(`[${executionId}] 🏁 Processing completed:`, {
       processed: processedFollowUps.length,
       errors: errors.length
     });
@@ -294,6 +310,7 @@ serve(async (req) => {
       JSON.stringify({ 
         success: true, 
         message: 'Follow-ups processed',
+        execution_id: executionId,
         processed: processedFollowUps,
         errors
       }),
@@ -301,10 +318,11 @@ serve(async (req) => {
     );
 
   } catch (error) {
-    console.error('❌ Critical error:', error);
+    console.error(`[${executionId}] ❌ Critical error:`, error);
     return new Response(
       JSON.stringify({ 
         success: false,
+        execution_id: executionId,
         error: error.message 
       }),
       { 
