@@ -45,7 +45,8 @@ serve(async (req) => {
           id,
           name,
           user_id,
-          phone_number
+          phone_number,
+          system_prompt
         )
       `)
       .eq('is_active', true)
@@ -124,7 +125,7 @@ serve(async (req) => {
         const messages = [
           { 
             role: 'system', 
-            content: followUp.system_prompt || "Você é um assistente prestativo que gera mensagens de follow-up naturais e contextualizadas." 
+            content: followUp.system_prompt || followUp.instance.system_prompt || "Você é um assistente prestativo que gera mensagens de follow-up naturais e contextualizadas." 
           }
         ]
 
@@ -188,22 +189,19 @@ serve(async (req) => {
           })
         })
 
-        const evolutionData = await evolutionResponse.json()
-        console.log('✅ Resposta da Evolution API:', evolutionData)
-
-        if (!evolutionResponse.ok || !evolutionData?.key?.id) {
-          const errorText = JSON.stringify(evolutionData)
-          console.error('❌ Falha ao enviar mensagem:', {
-            status: evolutionResponse.status,
-            error: errorText
-          })
+        if (!evolutionResponse.ok) {
+          const error = await evolutionResponse.text()
+          console.error('❌ Erro na Evolution API:', error)
           errors.push({
             type: 'evolution_api_error',
             followUpId: followUp.id,
-            error: errorText
+            error
           })
           continue
         }
+
+        const evolutionData = await evolutionResponse.json()
+        console.log('✅ Resposta da Evolution API:', evolutionData)
 
         // Salvar mensagem no histórico
         const { error: saveError } = await supabaseClient
