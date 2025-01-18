@@ -12,18 +12,12 @@ serve(async (req) => {
   }
 
   try {
-    const startTime = new Date()
-    console.log('🚀 INICIANDO VERIFICAÇÃO DE FOLLOW-UPS:', {
-      horário: startTime.toISOString(),
-      timestamp: startTime.getTime()
-    })
-    
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    console.log('📋 Buscando follow-ups ativos...')
+    // Busca follow-ups ativos
     const { data: followUps, error: followUpsError } = await supabaseClient
       .from('instance_follow_ups')
       .select(`
@@ -32,61 +26,29 @@ serve(async (req) => {
           id,
           name,
           user_id,
-          connection_status
+          connection_status,
+          phone_number
         )
       `)
       .eq('is_active', true)
 
-    if (followUpsError) {
-      console.error('❌ Erro ao buscar follow-ups:', followUpsError)
-      throw followUpsError
-    }
+    if (followUpsError) throw followUpsError
 
     if (!followUps?.length) {
-      console.log('ℹ️ Nenhum follow-up ativo encontrado')
       return new Response(
-        JSON.stringify({ 
-          success: true,
-          message: 'Nenhum follow-up ativo',
-          processed: [] 
-        }),
+        JSON.stringify({ success: true, message: 'Nenhum follow-up ativo', processed: [] }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
-
-    console.log('📋 Follow-ups ativos encontrados:', {
-      quantidade: followUps.length,
-      followUps: followUps.map(f => ({
-        id: f.id,
-        instanceId: f.instance_id,
-        instanceName: f.instance?.name,
-        status: f.instance?.connection_status,
-        isActive: f.is_active,
-        tipo: f.follow_up_type,
-        mensagens: f.manual_messages
-      }))
-    })
 
     const processedContacts = []
     
     for (const followUp of followUps) {
       if (followUp.instance?.connection_status !== 'connected') {
-        console.log('⚠️ Instância desconectada, pulando:', {
-          instanceId: followUp.instance_id,
-          instanceName: followUp.instance?.name,
-          status: followUp.instance?.connection_status
-        })
         continue
       }
 
-      console.log('🔄 Processando follow-up:', {
-        instanceId: followUp.instance_id,
-        instanceName: followUp.instance?.name,
-        followUpId: followUp.id,
-        tipo: followUp.follow_up_type,
-        mensagens: followUp.manual_messages
-      })
-
+      // Busca contatos que não têm follow-up ou que já receberam alguma mensagem
       const { data: contacts, error: contactsError } = await supabaseClient
         .from('Users_clientes')
         .select('*')
@@ -94,41 +56,10 @@ serve(async (req) => {
         .or('ConversationId.is.null,ConversationId.like.follow-up-sent-%')
         .order('last_message_time', { ascending: true })
 
-      if (contactsError) {
-        console.error('❌ Erro ao buscar contatos:', {
-          erro: contactsError,
-          instanceId: followUp.instance_id
-        })
-        continue
-      }
-
-      if (!contacts?.length) {
-        console.log('ℹ️ Nenhum contato encontrado para processamento:', {
-          instanceId: followUp.instance_id,
-          instanceName: followUp.instance?.name
-        })
-        continue
-      }
-
-      console.log('👥 Contatos encontrados:', {
-        quantidade: contacts.length,
-        instanceId: followUp.instance_id,
-        contatos: contacts.map(c => ({
-          id: c.id,
-          telefone: c.TelefoneClientes,
-          conversationId: c.ConversationId,
-          ultimaMensagem: c.last_message_time
-        }))
-      })
+      if (contactsError) continue
+      if (!contacts?.length) continue
 
       for (const contact of contacts) {
-        console.log('👤 Iniciando processamento do contato:', {
-          id: contact.id,
-          telefone: contact.TelefoneClientes,
-          conversationId: contact.ConversationId,
-          ultimaMensagem: contact.last_message_time
-        })
-
         try {
           let currentMessageIndex = -1
           if (contact.ConversationId?.startsWith('follow-up-sent-')) {
@@ -137,56 +68,57 @@ serve(async (req) => {
 
           const manualMessages = Array.isArray(followUp.manual_messages) ? followUp.manual_messages : []
           
-          console.log('📝 Status das mensagens:', {
-            indiceAtual: currentMessageIndex,
-            totalMensagens: manualMessages.length,
-            proximaMensagem: currentMessageIndex + 1 < manualMessages.length ? manualMessages[currentMessageIndex + 1] : null
-          })
-
           if (currentMessageIndex + 1 >= manualMessages.length) {
-            console.log('✅ Sequência completa para o contato:', contact.id)
             continue
           }
 
           const lastMessageTime = new Date(contact.last_message_time || contact.created_at)
           const now = new Date()
-          const minutesSinceLastMessage = Math.floor((now.getTime() - lastMessageTime.getTime()) / (1000 * 60))
-
-          const nextMessage = manualMessages[currentMessageIndex + 1]
-          if (!nextMessage) {
-            console.error('❌ Próxima mensagem não encontrada:', {
-              contactId: contact.id,
-              currentIndex: currentMessageIndex,
-              totalMessages: manualMessages.length
-            })
-            continue
-          }
-
-          const minDelay = Math.max(3, nextMessage.delay_minutes || 3) // Changed from 10 to 3
           
-          console.log('⏰ Análise de tempo:', {
-            ultimaMensagem: lastMessageTime.toISOString(),
-            agora: now.toISOString(),
-            minutos: minutesSinceLastMessage,
-            delayNecessario: minDelay,
-            podeEnviar: minutesSinceLastMessage >= minDelay
-          })
+          // Converte para UTC para garantir comparação correta
+          const utcNow = new Date(Date.UTC(
+            now.getUTCFullYear(),
+            now.getUTCMonth(),
+            now.getUTCDate(),
+            now.getUTCHours(),
+            now.getUTCMinutes()
+          ))
+
+          const utcLastMessage = new Date(Date.UTC(
+            lastMessageTime.getUTCFullYear(),
+            lastMessageTime.getUTCMonth(),
+            lastMessageTime.getUTCDate(),
+            lastMessageTime.getUTCHours(),
+            lastMessageTime.getUTCMinutes()
+          ))
+
+          const minutesSinceLastMessage = Math.floor((utcNow.getTime() - utcLastMessage.getTime()) / (1000 * 60))
+          const nextMessage = manualMessages[currentMessageIndex + 1]
+          const minDelay = Math.max(3, nextMessage.delay_minutes || 3)
 
           if (minutesSinceLastMessage < minDelay) {
-            console.log('⏳ Aguardando tempo necessário:', {
-              contactId: contact.id,
-              minutosPassados: minutesSinceLastMessage,
-              minutosNecessarios: minDelay,
-              faltam: minDelay - minutesSinceLastMessage
-            })
             continue
           }
 
-          console.log('🚀 Iniciando envio do follow-up:', {
-            contactId: contact.id,
-            instanceId: followUp.instance_id,
-            mensagem: nextMessage.message
-          })
+          // Verifica horário de funcionamento
+          const currentHour = utcNow.getUTCHours()
+          const currentMinute = utcNow.getUTCMinutes()
+          const currentTime = `${currentHour.toString().padStart(2, '0')}:${currentMinute.toString().padStart(2, '0')}`
+          
+          const startTime = followUp.schedule_start_time || '09:00'
+          const endTime = followUp.schedule_end_time || '18:00'
+          
+          if (currentTime < startTime || currentTime > endTime) {
+            continue
+          }
+
+          // Verifica dias da semana (0 = Domingo, 6 = Sábado)
+          const currentDay = utcNow.getUTCDay() + 1 // Converte para 1-7 para match com o banco
+          const scheduleDays = followUp.schedule_days || [1,2,3,4,5]
+          
+          if (!scheduleDays.includes(currentDay)) {
+            continue
+          }
 
           const supabaseUrl = (Deno.env.get('SUPABASE_URL') || '').replace(/\/$/, '')
           
@@ -213,44 +145,23 @@ serve(async (req) => {
 
           if (!processResponse.ok) {
             const errorText = await processResponse.text()
-            console.error('❌ Erro ao processar follow-up:', {
-              status: processResponse.status,
-              erro: errorText,
-              contactId: contact.id,
-              instanceId: followUp.instance_id
-            })
             throw new Error(`Error processing follow-up: ${errorText}`)
           }
 
           const processResult = await processResponse.json()
-          console.log('✅ Follow-up processado:', {
-            contactId: contact.id,
-            resultado: processResult
-          })
-          
           processedContacts.push({
             contactId: contact.id,
             success: processResult.success,
             message: processResult.message
           })
         } catch (error) {
-          console.error('❌ Erro ao processar contato:', {
+          console.error('Erro ao processar contato:', {
             contato: contact.id,
-            erro: error.message,
-            stack: error.stack
+            erro: error.message
           })
         }
       }
     }
-
-    const endTime = new Date()
-    console.log('✅ Processamento concluído:', {
-      inicio: startTime.toISOString(),
-      fim: endTime.toISOString(),
-      duracao: `${(endTime.getTime() - startTime.getTime()) / 1000} segundos`,
-      totalProcessado: processedContacts.length,
-      resultados: processedContacts
-    })
 
     return new Response(
       JSON.stringify({ 
@@ -260,11 +171,6 @@ serve(async (req) => {
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   } catch (error) {
-    console.error('❌ Erro geral no processamento:', {
-      mensagem: error.message,
-      stack: error.stack,
-      timestamp: new Date().toISOString()
-    })
     return new Response(
       JSON.stringify({ error: error.message }),
       { 
