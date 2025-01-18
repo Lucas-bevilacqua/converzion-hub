@@ -7,7 +7,7 @@ const corsHeaders = {
 }
 
 serve(async (req) => {
-  console.log('🚀 Iniciando função de follow-up')
+  console.log('🚀 Iniciando função de follow-up - ' + new Date().toISOString())
   
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
@@ -19,9 +19,11 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    console.log('📥 Buscando follow-ups ativos')
-    
+    // Log para verificar se as credenciais estão corretas
+    console.log('📝 Credenciais do Supabase configuradas')
+
     // 1. Buscar follow-ups ativos
+    console.log('📥 Buscando follow-ups ativos')
     const { data: followUps, error: followUpsError } = await supabaseClient
       .from('instance_follow_ups')
       .select(`
@@ -58,9 +60,8 @@ serve(async (req) => {
       )
     }
 
+    // 2. Buscar contatos para follow-up
     console.log('🔍 Buscando contatos para follow-up')
-    
-    // 2. Buscar apenas 1 contato que precisa de follow-up
     const { data: contacts, error: contactsError } = await supabaseClient
       .from('Users_clientes')
       .select('*')
@@ -162,7 +163,21 @@ serve(async (req) => {
       throw messageError
     }
 
+    // Log final de sucesso
     console.log('✅ Follow-up processado com sucesso')
+    
+    // Registrar execução na tabela de logs
+    const { error: logError } = await supabaseClient
+      .from('cron_logs')
+      .insert({
+        job_name: 'get-follow-up-contacts',
+        status: 'success'
+      })
+
+    if (logError) {
+      console.error('❌ Erro ao registrar log:', logError)
+    }
+
     return new Response(
       JSON.stringify({ 
         success: true, 
@@ -174,6 +189,20 @@ serve(async (req) => {
 
   } catch (error) {
     console.error('❌ Erro ao processar follow-up:', error)
+    
+    // Registrar erro na tabela de logs
+    const supabaseClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    )
+    
+    await supabaseClient
+      .from('cron_logs')
+      .insert({
+        job_name: 'get-follow-up-contacts',
+        status: 'error',
+      })
+
     return new Response(
       JSON.stringify({ error: error.message }),
       { 
