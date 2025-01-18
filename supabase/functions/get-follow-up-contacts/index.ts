@@ -17,6 +17,7 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
+    // Buscar follow-ups ativos
     const { data: followUps, error: followUpsError } = await supabaseClient
       .from('instance_follow_ups')
       .select(`
@@ -42,6 +43,7 @@ serve(async (req) => {
       )
     }
 
+    // Buscar contatos pendentes
     const { data: contacts, error: contactsError } = await supabaseClient
       .from('Users_clientes')
       .select('*')
@@ -71,6 +73,7 @@ serve(async (req) => {
     const firstMessage = manualMessages[0]
     const evolutionApiUrl = (Deno.env.get('EVOLUTION_API_URL') || '').replace(/\/$/, '')
     
+    // Enviar mensagem via Evolution API
     const evolutionResponse = await fetch(
       `${evolutionApiUrl}/message/sendText/${followUp.instance.name}`,
       {
@@ -93,6 +96,7 @@ serve(async (req) => {
 
     const evolutionData = await evolutionResponse.json()
 
+    // Atualizar status do contato
     await supabaseClient
       .from('Users_clientes')
       .update({
@@ -101,6 +105,7 @@ serve(async (req) => {
       })
       .eq('id', contact.id)
 
+    // Registrar mensagem enviada
     await supabaseClient
       .from('chat_messages')
       .insert({
@@ -111,6 +116,7 @@ serve(async (req) => {
         whatsapp_message_id: evolutionData.key?.id
       })
 
+    // Registrar execução no log
     await supabaseClient
       .from('cron_logs')
       .insert({
