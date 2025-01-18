@@ -46,6 +46,11 @@ serve(async (req) => {
       throw new Error('Missing Evolution API configuration')
     }
 
+    console.log('Evolution API configuration:', { 
+      url: evolutionApiUrl,
+      hasKey: !!evolutionApiKey 
+    })
+
     // Buscar follow-ups ativos com informações da instância
     const { data: followUps, error: followUpsError } = await supabaseClient
       .from('instance_follow_ups')
@@ -93,224 +98,260 @@ serve(async (req) => {
 
     // Process each follow-up
     for (const followUp of followUps) {
-      console.log('📝 Processing follow-up:', {
-        id: followUp.id,
-        instanceId: followUp.instance_id,
-        instanceName: followUp.instance?.name,
-        instanceStatus: followUp.instance?.connection_status
-      })
-
-      // Check instance connection status with Evolution API
       try {
-        const stateResponse = await fetch(
-          `${evolutionApiUrl}/instance/connectionState/${followUp.instance.name}`,
-          {
-            headers: {
-              'Content-Type': 'application/json',
-              'apikey': evolutionApiKey,
-            }
-          }
-        )
-
-        const stateData = await stateResponse.json()
-        console.log('Instance state check:', {
-          instance: followUp.instance.name,
-          status: stateData?.state,
-          response: stateData
-        })
-
-        if (stateData?.state !== 'open') {
-          console.log('⚠️ Instance not connected, updating status:', followUp.instance.id)
-          
-          // Update instance status in database
-          await supabaseClient
-            .from('evolution_instances')
-            .update({
-              connection_status: 'disconnected',
-              updated_at: new Date().toISOString()
-            })
-            .eq('id', followUp.instance.id)
-
-          console.warn('⚠️ Instance not connected, skipping:', followUp.instance.id)
-          continue
-        }
-
-        // Update instance as connected if needed
-        if (followUp.instance.connection_status !== 'connected') {
-          await supabaseClient
-            .from('evolution_instances')
-            .update({
-              connection_status: 'connected',
-              updated_at: new Date().toISOString()
-            })
-            .eq('id', followUp.instance.id)
-        }
-
-      } catch (error) {
-        console.error('❌ Error checking instance state:', error)
-        continue
-      }
-
-      try {
-        // Buscar contatos pendentes
-        const { data: contacts, error: contactsError } = await supabaseClient
-          .from('Users_clientes')
-          .select('*')
-          .eq('NomeDaEmpresa', followUp.instance_id)
-          .is('ConversationId', null)
-          .order('created_at', { ascending: true })
-          .limit(10)
-
-        console.log('👥 Contacts query result:', {
+        console.log('📝 Processing follow-up:', {
+          id: followUp.id,
           instanceId: followUp.instance_id,
-          contactsFound: contacts?.length,
-          error: contactsError,
-          contacts: contacts
+          instanceName: followUp.instance?.name,
+          instanceStatus: followUp.instance?.connection_status
         })
 
-        if (contactsError) {
-          console.error('❌ Error fetching contacts:', contactsError)
-          errors.push({
-            type: 'contacts_query',
-            instanceId: followUp.instance_id,
-            error: contactsError
-          })
+        if (!followUp.instance?.name) {
+          console.error('❌ Instance name not found:', followUp.instance_id)
           continue
         }
 
-        if (!contacts?.length) {
-          console.log('ℹ️ No pending contacts found for instance:', followUp.instance_id)
-          continue
-        }
-
-        for (const contact of contacts) {
-          try {
-            console.log('📱 Processing contact:', {
-              id: contact.id,
-              phone: contact.TelefoneClientes
-            })
-
-            const manualMessages = Array.isArray(followUp.manual_messages) 
-              ? followUp.manual_messages 
-              : []
-
-            if (!manualMessages.length) {
-              console.log('⚠️ No messages configured for follow-up:', followUp.id)
-              continue
-            }
-
-            const firstMessage = manualMessages[0]
-
-            // Validate phone number format
-            const phoneNumber = contact.TelefoneClientes?.replace(/\D/g, '')
-            if (!phoneNumber || phoneNumber.length < 10) {
-              console.error('❌ Invalid phone number:', contact.TelefoneClientes)
-              continue
-            }
-
-            console.log('📤 Sending message via Evolution API:', {
-              instance: followUp.instance.name,
-              contact: phoneNumber,
-              apiUrl: evolutionApiUrl,
-              message: firstMessage.message
-            })
-
-            const evolutionResponse = await fetch(
-              `${evolutionApiUrl}/message/sendText/${followUp.instance.name}`,
-              {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                  'apikey': evolutionApiKey,
-                },
-                body: JSON.stringify({
-                  number: phoneNumber,
-                  text: firstMessage.message
-                })
+        // Check instance connection status with Evolution API
+        try {
+          console.log('🔄 Checking instance state:', followUp.instance.name)
+          
+          const stateResponse = await fetch(
+            `${evolutionApiUrl}/instance/connectionState/${followUp.instance.name}`,
+            {
+              headers: {
+                'Content-Type': 'application/json',
+                'apikey': evolutionApiKey,
               }
-            )
-
-            const evolutionData = await evolutionResponse.json()
-            console.log('Evolution API response:', evolutionData)
-            
-            if (!evolutionResponse.ok || !evolutionData?.key?.id) {
-              console.error('❌ Evolution API error:', evolutionData)
-              errors.push({
-                type: 'evolution_api',
-                instanceId: followUp.instance_id,
-                contactId: contact.id,
-                error: evolutionData
-              })
-              continue
             }
+          )
 
-            // Atualizar status do contato
+          if (!stateResponse.ok) {
+            const errorText = await stateResponse.text()
+            console.error('❌ Evolution API state check error:', {
+              status: stateResponse.status,
+              error: errorText
+            })
+            continue
+          }
+
+          const stateData = await stateResponse.json()
+          console.log('Instance state check:', {
+            instance: followUp.instance.name,
+            status: stateData?.state,
+            response: stateData
+          })
+
+          if (stateData?.state !== 'open') {
+            console.log('⚠️ Instance not connected, updating status:', followUp.instance.id)
+            
+            // Update instance status in database
             const { error: updateError } = await supabaseClient
-              .from('Users_clientes')
+              .from('evolution_instances')
               .update({
-                ConversationId: 'follow-up-sent-0',
-                last_message_time: new Date().toISOString()
+                connection_status: 'disconnected',
+                updated_at: new Date().toISOString()
               })
-              .eq('id', contact.id)
+              .eq('id', followUp.instance.id)
 
             if (updateError) {
-              console.error('❌ Error updating contact status:', updateError)
-              errors.push({
-                type: 'contact_update',
-                instanceId: followUp.instance_id,
-                contactId: contact.id,
-                error: updateError
-              })
-              continue
+              console.error('❌ Error updating instance status:', updateError)
             }
 
-            // Registrar mensagem enviada
-            const { error: messageError } = await supabaseClient
-              .from('chat_messages')
-              .insert({
-                instance_id: followUp.instance_id,
-                user_id: followUp.instance.user_id,
-                sender_type: 'follow_up',
-                content: firstMessage.message,
-                whatsapp_message_id: evolutionData.key?.id
-              })
-
-            if (messageError) {
-              console.error('❌ Error registering message:', messageError)
-              errors.push({
-                type: 'message_log',
-                instanceId: followUp.instance_id,
-                contactId: contact.id,
-                error: messageError
-              })
-            }
-
-            processedContacts.push({
-              id: contact.id,
-              phone: phoneNumber,
-              status: 'message_sent',
-              messageId: evolutionData.key?.id
-            })
-
-            console.log('✅ Successfully processed contact:', {
-              id: contact.id,
-              phone: phoneNumber
-            })
-
-          } catch (error) {
-            console.error('❌ Error processing contact:', error)
-            errors.push({
-              type: 'contact_processing',
-              instanceId: followUp.instance_id,
-              contactId: contact.id,
-              error
-            })
+            console.warn('⚠️ Instance not connected, skipping:', followUp.instance.id)
+            continue
           }
+
+          // Update instance as connected if needed
+          if (followUp.instance.connection_status !== 'connected') {
+            const { error: updateError } = await supabaseClient
+              .from('evolution_instances')
+              .update({
+                connection_status: 'connected',
+                updated_at: new Date().toISOString()
+              })
+              .eq('id', followUp.instance.id)
+
+            if (updateError) {
+              console.error('❌ Error updating instance status:', updateError)
+            }
+          }
+
+        } catch (error) {
+          console.error('❌ Error checking instance state:', error)
+          continue
+        }
+
+        try {
+          // Buscar contatos pendentes
+          const { data: contacts, error: contactsError } = await supabaseClient
+            .from('Users_clientes')
+            .select('*')
+            .eq('NomeDaEmpresa', followUp.instance_id)
+            .is('ConversationId', null)
+            .order('created_at', { ascending: true })
+            .limit(10)
+
+          console.log('👥 Contacts query result:', {
+            instanceId: followUp.instance_id,
+            contactsFound: contacts?.length,
+            error: contactsError,
+            contacts: contacts
+          })
+
+          if (contactsError) {
+            console.error('❌ Error fetching contacts:', contactsError)
+            errors.push({
+              type: 'contacts_query',
+              instanceId: followUp.instance_id,
+              error: contactsError
+            })
+            continue
+          }
+
+          if (!contacts?.length) {
+            console.log('ℹ️ No pending contacts found for instance:', followUp.instance_id)
+            continue
+          }
+
+          for (const contact of contacts) {
+            try {
+              console.log('📱 Processing contact:', {
+                id: contact.id,
+                phone: contact.TelefoneClientes
+              })
+
+              const manualMessages = Array.isArray(followUp.manual_messages) 
+                ? followUp.manual_messages 
+                : []
+
+              if (!manualMessages.length) {
+                console.log('⚠️ No messages configured for follow-up:', followUp.id)
+                continue
+              }
+
+              const firstMessage = manualMessages[0]
+
+              // Validate phone number format
+              const phoneNumber = contact.TelefoneClientes?.replace(/\D/g, '')
+              if (!phoneNumber || phoneNumber.length < 10) {
+                console.error('❌ Invalid phone number:', contact.TelefoneClientes)
+                continue
+              }
+
+              console.log('📤 Sending message via Evolution API:', {
+                instance: followUp.instance.name,
+                contact: phoneNumber,
+                apiUrl: evolutionApiUrl,
+                message: firstMessage.message
+              })
+
+              const evolutionResponse = await fetch(
+                `${evolutionApiUrl}/message/sendText/${followUp.instance.name}`,
+                {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'apikey': evolutionApiKey,
+                  },
+                  body: JSON.stringify({
+                    number: phoneNumber,
+                    text: firstMessage.message
+                  })
+                }
+              )
+
+              if (!evolutionResponse.ok) {
+                const errorText = await evolutionResponse.text()
+                console.error('❌ Evolution API error:', {
+                  status: evolutionResponse.status,
+                  error: errorText
+                })
+                continue
+              }
+
+              const evolutionData = await evolutionResponse.json()
+              console.log('Evolution API response:', evolutionData)
+
+              if (!evolutionData?.key?.id) {
+                console.error('❌ Invalid Evolution API response:', evolutionData)
+                continue
+              }
+
+              // Atualizar status do contato
+              const { error: updateError } = await supabaseClient
+                .from('Users_clientes')
+                .update({
+                  ConversationId: 'follow-up-sent-0',
+                  last_message_time: new Date().toISOString()
+                })
+                .eq('id', contact.id)
+
+              if (updateError) {
+                console.error('❌ Error updating contact status:', updateError)
+                errors.push({
+                  type: 'contact_update',
+                  instanceId: followUp.instance_id,
+                  contactId: contact.id,
+                  error: updateError
+                })
+                continue
+              }
+
+              // Registrar mensagem enviada
+              const { error: messageError } = await supabaseClient
+                .from('chat_messages')
+                .insert({
+                  instance_id: followUp.instance_id,
+                  user_id: followUp.instance.user_id,
+                  sender_type: 'follow_up',
+                  content: firstMessage.message,
+                  whatsapp_message_id: evolutionData.key?.id
+                })
+
+              if (messageError) {
+                console.error('❌ Error registering message:', messageError)
+                errors.push({
+                  type: 'message_log',
+                  instanceId: followUp.instance_id,
+                  contactId: contact.id,
+                  error: messageError
+                })
+              }
+
+              processedContacts.push({
+                id: contact.id,
+                phone: phoneNumber,
+                status: 'message_sent',
+                messageId: evolutionData.key?.id
+              })
+
+              console.log('✅ Successfully processed contact:', {
+                id: contact.id,
+                phone: phoneNumber
+              })
+
+            } catch (error) {
+              console.error('❌ Error processing contact:', error)
+              errors.push({
+                type: 'contact_processing',
+                instanceId: followUp.instance_id,
+                contactId: contact.id,
+                error
+              })
+            }
+          }
+        } catch (error) {
+          console.error('❌ Error processing follow-up:', error)
+          errors.push({
+            type: 'follow_up_processing',
+            instanceId: followUp.instance_id,
+            error
+          })
         }
       } catch (error) {
-        console.error('❌ Error processing follow-up:', error)
+        console.error('❌ Error in follow-up loop:', error)
         errors.push({
-          type: 'follow_up_processing',
+          type: 'follow_up_loop',
           instanceId: followUp.instance_id,
           error
         })
