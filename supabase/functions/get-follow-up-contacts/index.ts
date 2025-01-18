@@ -7,8 +7,6 @@ const corsHeaders = {
 }
 
 serve(async (req) => {
-  console.log('🚀 Iniciando função de follow-up - ' + new Date().toISOString())
-  
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
   }
@@ -19,11 +17,6 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    // Log para verificar se as credenciais estão corretas
-    console.log('📝 Credenciais do Supabase configuradas')
-
-    // 1. Buscar follow-ups ativos
-    console.log('📥 Buscando follow-ups ativos')
     const { data: followUps, error: followUpsError } = await supabaseClient
       .from('instance_follow_ups')
       .select(`
@@ -33,35 +26,22 @@ serve(async (req) => {
       .eq('is_active', true)
       .limit(1)
 
-    if (followUpsError) {
-      console.error('❌ Erro ao buscar follow-ups:', followUpsError)
-      throw followUpsError
-    }
-
-    console.log('✅ Follow-ups encontrados:', followUps?.length || 0)
-
+    if (followUpsError) throw followUpsError
     if (!followUps?.length) {
-      console.log('ℹ️ Nenhum follow-up ativo encontrado')
       return new Response(
-        JSON.stringify({ success: true, message: 'Nenhum follow-up ativo' }),
+        JSON.stringify({ success: true, message: 'No active follow-ups' }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
     const followUp = followUps[0]
-    console.log('📱 Processando follow-up para instância:', followUp.instance?.name)
-    
-    // Pular instâncias desconectadas
     if (!followUp.instance || followUp.instance.connection_status !== 'connected') {
-      console.log('⚠️ Instância não está conectada:', followUp.instance?.name)
       return new Response(
-        JSON.stringify({ success: true, message: 'Instância não está conectada' }),
+        JSON.stringify({ success: true, message: 'Instance not connected' }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
-    // 2. Buscar contatos para follow-up
-    console.log('🔍 Buscando contatos para follow-up')
     const { data: contacts, error: contactsError } = await supabaseClient
       .from('Users_clientes')
       .select('*')
@@ -70,30 +50,20 @@ serve(async (req) => {
       .order('created_at', { ascending: true })
       .limit(1)
 
-    if (contactsError) {
-      console.error('❌ Erro ao buscar contatos:', contactsError)
-      throw contactsError
-    }
-
-    console.log('✅ Contatos encontrados:', contacts?.length || 0)
-
+    if (contactsError) throw contactsError
     if (!contacts?.length) {
-      console.log('ℹ️ Nenhum contato para follow-up')
       return new Response(
-        JSON.stringify({ success: true, message: 'Nenhum contato para follow-up' }),
+        JSON.stringify({ success: true, message: 'No contacts for follow-up' }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
     const contact = contacts[0]
-    console.log('📱 Processando contato:', contact.TelefoneClientes)
-
     const manualMessages = Array.isArray(followUp.manual_messages) ? followUp.manual_messages : []
     
     if (!manualMessages.length) {
-      console.log('⚠️ Nenhuma mensagem configurada')
       return new Response(
-        JSON.stringify({ success: true, message: 'Nenhuma mensagem configurada' }),
+        JSON.stringify({ success: true, message: 'No messages configured' }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
@@ -101,12 +71,6 @@ serve(async (req) => {
     const firstMessage = manualMessages[0]
     const evolutionApiUrl = (Deno.env.get('EVOLUTION_API_URL') || '').replace(/\/$/, '')
     
-    console.log('📤 Enviando mensagem via Evolution API')
-    console.log('URL:', `${evolutionApiUrl}/message/sendText/${followUp.instance.name}`)
-    console.log('Número:', contact.TelefoneClientes)
-    console.log('Mensagem:', firstMessage.message)
-    
-    // 3. Enviar primeira mensagem
     const evolutionResponse = await fetch(
       `${evolutionApiUrl}/message/sendText/${followUp.instance.name}`,
       {
@@ -124,16 +88,12 @@ serve(async (req) => {
 
     if (!evolutionResponse.ok) {
       const error = await evolutionResponse.text()
-      console.error('❌ Erro ao enviar mensagem:', error)
       throw new Error(error)
     }
 
     const evolutionData = await evolutionResponse.json()
-    console.log('✅ Resposta da Evolution API:', evolutionData)
 
-    // 4. Atualizar status do contato
-    console.log('💾 Atualizando status do contato')
-    const { error: updateError } = await supabaseClient
+    await supabaseClient
       .from('Users_clientes')
       .update({
         ConversationId: 'follow-up-sent-0',
@@ -141,14 +101,7 @@ serve(async (req) => {
       })
       .eq('id', contact.id)
 
-    if (updateError) {
-      console.error('❌ Erro ao atualizar contato:', updateError)
-      throw updateError
-    }
-
-    // 5. Registrar mensagem enviada
-    console.log('💾 Registrando mensagem enviada')
-    const { error: messageError } = await supabaseClient
+    await supabaseClient
       .from('chat_messages')
       .insert({
         instance_id: followUp.instance_id,
@@ -158,44 +111,23 @@ serve(async (req) => {
         whatsapp_message_id: evolutionData.key?.id
       })
 
-    if (messageError) {
-      console.error('❌ Erro ao registrar mensagem:', messageError)
-      throw messageError
-    }
-
-    // Log final de sucesso
-    console.log('✅ Follow-up processado com sucesso')
-    
-    // Registrar execução na tabela de logs
-    const { error: logError } = await supabaseClient
+    await supabaseClient
       .from('cron_logs')
       .insert({
         job_name: 'get-follow-up-contacts',
         status: 'success'
       })
 
-    if (logError) {
-      console.error('❌ Erro ao registrar log:', logError)
-    }
-
     return new Response(
       JSON.stringify({ 
         success: true, 
-        message: 'Mensagem enviada com sucesso',
+        message: 'Message sent successfully',
         contact: contact.TelefoneClientes
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
 
   } catch (error) {
-    console.error('❌ Erro ao processar follow-up:', error)
-    
-    // Registrar erro na tabela de logs
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    )
-    
     await supabaseClient
       .from('cron_logs')
       .insert({
