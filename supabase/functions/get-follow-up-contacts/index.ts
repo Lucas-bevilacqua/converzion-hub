@@ -38,21 +38,48 @@ serve(async (req) => {
       throw followUpsError
     }
 
-    console.log(`✅ Found ${followUps?.length || 0} active follow-ups`)
+    if (!followUps?.length) {
+      console.log('ℹ️ No active follow-ups found')
+      return new Response(
+        JSON.stringify({ 
+          success: true,
+          processed: [],
+          errors: [] 
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    console.log(`✅ Found ${followUps.length} active follow-ups`)
 
     const processedFollowUps = []
     const errors = []
 
-    for (const followUp of followUps || []) {
+    for (const followUp of followUps) {
       try {
+        if (!followUp.instance?.id) {
+          console.log(`⚠️ Follow-up ${followUp.id} has no associated instance`)
+          continue
+        }
+
         console.log(`📝 Processing follow-up: { id: "${followUp.id}", instanceId: "${followUp.instance?.name}", type: "${followUp.follow_up_type}" }`)
 
+        // Verificar se há mensagens configuradas
+        if (followUp.follow_up_type === 'manual' && (!followUp.manual_messages?.length)) {
+          console.log(`⚠️ No manual messages configured for follow-up: ${followUp.id}`)
+          continue
+        }
+
         // Buscar contatos que precisam de follow-up
-        const { data: contacts } = await supabase
+        const { data: contacts, error: contactsError } = await supabase
           .from('Users_clientes')
           .select('*')
           .eq('NomeDaEmpresa', followUp.instance_id)
           .not('TelefoneClientes', 'is', null)
+
+        if (contactsError) {
+          throw contactsError
+        }
 
         if (!contacts?.length) {
           console.log('⚠️ No contacts found for follow-up')
@@ -134,8 +161,8 @@ serve(async (req) => {
         // Preparar mensagens para envio
         let messagesToSend = []
         
-        if (followUp.follow_up_type === 'manual') {
-          messagesToSend = followUp.manual_messages || []
+        if (followUp.follow_up_type === 'manual' && followUp.manual_messages?.length > 0) {
+          messagesToSend = followUp.manual_messages
         } else if (followUp.follow_up_type === 'ai_generated') {
           // Gerar mensagem com OpenAI
           console.log('🤖 Generating message with OpenAI')
@@ -147,7 +174,7 @@ serve(async (req) => {
               'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-              model: 'gpt-4o-mini',
+              model: 'gpt-4',
               messages: [
                 { 
                   role: 'system', 
@@ -178,7 +205,7 @@ serve(async (req) => {
         }
 
         if (!messagesToSend.length) {
-          console.log('⚠️ No messages configured for follow-up:', followUp.id)
+          console.log(`⚠️ No messages configured for follow-up: ${followUp.id}`)
           continue
         }
 
