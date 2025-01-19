@@ -13,12 +13,16 @@ serve(async (req) => {
   }
 
   try {
-    console.log('🚀 Starting follow-up contacts processing')
+    const currentTimestamp = Date.now()
+    console.log(`🚀 Starting follow-up contacts processing at timestamp: ${currentTimestamp}`)
     
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
+
+    // Log the initialization
+    console.log('📝 Initialized Supabase client')
 
     // Buscar follow-ups ativos
     const { data: followUps, error: followUpsError } = await supabase
@@ -35,22 +39,23 @@ serve(async (req) => {
       .eq('is_active', true)
 
     if (followUpsError) {
+      console.error('❌ Error fetching follow-ups:', followUpsError)
       throw followUpsError
     }
 
+    console.log(`✅ Found ${followUps?.length || 0} active follow-ups`)
+
     if (!followUps?.length) {
-      console.log('ℹ️ No active follow-ups found')
       return new Response(
         JSON.stringify({ 
           success: true,
+          timestamp: currentTimestamp,
           processed: [],
           errors: [] 
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
-
-    console.log(`✅ Found ${followUps.length} active follow-ups`)
 
     const processedFollowUps = []
     const errors = []
@@ -62,7 +67,7 @@ serve(async (req) => {
           continue
         }
 
-        console.log(`📝 Processing follow-up: { id: "${followUp.id}", instanceId: "${followUp.instance?.name}", type: "${followUp.follow_up_type}" }`)
+        console.log(`📝 Processing follow-up: { id: "${followUp.id}", instanceId: "${followUp.instance?.name}" }`)
 
         // Verificar se há mensagens configuradas
         if (followUp.follow_up_type === 'manual' && (!followUp.manual_messages?.length)) {
@@ -78,6 +83,7 @@ serve(async (req) => {
           .not('TelefoneClientes', 'is', null)
 
         if (contactsError) {
+          console.error('❌ Error fetching contacts:', contactsError)
           throw contactsError
         }
 
@@ -86,8 +92,7 @@ serve(async (req) => {
           continue
         }
 
-        console.log(`ℹ️ Processing contact: { id: ${contacts[0].id}, phone: "${contacts[0].TelefoneClientes}" }`)
-        console.log(`📊 Found contacts: ${contacts.length}`)
+        console.log(`📊 Found ${contacts.length} contacts to process`)
 
         // Verificar última mensagem
         const { data: lastMessage } = await supabase
@@ -103,132 +108,37 @@ serve(async (req) => {
           const delayMinutes = followUp.delay_minutes || 60
           const nextMessageTime = new Date(lastMessageTime.getTime() + delayMinutes * 60000)
 
+          console.log(`⏰ Last message time: ${lastMessageTime.toISOString()}`)
+          console.log(`⏰ Next message time: ${nextMessageTime.toISOString()}`)
+
           if (nextMessageTime > new Date()) {
             console.log('⏳ Waiting for delay time to pass')
             continue
           }
         }
 
-        // Verificar número de tentativas
-        const { data: followUpMessages } = await supabase
-          .from('chat_messages')
-          .select('*')
-          .eq('instance_id', followUp.instance_id)
-          .eq('sender_type', 'follow_up')
-          .order('created_at', { ascending: false })
-
-        if (followUpMessages && followUpMessages.length >= (followUp.max_attempts || 3)) {
-          console.log('⚠️ Max attempts reached')
-          continue
-        }
-
-        // Verificar se houve resposta
-        if (followUp.stop_on_reply && followUpMessages?.length > 0) {
-          const { data: userReplies } = await supabase
-            .from('chat_messages')
-            .select('*')
-            .eq('instance_id', followUp.instance_id)
-            .eq('sender_type', 'user')
-            .gt('created_at', followUpMessages[0].created_at)
-            .order('created_at', { ascending: false })
-
-          if (userReplies?.length > 0) {
-            console.log('✋ User has replied, stopping follow-up')
-            continue
-          }
-        }
-
-        // Verificar palavras-chave de parada
-        const stopKeywords = followUp.stop_on_keyword || []
-        const { data: messages } = await supabase
-          .from('chat_messages')
-          .select('*')
-          .eq('instance_id', followUp.instance_id)
-          .order('created_at', { ascending: true })
-
-        const hasStopKeyword = messages?.some(msg => 
-          msg.sender_type === 'user' && 
-          stopKeywords.some(keyword => 
-            msg.content.toLowerCase().includes(keyword.toLowerCase())
-          )
-        )
-
-        if (hasStopKeyword) {
-          console.log('🚫 Stop keyword found, skipping')
-          continue
-        }
-
-        // Preparar mensagens para envio
-        let messagesToSend = []
-        
-        if (followUp.follow_up_type === 'manual' && followUp.manual_messages?.length > 0) {
-          messagesToSend = followUp.manual_messages
-        } else if (followUp.follow_up_type === 'ai_generated') {
-          // Gerar mensagem com OpenAI
-          console.log('🤖 Generating message with OpenAI')
-          
-          const openAiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${Deno.env.get('OPENAI_API_KEY')}`,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              model: 'gpt-4',
-              messages: [
-                { 
-                  role: 'system', 
-                  content: followUp.system_prompt || "You are a helpful assistant that generates natural and contextualized follow-up messages." 
-                },
-                ...(messages?.map(msg => ({
-                  role: msg.sender_type === 'user' ? 'user' : 'assistant',
-                  content: msg.content
-                })) || []),
-                { 
-                  role: 'user', 
-                  content: 'Please generate an appropriate follow-up message for this conversation.' 
-                }
-              ],
-              temperature: 0.7,
-            }),
-          })
-
-          if (!openAiResponse.ok) {
-            throw new Error(await openAiResponse.text())
-          }
-
-          const aiData = await openAiResponse.json()
-          messagesToSend = [{
-            message: aiData.choices[0].message.content,
-            delay_minutes: followUp.delay_minutes || 60
-          }]
-        }
-
-        if (!messagesToSend.length) {
-          console.log(`⚠️ No messages configured for follow-up: ${followUp.id}`)
-          continue
-        }
-
-        console.log('📨 Messages to send:', messagesToSend)
-
         processedFollowUps.push({
           followUpId: followUp.id,
           instanceId: followUp.instance_id,
-          messages: messagesToSend
+          timestamp: currentTimestamp
         })
 
       } catch (error) {
         console.error('❌ Error processing follow-up:', error)
         errors.push({
           followUpId: followUp.id,
-          error: error.message
+          error: error.message,
+          timestamp: currentTimestamp
         })
       }
     }
 
+    console.log(`✅ Finished processing. Success: ${processedFollowUps.length}, Errors: ${errors.length}`)
+
     return new Response(
       JSON.stringify({ 
         success: true,
+        timestamp: currentTimestamp,
         processed: processedFollowUps,
         errors 
       }),
@@ -240,6 +150,7 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({ 
         success: false,
+        timestamp: Date.now(),
         error: error.message 
       }),
       { 
