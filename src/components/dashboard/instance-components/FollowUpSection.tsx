@@ -79,6 +79,7 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
   const { data: followUp, isLoading } = useQuery({
     queryKey: ['follow-up', instanceId],
     queryFn: async () => {
+      console.log('🔍 [DEBUG] Buscando configurações de follow-up para instância:', instanceId)
       const { data, error } = await supabase
         .from('instance_follow_ups')
         .select('*')
@@ -86,6 +87,7 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
         .maybeSingle()
 
       if (error && error.code !== 'PGRST116') {
+        console.error('❌ [ERROR] Erro ao buscar follow-up:', error)
         throw error
       }
 
@@ -107,15 +109,17 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
           
           const typedMessages = parsedMessages.map((msg: any) => ({
             message: String(msg?.message || ''),
-            delay_minutes: Number(msg?.delay_minutes || 1) // Changed default from 3 to 1
+            delay_minutes: Number(msg?.delay_minutes || 1)
           }))
 
           data.manual_messages = typedMessages
         } catch (e) {
+          console.error('❌ [ERROR] Erro ao processar mensagens:', e)
           data.manual_messages = []
         }
       }
 
+      console.log('✅ [DEBUG] Configurações de follow-up carregadas:', data)
       return data as unknown as FollowUpData
     }
   })
@@ -123,7 +127,7 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
   const [formData, setFormData] = useState<FormData>({
     is_active: followUp?.is_active || false,
     follow_up_type: followUp?.follow_up_type || "manual",
-    delay_minutes: followUp?.delay_minutes || 1, // Changed from 3 to 1
+    delay_minutes: followUp?.delay_minutes || 1,
     template_message: followUp?.template_message || '',
     schedule_start_time: followUp?.schedule_start_time || '09:00',
     schedule_end_time: followUp?.schedule_end_time || '18:00',
@@ -137,10 +141,11 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
 
   useEffect(() => {
     if (followUp) {
+      console.log('📝 [DEBUG] Atualizando formulário com dados do follow-up:', followUp)
       setFormData({
         is_active: followUp.is_active || false,
         follow_up_type: followUp.follow_up_type || "manual",
-        delay_minutes: followUp.delay_minutes || 1, // Changed from 3 to 1
+        delay_minutes: followUp.delay_minutes || 1,
         template_message: followUp.template_message || '',
         schedule_start_time: followUp.schedule_start_time || '09:00',
         schedule_end_time: followUp.schedule_end_time || '18:00',
@@ -156,10 +161,12 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
 
   const saveMutation = useMutation({
     mutationFn: async (values: FormData) => {      
+      console.log('💾 [DEBUG] Salvando configurações de follow-up:', values)
+      
       const manualMessages = Array.isArray(values.manual_messages) 
         ? values.manual_messages.map(msg => ({
             message: msg.message || '',
-            delay_minutes: Math.max(1, Number(msg.delay_minutes) || 1) // Changed from 3 to 1
+            delay_minutes: Math.max(1, Number(msg.delay_minutes) || 1)
           }))
         : []
 
@@ -167,7 +174,7 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
         instance_id: instanceId,
         is_active: values.is_active,
         follow_up_type: values.follow_up_type,
-        delay_minutes: Math.max(1, values.delay_minutes), // Changed from 3 to 1
+        delay_minutes: Math.max(1, values.delay_minutes),
         template_message: values.template_message,
         schedule_start_time: values.schedule_start_time,
         schedule_end_time: values.schedule_end_time,
@@ -191,10 +198,12 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
 
       const { error } = await operation
       if (error) {
+        console.error('❌ [ERROR] Erro ao salvar follow-up:', error)
         throw error
       }
 
       if (values.follow_up_type === 'ai_generated') {
+        console.log('🤖 [DEBUG] Configurando follow-up com IA')
         const { data: instance, error: instanceError } = await supabase
           .from('evolution_instances')
           .select('name, phone_number')
@@ -202,6 +211,7 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
           .single()
 
         if (instanceError) {
+          console.error('❌ [ERROR] Erro ao buscar dados da instância:', instanceError)
           throw instanceError
         }
         
@@ -220,9 +230,12 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
         })
 
         if (aiError) {
+          console.error('❌ [ERROR] Erro ao processar follow-up com IA:', aiError)
           throw aiError
         }
       }
+
+      console.log('✅ [DEBUG] Follow-up salvo com sucesso')
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['follow-up'] })
@@ -232,6 +245,7 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
       })
     },
     onError: (error) => {
+      console.error('❌ [ERROR] Erro na mutação de salvamento:', error)
       toast({
         title: "Erro",
         description: "Não foi possível salvar as configurações.",
@@ -242,7 +256,7 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
 
   const deleteMutation = useMutation({
     mutationFn: async () => {
-      console.log('Deletando configuração de follow-up para instância:', instanceId)
+      console.log('🗑️ [DEBUG] Deletando configuração de follow-up para instância:', instanceId)
       const { error } = await supabase
         .from('instance_follow_ups')
         .delete()
@@ -259,7 +273,7 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
       setFormData({
         is_active: false,
         follow_up_type: "manual",
-        delay_minutes: 3, // Changed from 10 to 3
+        delay_minutes: 1,
         template_message: '',
         schedule_start_time: '09:00',
         schedule_end_time: '18:00',
@@ -271,7 +285,7 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
       })
     },
     onError: (error) => {
-      console.error('Erro ao excluir follow-up:', error)
+      console.error('❌ [ERROR] Erro ao excluir follow-up:', error)
       toast({
         title: "Erro",
         description: "Não foi possível excluir as configurações.",
@@ -281,13 +295,15 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
   })
 
   const addMessage = () => {
+    console.log('➕ [DEBUG] Adicionando nova mensagem ao follow-up')
     setFormData(prev => ({
       ...prev,
-      manual_messages: [...prev.manual_messages, { message: '', delay_minutes: 3 }] // Changed from 10 to 3
+      manual_messages: [...prev.manual_messages, { message: '', delay_minutes: 1 }]
     }))
   }
 
   const removeMessage = (index: number) => {
+    console.log('➖ [DEBUG] Removendo mensagem do índice:', index)
     setFormData(prev => ({
       ...prev,
       manual_messages: prev.manual_messages.filter((_, i) => i !== index)
@@ -295,6 +311,7 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
   }
 
   const updateMessage = (index: number, field: keyof ManualMessage, value: string | number) => {
+    console.log('📝 [DEBUG] Atualizando mensagem:', { index, field, value })
     setFormData(prev => ({
       ...prev,
       manual_messages: prev.manual_messages.map((msg, i) => 
@@ -304,7 +321,7 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
   }
 
   const handleSave = async () => {
-    console.log('Iniciando salvamento do follow-up:', {
+    console.log('💾 [DEBUG] Iniciando salvamento do follow-up:', {
       formData,
       instanceId,
       userId: user?.id
@@ -312,14 +329,14 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
 
     try {
       await saveMutation.mutateAsync(formData)
-      console.log('Follow-up salvo com sucesso')
+      console.log('✅ [DEBUG] Follow-up salvo com sucesso')
       
       toast({
         title: "Sucesso",
         description: "Configurações de follow-up salvas.",
       })
     } catch (error) {
-      console.error('Erro ao salvar follow-up:', error)
+      console.error('❌ [ERROR] Erro ao salvar follow-up:', error)
       toast({
         title: "Erro",
         description: "Não foi possível salvar as configurações.",

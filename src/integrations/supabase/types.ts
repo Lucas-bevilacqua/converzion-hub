@@ -642,6 +642,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: string
       }
+      execute_follow_up_contacts_real: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
       get_persistent_service_key: {
         Args: Record<PropertyKey, never>
         Returns: string
@@ -671,6 +675,10 @@ export type Database = {
         Returns: undefined
       }
       process_follow_up_job: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
+      schedule_follow_up_contacts: {
         Args: Record<PropertyKey, never>
         Returns: undefined
       }
@@ -731,6 +739,12 @@ export type Database = {
           key_exists: boolean
           key_value: string
         }[]
+      }
+      validate_url: {
+        Args: {
+          url: string
+        }
+        Returns: boolean
       }
     }
     Enums: {
