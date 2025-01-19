@@ -137,20 +137,47 @@ export type Database = {
         }
         Relationships: []
       }
+      cron_job_logs: {
+        Row: {
+          created_at: string | null
+          details: string | null
+          id: number
+          job_name: string
+          status: string
+        }
+        Insert: {
+          created_at?: string | null
+          details?: string | null
+          id?: number
+          job_name: string
+          status: string
+        }
+        Update: {
+          created_at?: string | null
+          details?: string | null
+          id?: number
+          job_name?: string
+          status?: string
+        }
+        Relationships: []
+      }
       cron_logs: {
         Row: {
+          details: string | null
           execution_time: string | null
           id: number
           job_name: string | null
           status: string | null
         }
         Insert: {
+          details?: string | null
           execution_time?: string | null
           id?: number
           job_name?: string | null
           status?: string | null
         }
         Update: {
+          details?: string | null
           execution_time?: string | null
           id?: number
           job_name?: string | null
@@ -483,6 +510,27 @@ export type Database = {
         }
         Relationships: []
       }
+      secure_configurations: {
+        Row: {
+          config_key: string
+          config_value: string
+          created_at: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          config_key: string
+          config_value: string
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          config_key?: string
+          config_value?: string
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       subscriptions: {
         Row: {
           created_at: string
@@ -576,11 +624,45 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      comprehensive_endpoint_test: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          test_stage: string
+          diagnostic_info: string
+        }[]
+      }
+      diagnose_service_key: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          check_name: string
+          check_result: string
+        }[]
+      }
+      direct_endpoint_test: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
+      get_persistent_service_key: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
       get_service_key: {
         Args: Record<PropertyKey, never>
         Returns: string
       }
       invoke_follow_up: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
+      log_comprehensive_test: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
+      log_endpoint_test_result: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
+      log_follow_up_job_execution: {
         Args: Record<PropertyKey, never>
         Returns: undefined
       }
@@ -592,9 +674,63 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: undefined
       }
+      set_persistent_service_key: {
+        Args: {
+          p_service_key: string
+        }
+        Returns: boolean
+      }
+      set_supabase_service_key: {
+        Args: {
+          service_key: string
+        }
+        Returns: undefined
+      }
       setup_follow_up_cron: {
         Args: Record<PropertyKey, never>
         Returns: undefined
+      }
+      simulate_http_request: {
+        Args: {
+          p_url: string
+          p_method?: string
+          p_headers?: Json
+          p_body?: Json
+        }
+        Returns: {
+          status_code: number
+          response_body: string
+          error_message: string
+        }[]
+      }
+      test_follow_up_endpoint: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
+      test_follow_up_endpoint_fallback: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          test_description: string
+          http_status_code: number
+          response_text: string
+          error_text: string
+        }[]
+      }
+      test_service_key_config: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          config_name: string
+          key_exists: boolean
+          key_value: string
+        }[]
+      }
+      test_service_key_configuration: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          config_status: string
+          key_exists: boolean
+          key_value: string
+        }[]
       }
     }
     Enums: {
