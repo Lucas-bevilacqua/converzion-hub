@@ -11,12 +11,7 @@ console.log("[INICIO] Função get-follow-up-contacts iniciada")
 
 serve(async (req) => {
   const startTime = new Date()
-  console.log(`[INICIO] ${startTime.toISOString()} - Iniciando execução da função get-follow-up-contacts`)
-  console.log('[DEBUG] Request recebido:', {
-    method: req.method,
-    url: req.url,
-    headers: Object.fromEntries(req.headers.entries())
-  })
+  console.log(`[${startTime.toISOString()}] Iniciando execução da função get-follow-up-contacts`)
   
   if (req.method === 'OPTIONS') {
     console.log('[DEBUG] Handling CORS preflight request')
@@ -29,11 +24,12 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
     
     if (!supabaseUrl || !supabaseKey) {
+      const error = new Error('Configurações do Supabase não encontradas')
       console.error('[ERRO] Variáveis de ambiente não encontradas:', { 
         temUrl: !!supabaseUrl, 
         temKey: !!supabaseKey 
       })
-      throw new Error('Configurações do Supabase não encontradas')
+      throw error
     }
 
     console.log('[DEBUG] Inicializando cliente Supabase')
