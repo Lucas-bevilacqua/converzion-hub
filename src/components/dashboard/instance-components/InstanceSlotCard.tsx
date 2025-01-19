@@ -29,7 +29,7 @@ export function InstanceSlotCard({
   const [qrCodeData, setQrCodeData] = useState<string | null>(null)
 
   // Query para verificar o estado do número
-  const { data: stateData } = useQuery({
+  const { data: stateData, error: stateError } = useQuery({
     queryKey: ['instanceState', instance?.id],
     queryFn: async () => {
       if (!instance?.id) return null
@@ -51,34 +51,37 @@ export function InstanceSlotCard({
         
         if (error) {
           console.error('Erro ao verificar estado do número:', error)
-          if (error.message && error.message.includes('subscription_required')) {
-            toast({
-              title: "Assinatura Necessária",
-              description: "Você precisa de uma assinatura ativa para usar este recurso.",
-              variant: "destructive",
-            })
-            return { state: 'disconnected' }
-          }
-          
-          toast({
-            title: "Erro",
-            description: "Falha ao verificar estado do número. Tente novamente.",
-            variant: "destructive",
-          })
-          return { state: 'error' }
+          throw error
         }
 
         const isConnected = data?.instance?.state === 'open'
         return { state: isConnected ? 'connected' : 'disconnected' }
       } catch (error) {
         console.error('Erro na verificação de estado:', error)
-        return { state: 'error' }
+        // Retorna o último estado conhecido em caso de erro de conexão
+        return { 
+          state: instance?.connection_status || 'disconnected',
+          error: true
+        }
       }
     },
     enabled: !!instance?.id,
     refetchInterval: 5000,
-    retry: false
+    retry: 2,
+    retryDelay: 1000
   })
+
+  // Se houver erro na verificação de estado, mostra toast apenas uma vez
+  React.useEffect(() => {
+    if (stateError) {
+      console.error('Erro ao verificar estado:', stateError)
+      toast({
+        title: "Erro de Conexão",
+        description: "Não foi possível verificar o estado do número. Tentando novamente...",
+        variant: "destructive",
+      })
+    }
+  }, [stateError])
 
   const handleDelete = async () => {
     if (!instance?.id) return
@@ -186,6 +189,7 @@ export function InstanceSlotCard({
                 <p className="text-sm text-muted-foreground">{instance.phone_number}</p>
                 <p className="text-sm text-muted-foreground">
                   Status: {isConnected ? 'Conectado' : 'Desconectado'}
+                  {stateData?.error && ' (Verificando...)'}
                 </p>
               </div>
             </div>
