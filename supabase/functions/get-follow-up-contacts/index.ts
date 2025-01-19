@@ -24,6 +24,21 @@ serve(async (req) => {
 
     console.log('📝 Initialized Supabase client')
 
+    // Log de execução na tabela cron_logs
+    const { error: logError } = await supabase
+      .from('cron_logs')
+      .insert([
+        {
+          job_name: 'get-follow-up-contacts-job',
+          status: 'started',
+          execution_time: new Date().toISOString()
+        }
+      ])
+
+    if (logError) {
+      console.error('❌ Error logging execution:', logError)
+    }
+
     // Buscar follow-ups ativos
     const { data: followUps, error: followUpsError } = await supabase
       .from('instance_follow_ups')
@@ -46,21 +61,6 @@ serve(async (req) => {
 
     console.log(`✅ Found ${followUps?.length || 0} active follow-ups`)
     console.log('📊 Active follow-ups:', followUps)
-
-    // Log de execução na tabela cron_logs
-    const { error: logError } = await supabase
-      .from('cron_logs')
-      .insert([
-        {
-          job_name: 'get-follow-up-contacts-job',
-          status: 'executed',
-          execution_time: new Date().toISOString()
-        }
-      ])
-
-    if (logError) {
-      console.error('❌ Error logging execution:', logError)
-    }
 
     if (!followUps?.length) {
       console.log('ℹ️ No active follow-ups found')
@@ -150,6 +150,7 @@ serve(async (req) => {
         }
 
         // Chamar a função de processamento
+        console.log('🚀 Calling process-follow-up function')
         const processingResponse = await fetch(
           'https://vodexhppkasbulogmcqb.supabase.co/functions/v1/process-follow-up',
           {
@@ -170,6 +171,7 @@ serve(async (req) => {
           throw new Error(`Failed to process follow-up: ${await processingResponse.text()}`)
         }
 
+        console.log('✅ Successfully processed follow-up')
         processedFollowUps.push({
           followUpId: followUp.id,
           instanceId: followUp.instance_id,
@@ -186,6 +188,17 @@ serve(async (req) => {
         })
       }
     }
+
+    // Atualizar log de execução
+    await supabase
+      .from('cron_logs')
+      .insert([
+        {
+          job_name: 'get-follow-up-contacts-job',
+          status: 'completed',
+          execution_time: new Date().toISOString()
+        }
+      ])
 
     console.log(`✅ Finished processing. Success: ${processedFollowUps.length}, Errors: ${errors.length}`)
 
