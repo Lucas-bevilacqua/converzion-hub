@@ -11,3 +11,9 @@ select
       ) as request_id;
     $$
   );
+
+-- Add logging trigger
+CREATE TRIGGER log_ai_follow_up_cron
+AFTER INSERT ON cron.job_run_details
+FOR EACH ROW
+EXECUTE FUNCTION log_ai_follow_up();
