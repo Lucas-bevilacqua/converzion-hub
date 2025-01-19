@@ -12,6 +12,11 @@ console.log("[INICIO] Função get-follow-up-contacts iniciada")
 serve(async (req) => {
   const startTime = new Date()
   console.log(`[INICIO] ${startTime.toISOString()} - Iniciando execução da função get-follow-up-contacts`)
+  console.log('[DEBUG] Request recebido:', {
+    method: req.method,
+    url: req.url,
+    headers: Object.fromEntries(req.headers.entries())
+  })
   
   if (req.method === 'OPTIONS') {
     console.log('[DEBUG] Handling CORS preflight request')
