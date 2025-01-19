@@ -684,6 +684,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: undefined
       }
+      execute_follow_up_job: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
       get_persistent_service_key: {
         Args: Record<PropertyKey, never>
         Returns: string
