@@ -10,7 +10,6 @@ serve(async (req) => {
   console.log('🚀 [DEBUG] Iniciando função process-follow-up')
   
   if (req.method === 'OPTIONS') {
-    console.log('👋 [DEBUG] Handling CORS preflight request')
     return new Response(null, { headers: corsHeaders })
   }
 
@@ -19,30 +18,27 @@ serve(async (req) => {
     console.log('📝 [DEBUG] Dados do contato recebidos:', JSON.stringify(contact, null, 2))
     
     if (!contact) {
-      console.error('❌ [ERROR] Dados do contato não fornecidos')
       throw new Error('Dados do contato não fornecidos')
     }
 
-    console.log('🔑 [DEBUG] Inicializando cliente Supabase')
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
+    // Determinar qual mensagem enviar
     let currentMessageIndex = -1
     if (contact.ConversationId?.startsWith('follow-up-sent-')) {
       currentMessageIndex = parseInt(contact.ConversationId.split('-').pop() || '-1')
     }
-    console.log(`📊 [DEBUG] Índice atual da mensagem: ${currentMessageIndex}`)
 
     const nextMessageIndex = currentMessageIndex + 1
     const manualMessages = Array.isArray(contact.followUp?.manual_messages) 
       ? contact.followUp.manual_messages 
       : []
 
-    console.log(`📝 [DEBUG] Total de mensagens manuais: ${manualMessages.length}`)
-    console.log(`📝 [DEBUG] Próximo índice: ${nextMessageIndex}`)
-    console.log('[DEBUG] Mensagens manuais:', JSON.stringify(manualMessages, null, 2))
+    console.log(`📝 [DEBUG] Índice atual: ${currentMessageIndex}, Próximo: ${nextMessageIndex}`)
+    console.log('📝 [DEBUG] Total de mensagens:', manualMessages.length)
 
     if (nextMessageIndex >= manualMessages.length) {
       console.log('✅ [DEBUG] Sequência de mensagens completa')
@@ -53,12 +49,10 @@ serve(async (req) => {
     }
 
     const nextMessage = manualMessages[nextMessageIndex]
-    console.log('📝 [DEBUG] Próxima mensagem:', JSON.stringify(nextMessage, null, 2))
+    console.log('📝 [DEBUG] Próxima mensagem:', nextMessage)
 
+    // Enviar mensagem via Evolution API
     const evolutionApiUrl = (Deno.env.get('EVOLUTION_API_URL') || '').replace(/\/$/, '')
-    console.log('🔗 [DEBUG] URL da Evolution API:', evolutionApiUrl)
-    
-    console.log('📤 [DEBUG] Enviando mensagem via Evolution API')
     const evolutionResponse = await fetch(
       `${evolutionApiUrl}/message/sendText/${contact.followUp.instanceName}`,
       {
@@ -76,15 +70,14 @@ serve(async (req) => {
 
     if (!evolutionResponse.ok) {
       const errorText = await evolutionResponse.text()
-      console.error('❌ [ERROR] Erro da Evolution API:', errorText)
       throw new Error(errorText)
     }
 
     const evolutionData = await evolutionResponse.json()
-    console.log('✅ [DEBUG] Resposta da Evolution API:', JSON.stringify(evolutionData, null, 2))
-    
-    console.log('📝 [DEBUG] Atualizando status do contato no Supabase')
-    const updateResponse = await supabaseClient
+    console.log('✅ [DEBUG] Mensagem enviada:', evolutionData)
+
+    // Atualizar status do contato
+    await supabaseClient
       .from('Users_clientes')
       .update({
         ConversationId: `follow-up-sent-${nextMessageIndex}`,
@@ -92,12 +85,8 @@ serve(async (req) => {
       })
       .eq('id', contact.id)
 
-    if (updateResponse.error) {
-      console.error('❌ [ERROR] Erro ao atualizar contato:', updateResponse.error)
-    }
-
-    console.log('📝 [DEBUG] Registrando mensagem no histórico')
-    const messageResponse = await supabaseClient
+    // Registrar mensagem
+    await supabaseClient
       .from('chat_messages')
       .insert({
         instance_id: contact.followUp.instance_id,
@@ -107,11 +96,6 @@ serve(async (req) => {
         whatsapp_message_id: evolutionData.key?.id
       })
 
-    if (messageResponse.error) {
-      console.error('❌ [ERROR] Erro ao registrar mensagem:', messageResponse.error)
-    }
-
-    console.log('✅ [DEBUG] Processamento concluído com sucesso')
     return new Response(
       JSON.stringify({ 
         success: true,
@@ -121,8 +105,7 @@ serve(async (req) => {
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   } catch (error) {
-    console.error('❌ [ERROR] Erro crítico:', error)
-    console.error('[ERROR] Stack do erro:', error.stack)
+    console.error('❌ [ERRO]:', error)
     return new Response(
       JSON.stringify({ error: error.message }),
       { 
