@@ -7,6 +7,8 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+console.log("[INICIO] Função get-follow-up-contacts iniciada")
+
 serve(async (req) => {
   const startTime = new Date()
   console.log(`[INICIO] ${startTime.toISOString()} - Iniciando execução da função get-follow-up-contacts`)
@@ -17,6 +19,7 @@ serve(async (req) => {
   }
 
   try {
+    console.log('[DEBUG] Verificando variáveis de ambiente')
     const supabaseUrl = Deno.env.get('SUPABASE_URL')
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
     
