@@ -7,14 +7,19 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-console.log("[INICIO] Função get-follow-up-contacts iniciada")
+console.log("[SISTEMA] Função get-follow-up-contacts carregada e pronta para execução")
 
 serve(async (req) => {
   const startTime = new Date()
-  console.log(`[${startTime.toISOString()}] Iniciando execução da função get-follow-up-contacts`)
+  console.log(`[${startTime.toISOString()}] ========== NOVA EXECUÇÃO ==========`)
+  console.log(`[${startTime.toISOString()}] Request recebido:`, {
+    method: req.method,
+    url: req.url,
+    headers: Object.fromEntries(req.headers.entries())
+  })
   
   if (req.method === 'OPTIONS') {
-    console.log('[DEBUG] Handling CORS preflight request')
+    console.log('[DEBUG] Tratando requisição CORS preflight')
     return new Response(null, { headers: corsHeaders })
   }
 
@@ -24,12 +29,11 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
     
     if (!supabaseUrl || !supabaseKey) {
-      const error = new Error('Configurações do Supabase não encontradas')
-      console.error('[ERRO] Variáveis de ambiente não encontradas:', { 
+      console.error('[ERRO CRÍTICO] Variáveis de ambiente não encontradas:', { 
         temUrl: !!supabaseUrl, 
         temKey: !!supabaseKey 
       })
-      throw error
+      throw new Error('Configurações do Supabase não encontradas')
     }
 
     console.log('[DEBUG] Inicializando cliente Supabase')
