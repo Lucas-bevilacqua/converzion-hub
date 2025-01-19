@@ -1,10 +1,10 @@
+import React, { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { MessageSquare, QrCode, Settings, LogOut, Trash2 } from "lucide-react"
 import { useQuery } from "@tanstack/react-query"
 import { supabase } from "@/integrations/supabase/client"
 import { useToast } from "@/components/ui/use-toast"
-import { useState } from "react"
 import { QRCodeDialog } from "./QRCodeDialog"
 import { InstancePromptDialog } from "./InstancePromptDialog"
 
