@@ -26,15 +26,19 @@ serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, supabaseKey)
 
-    // Log inicial no banco
+    // Log inicial
     console.log('📝 [DEBUG] Registrando início da execução')
-    await supabase
+    const { error: logError } = await supabase
       .from('cron_logs')
       .insert({
         job_name: 'get-follow-up-contacts',
         status: 'iniciado',
         execution_time: new Date().toISOString()
       })
+
+    if (logError) {
+      console.error('❌ [ERRO] Falha ao registrar log inicial:', logError)
+    }
 
     // Buscar follow-ups ativos
     console.log('🔍 [DEBUG] Buscando follow-ups ativos')
@@ -57,12 +61,26 @@ serve(async (req) => {
       throw followUpsError
     }
 
-    console.log(`📊 [DEBUG] Encontrados ${followUps?.length || 0} follow-ups ativos`)
+    if (!followUps?.length) {
+      console.log('ℹ️ [INFO] Nenhum follow-up ativo encontrado')
+      return new Response(
+        JSON.stringify({ 
+          success: true, 
+          message: 'Nenhum follow-up ativo encontrado',
+          processed: [],
+          errors: [],
+          timestamp: new Date().toISOString()
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    console.log(`📊 [DEBUG] Encontrados ${followUps.length} follow-ups ativos`)
 
     const processedFollowUps = []
     const errors = []
 
-    for (const followUp of followUps || []) {
+    for (const followUp of followUps) {
       try {
         console.log(`\n🔄 [DEBUG] Processando follow-up ID: ${followUp.id}`)
         
@@ -83,6 +101,7 @@ serve(async (req) => {
           .select('*')
           .eq('NomeDaEmpresa', followUp.instance_id)
           .not('TelefoneClientes', 'is', null)
+          .order('last_message_time', { ascending: true, nullsFirst: true })
 
         if (contactsError) {
           console.error('❌ [ERRO] Falha ao buscar contatos:', contactsError)
@@ -131,6 +150,16 @@ serve(async (req) => {
             const responseData = await processingResponse.json()
             console.log('✅ [DEBUG] Resposta do processamento:', JSON.stringify(responseData, null, 2))
 
+            // Atualizar último contato
+            const { error: updateError } = await supabase
+              .from('Users_clientes')
+              .update({ last_message_time: new Date().toISOString() })
+              .eq('id', contact.id)
+
+            if (updateError) {
+              console.error('❌ [ERRO] Falha ao atualizar último contato:', updateError)
+            }
+
             processedFollowUps.push({
               followUpId: followUp.id,
               instanceId: followUp.instance_id,
@@ -159,13 +188,17 @@ serve(async (req) => {
 
     // Log final de sucesso
     console.log('✅ [DEBUG] Processamento finalizado com sucesso')
-    await supabase
+    const { error: finalLogError } = await supabase
       .from('cron_logs')
       .insert({
         job_name: 'get-follow-up-contacts',
         status: 'completado',
         execution_time: new Date().toISOString()
       })
+
+    if (finalLogError) {
+      console.error('❌ [ERRO] Falha ao registrar log final:', finalLogError)
+    }
 
     return new Response(
       JSON.stringify({
@@ -185,19 +218,23 @@ serve(async (req) => {
   } catch (error) {
     console.error('❌ [ERRO CRÍTICO]:', error)
     
-    // Log do erro
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') || '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
-    )
-    
-    await supabase
-      .from('cron_logs')
-      .insert({
-        job_name: 'get-follow-up-contacts',
-        status: `erro: ${error.message}`,
-        execution_time: new Date().toISOString()
-      })
+    try {
+      // Log do erro
+      const supabase = createClient(
+        Deno.env.get('SUPABASE_URL') || '',
+        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
+      )
+      
+      await supabase
+        .from('cron_logs')
+        .insert({
+          job_name: 'get-follow-up-contacts',
+          status: `erro: ${error.message}`,
+          execution_time: new Date().toISOString()
+        })
+    } catch (logError) {
+      console.error('❌ [ERRO] Falha ao registrar erro:', logError)
+    }
 
     return new Response(
       JSON.stringify({ 
