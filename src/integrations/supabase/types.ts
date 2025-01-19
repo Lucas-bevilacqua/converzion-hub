@@ -576,6 +576,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_service_key: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
       invoke_follow_up: {
         Args: Record<PropertyKey, never>
         Returns: undefined
