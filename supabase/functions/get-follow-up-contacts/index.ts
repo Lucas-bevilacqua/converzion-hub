@@ -8,7 +8,7 @@ const corsHeaders = {
 }
 
 serve(async (req) => {
-  console.log('🔍 [DEBUG] Iniciando função get-follow-up-contacts')
+  console.log('🔍 [DEBUG] Iniciando função get-follow-up-contacts com timestamp:', new Date().toISOString())
   
   if (req.method === 'OPTIONS') {
     console.log('👋 [DEBUG] Handling CORS preflight request')
@@ -29,19 +29,6 @@ serve(async (req) => {
 
     console.log('🔑 [DEBUG] Inicializando cliente Supabase')
     const supabase = createClient(supabaseUrl, supabaseKey)
-
-    console.log('📝 [DEBUG] Registrando início da execução')
-    const { error: logError } = await supabase
-      .from('cron_logs')
-      .insert([{
-        job_name: 'get-follow-up-contacts-job',
-        status: 'started',
-        execution_time: currentTimestamp
-      }])
-
-    if (logError) {
-      console.error('❌ [ERROR] Erro ao registrar execução:', logError)
-    }
 
     console.log('🔍 [DEBUG] Buscando follow-ups ativos')
     const { data: followUps, error: followUpsError } = await supabase
@@ -64,7 +51,7 @@ serve(async (req) => {
     }
 
     console.log(`✅ [DEBUG] Encontrados ${followUps?.length || 0} follow-ups ativos`)
-    console.log('📊 [DEBUG] Follow-ups ativos:', JSON.stringify(followUps, null, 2))
+    console.log('[DEBUG] Follow-ups ativos:', JSON.stringify(followUps, null, 2))
 
     if (!followUps?.length) {
       console.log('ℹ️ [INFO] Nenhum follow-up ativo encontrado')
