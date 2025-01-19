@@ -8,7 +8,8 @@ const corsHeaders = {
 }
 
 serve(async (req) => {
-  console.log('🔍 [DEBUG] Iniciando função get-follow-up-contacts com timestamp:', new Date().toISOString())
+  const startTime = new Date()
+  console.log(`🚀 [${startTime.toISOString()}] Iniciando execução da função get-follow-up-contacts`)
   
   if (req.method === 'OPTIONS') {
     console.log('👋 [DEBUG] Handling CORS preflight request')
@@ -16,20 +17,18 @@ serve(async (req) => {
   }
 
   try {
-    const currentTimestamp = new Date().toISOString()
-    console.log(`⏰ [DEBUG] Timestamp atual: ${currentTimestamp}`)
-    
     const supabaseUrl = Deno.env.get('SUPABASE_URL')
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
     
     if (!supabaseUrl || !supabaseKey) {
-      console.error('❌ [ERROR] Configurações do Supabase não encontradas')
+      console.error('❌ [ERROR] Variáveis de ambiente não encontradas')
       throw new Error('Configurações do Supabase não encontradas')
     }
 
     console.log('🔑 [DEBUG] Inicializando cliente Supabase')
     const supabase = createClient(supabaseUrl, supabaseKey)
 
+    // Buscar follow-ups ativos
     console.log('🔍 [DEBUG] Buscando follow-ups ativos')
     const { data: followUps, error: followUpsError } = await supabase
       .from('instance_follow_ups')
@@ -50,15 +49,23 @@ serve(async (req) => {
       throw followUpsError
     }
 
-    console.log(`✅ [DEBUG] Encontrados ${followUps?.length || 0} follow-ups ativos`)
-    console.log('[DEBUG] Follow-ups ativos:', JSON.stringify(followUps, null, 2))
+    console.log(`📊 [DEBUG] Encontrados ${followUps?.length || 0} follow-ups ativos`)
+    
+    if (followUps?.length) {
+      console.log('📝 [DEBUG] Detalhes dos follow-ups:', JSON.stringify(followUps.map(f => ({
+        id: f.id,
+        instance_name: f.instance?.name,
+        connection_status: f.instance?.connection_status,
+        follow_up_type: f.follow_up_type
+      })), null, 2))
+    }
 
     if (!followUps?.length) {
       console.log('ℹ️ [INFO] Nenhum follow-up ativo encontrado')
       return new Response(
         JSON.stringify({ 
           success: true,
-          timestamp: currentTimestamp,
+          timestamp: startTime.toISOString(),
           message: 'Nenhum follow-up ativo encontrado',
           processed: [],
           errors: [] 
@@ -72,29 +79,20 @@ serve(async (req) => {
 
     for (const followUp of followUps) {
       try {
-        console.log(`🔄 [DEBUG] Processando follow-up ID: ${followUp.id}`)
-        console.log('[DEBUG] Detalhes do follow-up:', JSON.stringify(followUp, null, 2))
+        console.log(`\n🔄 [DEBUG] Processando follow-up ID: ${followUp.id}`)
         
         if (!followUp.instance?.id) {
           console.log(`⚠️ [WARN] Follow-up ${followUp.id} não tem instância associada`)
           continue
         }
 
-        console.log(`📱 [DEBUG] Status da conexão da instância: ${followUp.instance.connection_status}`)
+        console.log(`📱 [DEBUG] Status da conexão da instância ${followUp.instance.name}: ${followUp.instance.connection_status}`)
         if (followUp.instance.connection_status !== 'connected') {
-          console.log(`⚠️ [WARN] Instância ${followUp.instance.name} não está conectada. Status: ${followUp.instance.connection_status}`)
+          console.log(`⚠️ [WARN] Instância ${followUp.instance.name} não está conectada`)
           continue
         }
 
-        console.log('📝 [DEBUG] Verificando configuração das mensagens')
-        console.log('[DEBUG] Tipo de follow-up:', followUp.follow_up_type)
-        console.log('[DEBUG] Mensagens manuais:', JSON.stringify(followUp.manual_messages, null, 2))
-        
-        if (followUp.follow_up_type === 'manual' && (!followUp.manual_messages?.length)) {
-          console.log(`⚠️ [WARN] Nenhuma mensagem manual configurada para o follow-up: ${followUp.id}`)
-          continue
-        }
-
+        // Verificar contatos
         console.log(`🔍 [DEBUG] Buscando contatos para a instância: ${followUp.instance.name}`)
         const { data: contacts, error: contactsError } = await supabase
           .from('Users_clientes')
@@ -108,7 +106,16 @@ serve(async (req) => {
         }
 
         console.log(`📊 [DEBUG] Encontrados ${contacts?.length || 0} contatos para a instância ${followUp.instance.name}`)
-        console.log('[DEBUG] Primeiros 3 contatos para debug:', JSON.stringify(contacts?.slice(0, 3), null, 2))
+        
+        if (contacts?.length) {
+          console.log('📝 [DEBUG] Primeiros 3 contatos para debug:', 
+            JSON.stringify(contacts.slice(0, 3).map(c => ({
+              id: c.id,
+              telefone: c.TelefoneClientes,
+              conversation_id: c.ConversationId
+            })), null, 2)
+          )
+        }
 
         if (!contacts?.length) {
           console.log('⚠️ [WARN] Nenhum contato encontrado para follow-up')
@@ -168,7 +175,7 @@ serve(async (req) => {
         }
 
       } catch (error) {
-        console.error('❌ [ERROR] Erro ao processar follow-up:', error)
+        console.error(`❌ [ERROR] Erro ao processar follow-up ${followUp.id}:`, error)
         console.error('[ERROR] Stack do erro:', error.stack)
         errors.push({
           followUpId: followUp.id,
@@ -178,23 +185,17 @@ serve(async (req) => {
       }
     }
 
-    console.log('📝 [DEBUG] Registrando conclusão')
-    await supabase
-      .from('cron_logs')
-      .insert([{
-        job_name: 'get-follow-up-contacts-job',
-        status: 'completed',
-        execution_time: new Date().toISOString()
-      }])
-
-    console.log(`✅ [DEBUG] Processamento finalizado. Sucesso: ${processedFollowUps.length}, Erros: ${errors.length}`)
-    console.log('[DEBUG] Follow-ups processados:', JSON.stringify(processedFollowUps, null, 2))
-    console.log('[DEBUG] Erros:', JSON.stringify(errors, null, 2))
+    const endTime = new Date()
+    const executionTime = endTime.getTime() - startTime.getTime()
+    
+    console.log(`\n✅ [${endTime.toISOString()}] Processamento finalizado em ${executionTime}ms`)
+    console.log(`📊 [DEBUG] Resumo: ${processedFollowUps.length} processados, ${errors.length} erros`)
 
     return new Response(
       JSON.stringify({ 
         success: true,
-        timestamp: currentTimestamp,
+        timestamp: startTime.toISOString(),
+        executionTime,
         processed: processedFollowUps,
         errors 
       }),
