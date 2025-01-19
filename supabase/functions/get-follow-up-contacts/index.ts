@@ -8,38 +8,44 @@ const corsHeaders = {
 }
 
 serve(async (req) => {
-  // Handle CORS
+  console.log('🚀 Starting follow-up contacts function')
+  
   if (req.method === 'OPTIONS') {
+    console.log('👋 Handling CORS preflight request')
     return new Response(null, { headers: corsHeaders })
   }
 
   try {
     const currentTimestamp = new Date().toISOString()
-    console.log(`🚀 Starting follow-up contacts processing at: ${currentTimestamp}`)
+    console.log(`⏰ Current timestamp: ${currentTimestamp}`)
     
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    )
+    // Initialize Supabase client
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+    
+    if (!supabaseUrl || !supabaseKey) {
+      throw new Error('Missing Supabase configuration')
+    }
 
-    console.log('📝 Initialized Supabase client')
+    console.log('🔑 Initializing Supabase client')
+    const supabase = createClient(supabaseUrl, supabaseKey)
 
-    // Log de execução na tabela cron_logs
+    // Log execution start
+    console.log('📝 Logging execution start')
     const { error: logError } = await supabase
       .from('cron_logs')
-      .insert([
-        {
-          job_name: 'get-follow-up-contacts-job',
-          status: 'started',
-          execution_time: new Date().toISOString()
-        }
-      ])
+      .insert([{
+        job_name: 'get-follow-up-contacts-job',
+        status: 'started',
+        execution_time: currentTimestamp
+      }])
 
     if (logError) {
       console.error('❌ Error logging execution:', logError)
     }
 
-    // Buscar follow-ups ativos
+    // Fetch active follow-ups
+    console.log('🔍 Fetching active follow-ups')
     const { data: followUps, error: followUpsError } = await supabase
       .from('instance_follow_ups')
       .select(`
@@ -81,26 +87,27 @@ serve(async (req) => {
 
     for (const followUp of followUps) {
       try {
+        console.log(`🔄 Processing follow-up ID: ${followUp.id}`)
+        
         if (!followUp.instance?.id) {
           console.log(`⚠️ Follow-up ${followUp.id} has no associated instance`)
           continue
         }
 
-        // Verificar se a instância está conectada
+        // Check instance connection
         if (followUp.instance.connection_status !== 'connected') {
           console.log(`⚠️ Instance ${followUp.instance.name} is not connected. Status: ${followUp.instance.connection_status}`)
           continue
         }
 
-        console.log(`📝 Processing follow-up: { id: "${followUp.id}", instanceId: "${followUp.instance?.name}" }`)
-
-        // Verificar se há mensagens configuradas
+        // Check message configuration
         if (followUp.follow_up_type === 'manual' && (!followUp.manual_messages?.length)) {
           console.log(`⚠️ No manual messages configured for follow-up: ${followUp.id}`)
           continue
         }
 
-        // Buscar contatos que precisam de follow-up
+        // Fetch contacts
+        console.log(`🔍 Fetching contacts for instance: ${followUp.instance.name}`)
         const { data: contacts, error: contactsError } = await supabase
           .from('Users_clientes')
           .select('*')
@@ -112,15 +119,14 @@ serve(async (req) => {
           throw contactsError
         }
 
-        console.log(`📊 Found ${contacts?.length || 0} contacts to process for instance ${followUp.instance?.name}`)
-        console.log('📊 Contacts:', contacts)
+        console.log(`📊 Found ${contacts?.length || 0} contacts for instance ${followUp.instance.name}`)
 
         if (!contacts?.length) {
           console.log('⚠️ No contacts found for follow-up')
           continue
         }
 
-        // Verificar última mensagem
+        // Check last message timing
         const { data: lastMessage, error: messageError } = await supabase
           .from('chat_messages')
           .select('created_at')
@@ -138,18 +144,19 @@ serve(async (req) => {
           const lastMessageTime = new Date(lastMessage.created_at)
           const delayMinutes = followUp.delay_minutes || 60
           const nextMessageTime = new Date(lastMessageTime.getTime() + delayMinutes * 60000)
+          const currentTime = new Date()
 
           console.log(`⏰ Last message time: ${lastMessageTime.toISOString()}`)
           console.log(`⏰ Next message time: ${nextMessageTime.toISOString()}`)
-          console.log(`⏰ Current time: ${new Date().toISOString()}`)
+          console.log(`⏰ Current time: ${currentTime.toISOString()}`)
 
-          if (nextMessageTime > new Date()) {
+          if (nextMessageTime > currentTime) {
             console.log('⏳ Waiting for delay time to pass')
             continue
           }
         }
 
-        // Chamar a função de processamento
+        // Process follow-up
         console.log('🚀 Calling process-follow-up function')
         const processingResponse = await fetch(
           'https://vodexhppkasbulogmcqb.supabase.co/functions/v1/process-follow-up',
@@ -189,16 +196,14 @@ serve(async (req) => {
       }
     }
 
-    // Atualizar log de execução
+    // Log completion
     await supabase
       .from('cron_logs')
-      .insert([
-        {
-          job_name: 'get-follow-up-contacts-job',
-          status: 'completed',
-          execution_time: new Date().toISOString()
-        }
-      ])
+      .insert([{
+        job_name: 'get-follow-up-contacts-job',
+        status: 'completed',
+        execution_time: new Date().toISOString()
+      }])
 
     console.log(`✅ Finished processing. Success: ${processedFollowUps.length}, Errors: ${errors.length}`)
 
