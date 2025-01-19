@@ -17,13 +17,15 @@ serve(async (req) => {
 
   try {
     // Inicializar cliente Supabase
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')?.replace(/\/$/, '') // Remove trailing slash
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
 
     if (!supabaseUrl || !supabaseKey) {
+      console.error('❌ [ERRO] Credenciais do Supabase não encontradas:', { supabaseUrl: !!supabaseUrl, supabaseKey: !!supabaseKey })
       throw new Error('Credenciais do Supabase não encontradas')
     }
 
+    console.log('🔗 [DEBUG] URL do Supabase:', supabaseUrl)
     const supabase = createClient(supabaseUrl, supabaseKey)
 
     // Log inicial
@@ -119,10 +121,12 @@ serve(async (req) => {
           try {
             console.log(`\n👤 [DEBUG] Processando contato: ${contact.TelefoneClientes}`)
             
-            // Construir URL corretamente removendo a barra final se existir
-            const baseUrl = supabaseUrl.replace(/\/$/, '')
+            // Construir URL para process-follow-up
+            const processFollowUpUrl = `${supabaseUrl}/functions/v1/process-follow-up`
+            console.log('🔗 [DEBUG] URL do process-follow-up:', processFollowUpUrl)
+
             const processingResponse = await fetch(
-              `${baseUrl}/functions/v1/process-follow-up`,
+              processFollowUpUrl,
               {
                 method: 'POST',
                 headers: {
