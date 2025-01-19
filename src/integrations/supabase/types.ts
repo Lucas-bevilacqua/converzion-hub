@@ -581,6 +581,44 @@ export type Database = {
           },
         ]
       }
+      users_clientes: {
+        Row: {
+          conversationid: string | null
+          created_at: string
+          id: number
+          last_message_time: string | null
+          nomeclientes: string | null
+          nomedaempresa: string | null
+          telefoneclientes: string | null
+        }
+        Insert: {
+          conversationid?: string | null
+          created_at?: string
+          id?: never
+          last_message_time?: string | null
+          nomeclientes?: string | null
+          nomedaempresa?: string | null
+          telefoneclientes?: string | null
+        }
+        Update: {
+          conversationid?: string | null
+          created_at?: string
+          id?: never
+          last_message_time?: string | null
+          nomeclientes?: string | null
+          nomedaempresa?: string | null
+          telefoneclientes?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "users_clientes_nomedaempresa_fkey"
+            columns: ["nomedaempresa"]
+            isOneToOne: false
+            referencedRelation: "evolution_instances"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       Users_clientes: {
         Row: {
           ConversationId: string | null
