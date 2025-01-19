@@ -21,12 +21,25 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
     
     if (!supabaseUrl || !supabaseKey) {
-      console.error('❌ [ERROR] Variáveis de ambiente não encontradas')
+      console.error('❌ [ERROR] Variáveis de ambiente não encontradas:', { supabaseUrl: !!supabaseUrl, supabaseKey: !!supabaseKey })
       throw new Error('Configurações do Supabase não encontradas')
     }
 
     console.log('🔑 [DEBUG] Inicializando cliente Supabase')
     const supabase = createClient(supabaseUrl, supabaseKey)
+
+    // Registrar execução no log
+    const { error: logError } = await supabase
+      .from('cron_logs')
+      .insert({
+        job_name: 'get-follow-up-contacts',
+        status: 'started',
+        execution_time: new Date().toISOString()
+      })
+
+    if (logError) {
+      console.error('❌ [ERROR] Erro ao registrar log inicial:', logError)
+    }
 
     // Buscar follow-ups ativos
     console.log('🔍 [DEBUG] Buscando follow-ups ativos')
@@ -46,6 +59,16 @@ serve(async (req) => {
 
     if (followUpsError) {
       console.error('❌ [ERROR] Erro ao buscar follow-ups:', followUpsError)
+      
+      // Registrar erro no log
+      await supabase
+        .from('cron_logs')
+        .insert({
+          job_name: 'get-follow-up-contacts',
+          status: `error: ${followUpsError.message}`,
+          execution_time: new Date().toISOString()
+        })
+      
       throw followUpsError
     }
 
@@ -60,24 +83,10 @@ serve(async (req) => {
       })), null, 2))
     }
 
-    if (!followUps?.length) {
-      console.log('ℹ️ [INFO] Nenhum follow-up ativo encontrado')
-      return new Response(
-        JSON.stringify({ 
-          success: true,
-          timestamp: startTime.toISOString(),
-          message: 'Nenhum follow-up ativo encontrado',
-          processed: [],
-          errors: [] 
-        }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
-    }
-
     const processedFollowUps = []
     const errors = []
 
-    for (const followUp of followUps) {
+    for (const followUp of followUps || []) {
       try {
         console.log(`\n🔄 [DEBUG] Processando follow-up ID: ${followUp.id}`)
         
@@ -108,7 +117,7 @@ serve(async (req) => {
         console.log(`📊 [DEBUG] Encontrados ${contacts?.length || 0} contatos para a instância ${followUp.instance.name}`)
         
         if (contacts?.length) {
-          console.log('📝 [DEBUG] Primeiros 3 contatos para debug:', 
+          console.log('📝 [DEBUG] Primeiros 3 contatos:', 
             JSON.stringify(contacts.slice(0, 3).map(c => ({
               id: c.id,
               telefone: c.TelefoneClientes,
@@ -118,7 +127,7 @@ serve(async (req) => {
         }
 
         if (!contacts?.length) {
-          console.log('⚠️ [WARN] Nenhum contato encontrado para follow-up')
+          console.log(`⚠️ [WARN] Nenhum contato encontrado para follow-up da instância ${followUp.instance.name}`)
           continue
         }
 
@@ -132,7 +141,7 @@ serve(async (req) => {
                 method: 'POST',
                 headers: {
                   'Content-Type': 'application/json',
-                  'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`
+                  'Authorization': `Bearer ${supabaseKey}`
                 },
                 body: JSON.stringify({
                   contact: {
@@ -176,7 +185,6 @@ serve(async (req) => {
 
       } catch (error) {
         console.error(`❌ [ERROR] Erro ao processar follow-up ${followUp.id}:`, error)
-        console.error('[ERROR] Stack do erro:', error.stack)
         errors.push({
           followUpId: followUp.id,
           error: error.message,
@@ -191,6 +199,15 @@ serve(async (req) => {
     console.log(`\n✅ [${endTime.toISOString()}] Processamento finalizado em ${executionTime}ms`)
     console.log(`📊 [DEBUG] Resumo: ${processedFollowUps.length} processados, ${errors.length} erros`)
 
+    // Registrar sucesso no log
+    await supabase
+      .from('cron_logs')
+      .insert({
+        job_name: 'get-follow-up-contacts',
+        status: 'completed successfully',
+        execution_time: new Date().toISOString()
+      })
+
     return new Response(
       JSON.stringify({ 
         success: true,
@@ -204,7 +221,22 @@ serve(async (req) => {
 
   } catch (error) {
     console.error('❌ [ERROR] Erro crítico:', error)
-    console.error('[ERROR] Stack do erro:', error.stack)
+    
+    // Registrar erro no log
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+    
+    if (supabaseUrl && supabaseKey) {
+      const supabase = createClient(supabaseUrl, supabaseKey)
+      await supabase
+        .from('cron_logs')
+        .insert({
+          job_name: 'get-follow-up-contacts',
+          status: `error: ${error.message}`,
+          execution_time: new Date().toISOString()
+        })
+    }
+
     return new Response(
       JSON.stringify({ 
         success: false,
