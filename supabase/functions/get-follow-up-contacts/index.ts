@@ -24,14 +24,15 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
     
     if (!supabaseUrl || !supabaseKey) {
+      console.error('❌ Missing Supabase configuration')
       throw new Error('Missing Supabase configuration')
     }
 
     console.log('🔑 Initializing Supabase client')
     const supabase = createClient(supabaseUrl, supabaseKey)
 
-    // Log execution start
-    console.log('📝 Logging execution start')
+    // Log execution start with more details
+    console.log('📝 Logging execution start with details')
     const { error: logError } = await supabase
       .from('cron_logs')
       .insert([{
@@ -44,7 +45,7 @@ serve(async (req) => {
       console.error('❌ Error logging execution:', logError)
     }
 
-    // Fetch active follow-ups
+    // Fetch active follow-ups with more detailed logging
     console.log('🔍 Fetching active follow-ups')
     const { data: followUps, error: followUpsError } = await supabase
       .from('instance_follow_ups')
@@ -88,25 +89,31 @@ serve(async (req) => {
     for (const followUp of followUps) {
       try {
         console.log(`🔄 Processing follow-up ID: ${followUp.id}`)
+        console.log('Follow-up details:', JSON.stringify(followUp, null, 2))
         
         if (!followUp.instance?.id) {
           console.log(`⚠️ Follow-up ${followUp.id} has no associated instance`)
           continue
         }
 
-        // Check instance connection
+        // Check instance connection with detailed logging
+        console.log(`📱 Instance connection status: ${followUp.instance.connection_status}`)
         if (followUp.instance.connection_status !== 'connected') {
           console.log(`⚠️ Instance ${followUp.instance.name} is not connected. Status: ${followUp.instance.connection_status}`)
           continue
         }
 
-        // Check message configuration
+        // Check message configuration with detailed logging
+        console.log('📝 Checking message configuration')
+        console.log('Follow-up type:', followUp.follow_up_type)
+        console.log('Manual messages:', followUp.manual_messages)
+        
         if (followUp.follow_up_type === 'manual' && (!followUp.manual_messages?.length)) {
           console.log(`⚠️ No manual messages configured for follow-up: ${followUp.id}`)
           continue
         }
 
-        // Fetch contacts
+        // Fetch contacts with detailed logging
         console.log(`🔍 Fetching contacts for instance: ${followUp.instance.name}`)
         const { data: contacts, error: contactsError } = await supabase
           .from('Users_clientes')
@@ -120,13 +127,15 @@ serve(async (req) => {
         }
 
         console.log(`📊 Found ${contacts?.length || 0} contacts for instance ${followUp.instance.name}`)
+        console.log('First 3 contacts for debugging:', contacts?.slice(0, 3))
 
         if (!contacts?.length) {
           console.log('⚠️ No contacts found for follow-up')
           continue
         }
 
-        // Check last message timing
+        // Check last message timing with detailed logging
+        console.log('⏰ Checking last message timing')
         const { data: lastMessage, error: messageError } = await supabase
           .from('chat_messages')
           .select('created_at')
@@ -149,6 +158,7 @@ serve(async (req) => {
           console.log(`⏰ Last message time: ${lastMessageTime.toISOString()}`)
           console.log(`⏰ Next message time: ${nextMessageTime.toISOString()}`)
           console.log(`⏰ Current time: ${currentTime.toISOString()}`)
+          console.log(`⏰ Delay minutes: ${delayMinutes}`)
 
           if (nextMessageTime > currentTime) {
             console.log('⏳ Waiting for delay time to pass')
@@ -156,7 +166,7 @@ serve(async (req) => {
           }
         }
 
-        // Process follow-up
+        // Process follow-up with detailed logging
         console.log('🚀 Calling process-follow-up function')
         const processingResponse = await fetch(
           'https://vodexhppkasbulogmcqb.supabase.co/functions/v1/process-follow-up',
@@ -175,8 +185,13 @@ serve(async (req) => {
         )
 
         if (!processingResponse.ok) {
-          throw new Error(`Failed to process follow-up: ${await processingResponse.text()}`)
+          const errorText = await processingResponse.text()
+          console.error('❌ Error from process-follow-up:', errorText)
+          throw new Error(`Failed to process follow-up: ${errorText}`)
         }
+
+        const responseData = await processingResponse.json()
+        console.log('✅ Process follow-up response:', responseData)
 
         console.log('✅ Successfully processed follow-up')
         processedFollowUps.push({
@@ -188,6 +203,7 @@ serve(async (req) => {
 
       } catch (error) {
         console.error('❌ Error processing follow-up:', error)
+        console.error('Error stack:', error.stack)
         errors.push({
           followUpId: followUp.id,
           error: error.message,
@@ -196,7 +212,8 @@ serve(async (req) => {
       }
     }
 
-    // Log completion
+    // Log completion with details
+    console.log('📝 Logging completion')
     await supabase
       .from('cron_logs')
       .insert([{
@@ -206,6 +223,8 @@ serve(async (req) => {
       }])
 
     console.log(`✅ Finished processing. Success: ${processedFollowUps.length}, Errors: ${errors.length}`)
+    console.log('Processed follow-ups:', processedFollowUps)
+    console.log('Errors:', errors)
 
     return new Response(
       JSON.stringify({ 
@@ -219,6 +238,7 @@ serve(async (req) => {
 
   } catch (error) {
     console.error('❌ Critical error:', error)
+    console.error('Error stack:', error.stack)
     return new Response(
       JSON.stringify({ 
         success: false,
