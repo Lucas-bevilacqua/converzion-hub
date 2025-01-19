@@ -584,6 +584,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: undefined
       }
+      setup_follow_up_cron: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
     }
     Enums: {
       follow_up_type: "automatic" | "ai_generated" | "manual"
