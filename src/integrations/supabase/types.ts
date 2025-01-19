@@ -580,6 +580,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: undefined
       }
+      process_follow_up_contacts: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
     }
     Enums: {
       follow_up_type: "automatic" | "ai_generated" | "manual"

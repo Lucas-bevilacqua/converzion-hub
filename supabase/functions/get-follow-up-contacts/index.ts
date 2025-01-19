@@ -33,7 +33,8 @@ serve(async (req) => {
           id,
           name,
           user_id,
-          phone_number
+          phone_number,
+          connection_status
         )
       `)
       .eq('is_active', true)
@@ -44,6 +45,7 @@ serve(async (req) => {
     }
 
     console.log(`✅ Found ${followUps?.length || 0} active follow-ups`)
+    console.log('📊 Active follow-ups:', followUps)
 
     // Log de execução na tabela cron_logs
     const { error: logError } = await supabase
@@ -84,6 +86,12 @@ serve(async (req) => {
           continue
         }
 
+        // Verificar se a instância está conectada
+        if (followUp.instance.connection_status !== 'connected') {
+          console.log(`⚠️ Instance ${followUp.instance.name} is not connected. Status: ${followUp.instance.connection_status}`)
+          continue
+        }
+
         console.log(`📝 Processing follow-up: { id: "${followUp.id}", instanceId: "${followUp.instance?.name}" }`)
 
         // Verificar se há mensagens configuradas
@@ -105,6 +113,7 @@ serve(async (req) => {
         }
 
         console.log(`📊 Found ${contacts?.length || 0} contacts to process for instance ${followUp.instance?.name}`)
+        console.log('📊 Contacts:', contacts)
 
         if (!contacts?.length) {
           console.log('⚠️ No contacts found for follow-up')
@@ -138,6 +147,27 @@ serve(async (req) => {
             console.log('⏳ Waiting for delay time to pass')
             continue
           }
+        }
+
+        // Chamar a função de processamento
+        const processingResponse = await fetch(
+          'https://vodexhppkasbulogmcqb.supabase.co/functions/v1/process-follow-up',
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`
+            },
+            body: JSON.stringify({
+              followUpId: followUp.id,
+              instanceId: followUp.instance_id,
+              contacts: contacts
+            })
+          }
+        )
+
+        if (!processingResponse.ok) {
+          throw new Error(`Failed to process follow-up: ${await processingResponse.text()}`)
         }
 
         processedFollowUps.push({
