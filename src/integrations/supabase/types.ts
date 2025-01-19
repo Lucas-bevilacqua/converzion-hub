@@ -588,6 +588,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: undefined
       }
+      process_follow_up_job: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
       setup_follow_up_cron: {
         Args: Record<PropertyKey, never>
         Returns: undefined
