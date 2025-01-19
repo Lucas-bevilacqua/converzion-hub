@@ -11,7 +11,8 @@ console.log('🚀 Starting process-ai-follow-up function');
 
 serve(async (req) => {
   const executionId = crypto.randomUUID();
-  console.log(`[${executionId}] 📥 Received ${req.method} request`);
+  const startTime = new Date().toISOString();
+  console.log(`[${executionId}] 📥 Received ${req.method} request at ${startTime}`);
   
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -44,14 +45,16 @@ serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseKey);
     console.log(`[${executionId}] ✅ Supabase client initialized`);
 
-    // Log execution start
+    // Log execution start with more details
     const { data: logEntry, error: logError } = await supabase
       .from('ai_follow_up_logs')
       .insert({
         status: 'started',
         details: { 
           execution_id: executionId,
-          start_time: new Date().toISOString()
+          start_time: startTime,
+          trigger_type: req.method === 'POST' ? 'manual' : 'scheduled',
+          request_body: await req.clone().text()
         }
       })
       .select()
@@ -64,7 +67,7 @@ serve(async (req) => {
 
     console.log(`[${executionId}] ✅ Created execution log:`, logEntry);
 
-    // Fetch active follow-ups
+    // Fetch active follow-ups with detailed logging
     console.log(`[${executionId}] 🔍 Fetching active AI follow-ups...`);
     
     const { data: activeFollowUps, error: followUpsError } = await supabase
@@ -128,13 +131,14 @@ serve(async (req) => {
     const processedFollowUps = [];
     const errors = [];
 
-    // Process each follow-up
+    // Process each follow-up with detailed logging
     for (const followUp of activeFollowUps) {
       try {
         console.log(`[${executionId}] 📝 Processing follow-up:`, {
           id: followUp.id,
           instanceId: followUp.instance_id,
-          instanceName: followUp.instance?.name
+          instanceName: followUp.instance?.name,
+          processStartTime: new Date().toISOString()
         });
 
         if (!followUp.instance?.name || !followUp.instance?.phone_number) {
@@ -160,8 +164,16 @@ serve(async (req) => {
           const delayMinutes = followUp.delay_minutes || 60;
           const nextMessageTime = new Date(lastMessageTime.getTime() + delayMinutes * 60000);
 
+          console.log(`[${executionId}] ⏱️ Delay check for instance ${followUp.instance?.name}:`, {
+            lastMessageTime: lastMessageTime.toISOString(),
+            delayMinutes,
+            nextMessageTime: nextMessageTime.toISOString(),
+            currentTime: new Date().toISOString(),
+            shouldWait: nextMessageTime > new Date()
+          });
+
           if (nextMessageTime > new Date()) {
-            console.log(`[${executionId}] ⏳ Ainda não passou o tempo de delay para:`, followUp.instance_id);
+            console.log(`[${executionId}] ⏳ Waiting for delay time to pass for:`, followUp.instance_id);
             continue;
           }
         }
@@ -337,20 +349,27 @@ serve(async (req) => {
 
         processedFollowUps.push({
           id: followUp.id,
-          messageId: evolutionData.key?.id
+          messageId: evolutionData?.key?.id,
+          processEndTime: new Date().toISOString()
         });
 
       } catch (error) {
-        console.error(`[${executionId}] ❌ Error processing follow-up:`, error);
+        console.error(`[${executionId}] ❌ Error processing follow-up:`, {
+          followUpId: followUp.id,
+          error: error.message,
+          timestamp: new Date().toISOString()
+        });
         errors.push({
           type: 'follow_up_processing_error',
           followUpId: followUp.id,
-          error: error.message
+          error: error.message,
+          timestamp: new Date().toISOString()
         });
       }
     }
 
-    // Update final status in log
+    // Update final status in log with detailed information
+    const endTime = new Date().toISOString();
     const finalStatus = errors.length > 0 
       ? `completed with ${errors.length} errors` 
       : 'completed successfully';
@@ -363,14 +382,20 @@ serve(async (req) => {
           execution_id: executionId,
           processed: processedFollowUps,
           errors,
-          end_time: new Date().toISOString()
+          start_time: startTime,
+          end_time: endTime,
+          total_duration_ms: new Date(endTime).getTime() - new Date(startTime).getTime(),
+          total_follow_ups: activeFollowUps.length,
+          processed_count: processedFollowUps.length,
+          error_count: errors.length
         }
       })
       .eq('id', logEntry.id);
 
     console.log(`[${executionId}] 🏁 Processing completed:`, {
       processed: processedFollowUps.length,
-      errors: errors.length
+      errors: errors.length,
+      duration: `${new Date(endTime).getTime() - new Date(startTime).getTime()}ms`
     });
 
     return new Response(
@@ -379,18 +404,21 @@ serve(async (req) => {
         message: 'Follow-ups processed',
         execution_id: executionId,
         processed: processedFollowUps,
-        errors
+        errors,
+        duration: `${new Date(endTime).getTime() - new Date(startTime).getTime()}ms`
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
   } catch (error) {
-    console.error(`[${executionId}] ❌ Critical error:`, error);
+    const errorTime = new Date().toISOString();
+    console.error(`[${executionId}] ❌ Critical error at ${errorTime}:`, error);
     return new Response(
       JSON.stringify({ 
         success: false,
         execution_id: executionId,
-        error: error.message 
+        error: error.message,
+        timestamp: errorTime
       }),
       { 
         status: 500,
