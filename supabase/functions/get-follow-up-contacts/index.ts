@@ -32,7 +32,7 @@ serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseKey)
 
     // Log execution start with more details
-    console.log('📝 Logging execution start with details')
+    console.log('📝 Logging execution start')
     const { error: logError } = await supabase
       .from('cron_logs')
       .insert([{
@@ -134,72 +134,59 @@ serve(async (req) => {
           continue
         }
 
-        // Check last message timing with detailed logging
-        console.log('⏰ Checking last message timing')
-        const { data: lastMessage, error: messageError } = await supabase
-          .from('chat_messages')
-          .select('created_at')
-          .eq('instance_id', followUp.instance_id)
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .single()
+        // Process each contact
+        for (const contact of contacts) {
+          try {
+            console.log(`🔄 Processing contact: ${contact.TelefoneClientes}`)
+            
+            // Call process-follow-up function for each contact
+            const processingResponse = await fetch(
+              'https://vodexhppkasbulogmcqb.supabase.co/functions/v1/process-follow-up',
+              {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`
+                },
+                body: JSON.stringify({
+                  contact: {
+                    ...contact,
+                    followUp: {
+                      ...followUp,
+                      instance_id: followUp.instance_id,
+                      instanceName: followUp.instance.name,
+                      userId: followUp.instance.user_id
+                    }
+                  }
+                })
+              }
+            )
 
-        if (messageError && !messageError.message.includes('No rows found')) {
-          console.error('❌ Error fetching last message:', messageError)
-          throw messageError
-        }
+            if (!processingResponse.ok) {
+              const errorText = await processingResponse.text()
+              console.error('❌ Error from process-follow-up:', errorText)
+              throw new Error(`Failed to process follow-up: ${errorText}`)
+            }
 
-        if (lastMessage) {
-          const lastMessageTime = new Date(lastMessage.created_at)
-          const delayMinutes = followUp.delay_minutes || 60
-          const nextMessageTime = new Date(lastMessageTime.getTime() + delayMinutes * 60000)
-          const currentTime = new Date()
+            const responseData = await processingResponse.json()
+            console.log('✅ Process follow-up response:', responseData)
 
-          console.log(`⏰ Last message time: ${lastMessageTime.toISOString()}`)
-          console.log(`⏰ Next message time: ${nextMessageTime.toISOString()}`)
-          console.log(`⏰ Current time: ${currentTime.toISOString()}`)
-          console.log(`⏰ Delay minutes: ${delayMinutes}`)
-
-          if (nextMessageTime > currentTime) {
-            console.log('⏳ Waiting for delay time to pass')
-            continue
-          }
-        }
-
-        // Process follow-up with detailed logging
-        console.log('🚀 Calling process-follow-up function')
-        const processingResponse = await fetch(
-          'https://vodexhppkasbulogmcqb.supabase.co/functions/v1/process-follow-up',
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`
-            },
-            body: JSON.stringify({
+            processedFollowUps.push({
               followUpId: followUp.id,
               instanceId: followUp.instance_id,
-              contacts: contacts
+              contactId: contact.id,
+              timestamp: new Date().toISOString()
+            })
+          } catch (contactError) {
+            console.error(`❌ Error processing contact ${contact.id}:`, contactError)
+            errors.push({
+              followUpId: followUp.id,
+              contactId: contact.id,
+              error: contactError.message,
+              timestamp: new Date().toISOString()
             })
           }
-        )
-
-        if (!processingResponse.ok) {
-          const errorText = await processingResponse.text()
-          console.error('❌ Error from process-follow-up:', errorText)
-          throw new Error(`Failed to process follow-up: ${errorText}`)
         }
-
-        const responseData = await processingResponse.json()
-        console.log('✅ Process follow-up response:', responseData)
-
-        console.log('✅ Successfully processed follow-up')
-        processedFollowUps.push({
-          followUpId: followUp.id,
-          instanceId: followUp.instance_id,
-          contactsCount: contacts.length,
-          timestamp: new Date().toISOString()
-        })
 
       } catch (error) {
         console.error('❌ Error processing follow-up:', error)
