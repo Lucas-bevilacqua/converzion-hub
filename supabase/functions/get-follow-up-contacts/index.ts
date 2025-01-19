@@ -8,29 +8,29 @@ const corsHeaders = {
 }
 
 serve(async (req) => {
-  console.log('🔍 Iniciando função get-follow-up-contacts')
+  console.log('🔍 [DEBUG] Iniciando função get-follow-up-contacts')
   
   if (req.method === 'OPTIONS') {
-    console.log('👋 Handling CORS preflight request')
+    console.log('👋 [DEBUG] Handling CORS preflight request')
     return new Response(null, { headers: corsHeaders })
   }
 
   try {
     const currentTimestamp = new Date().toISOString()
-    console.log(`⏰ Timestamp atual: ${currentTimestamp}`)
+    console.log(`⏰ [DEBUG] Timestamp atual: ${currentTimestamp}`)
     
     const supabaseUrl = Deno.env.get('SUPABASE_URL')
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
     
     if (!supabaseUrl || !supabaseKey) {
-      console.error('❌ Erro: Configurações do Supabase não encontradas')
+      console.error('❌ [ERROR] Configurações do Supabase não encontradas')
       throw new Error('Configurações do Supabase não encontradas')
     }
 
-    console.log('🔑 Inicializando cliente Supabase')
+    console.log('🔑 [DEBUG] Inicializando cliente Supabase')
     const supabase = createClient(supabaseUrl, supabaseKey)
 
-    console.log('📝 Registrando início da execução')
+    console.log('📝 [DEBUG] Registrando início da execução')
     const { error: logError } = await supabase
       .from('cron_logs')
       .insert([{
@@ -40,10 +40,10 @@ serve(async (req) => {
       }])
 
     if (logError) {
-      console.error('❌ Erro ao registrar execução:', logError)
+      console.error('❌ [ERROR] Erro ao registrar execução:', logError)
     }
 
-    console.log('🔍 Buscando follow-ups ativos')
+    console.log('🔍 [DEBUG] Buscando follow-ups ativos')
     const { data: followUps, error: followUpsError } = await supabase
       .from('instance_follow_ups')
       .select(`
@@ -59,15 +59,15 @@ serve(async (req) => {
       .eq('is_active', true)
 
     if (followUpsError) {
-      console.error('❌ Erro ao buscar follow-ups:', followUpsError)
+      console.error('❌ [ERROR] Erro ao buscar follow-ups:', followUpsError)
       throw followUpsError
     }
 
-    console.log(`✅ Encontrados ${followUps?.length || 0} follow-ups ativos`)
-    console.log('📊 Follow-ups ativos:', followUps)
+    console.log(`✅ [DEBUG] Encontrados ${followUps?.length || 0} follow-ups ativos`)
+    console.log('📊 [DEBUG] Follow-ups ativos:', JSON.stringify(followUps, null, 2))
 
     if (!followUps?.length) {
-      console.log('ℹ️ Nenhum follow-up ativo encontrado')
+      console.log('ℹ️ [INFO] Nenhum follow-up ativo encontrado')
       return new Response(
         JSON.stringify({ 
           success: true,
@@ -85,30 +85,30 @@ serve(async (req) => {
 
     for (const followUp of followUps) {
       try {
-        console.log(`🔄 Processando follow-up ID: ${followUp.id}`)
-        console.log('Detalhes do follow-up:', JSON.stringify(followUp, null, 2))
+        console.log(`🔄 [DEBUG] Processando follow-up ID: ${followUp.id}`)
+        console.log('[DEBUG] Detalhes do follow-up:', JSON.stringify(followUp, null, 2))
         
         if (!followUp.instance?.id) {
-          console.log(`⚠️ Follow-up ${followUp.id} não tem instância associada`)
+          console.log(`⚠️ [WARN] Follow-up ${followUp.id} não tem instância associada`)
           continue
         }
 
-        console.log(`📱 Status da conexão da instância: ${followUp.instance.connection_status}`)
+        console.log(`📱 [DEBUG] Status da conexão da instância: ${followUp.instance.connection_status}`)
         if (followUp.instance.connection_status !== 'connected') {
-          console.log(`⚠️ Instância ${followUp.instance.name} não está conectada. Status: ${followUp.instance.connection_status}`)
+          console.log(`⚠️ [WARN] Instância ${followUp.instance.name} não está conectada. Status: ${followUp.instance.connection_status}`)
           continue
         }
 
-        console.log('📝 Verificando configuração das mensagens')
-        console.log('Tipo de follow-up:', followUp.follow_up_type)
-        console.log('Mensagens manuais:', followUp.manual_messages)
+        console.log('📝 [DEBUG] Verificando configuração das mensagens')
+        console.log('[DEBUG] Tipo de follow-up:', followUp.follow_up_type)
+        console.log('[DEBUG] Mensagens manuais:', JSON.stringify(followUp.manual_messages, null, 2))
         
         if (followUp.follow_up_type === 'manual' && (!followUp.manual_messages?.length)) {
-          console.log(`⚠️ Nenhuma mensagem manual configurada para o follow-up: ${followUp.id}`)
+          console.log(`⚠️ [WARN] Nenhuma mensagem manual configurada para o follow-up: ${followUp.id}`)
           continue
         }
 
-        console.log(`🔍 Buscando contatos para a instância: ${followUp.instance.name}`)
+        console.log(`🔍 [DEBUG] Buscando contatos para a instância: ${followUp.instance.name}`)
         const { data: contacts, error: contactsError } = await supabase
           .from('Users_clientes')
           .select('*')
@@ -116,21 +116,21 @@ serve(async (req) => {
           .not('TelefoneClientes', 'is', null)
 
         if (contactsError) {
-          console.error('❌ Erro ao buscar contatos:', contactsError)
+          console.error('❌ [ERROR] Erro ao buscar contatos:', contactsError)
           throw contactsError
         }
 
-        console.log(`📊 Encontrados ${contacts?.length || 0} contatos para a instância ${followUp.instance.name}`)
-        console.log('Primeiros 3 contatos para debug:', contacts?.slice(0, 3))
+        console.log(`📊 [DEBUG] Encontrados ${contacts?.length || 0} contatos para a instância ${followUp.instance.name}`)
+        console.log('[DEBUG] Primeiros 3 contatos para debug:', JSON.stringify(contacts?.slice(0, 3), null, 2))
 
         if (!contacts?.length) {
-          console.log('⚠️ Nenhum contato encontrado para follow-up')
+          console.log('⚠️ [WARN] Nenhum contato encontrado para follow-up')
           continue
         }
 
         for (const contact of contacts) {
           try {
-            console.log(`🔄 Processando contato: ${contact.TelefoneClientes}`)
+            console.log(`🔄 [DEBUG] Processando contato: ${contact.TelefoneClientes}`)
             
             const processingResponse = await fetch(
               'https://vodexhppkasbulogmcqb.supabase.co/functions/v1/process-follow-up',
@@ -156,12 +156,12 @@ serve(async (req) => {
 
             if (!processingResponse.ok) {
               const errorText = await processingResponse.text()
-              console.error('❌ Erro da função process-follow-up:', errorText)
+              console.error('❌ [ERROR] Erro da função process-follow-up:', errorText)
               throw new Error(`Falha ao processar follow-up: ${errorText}`)
             }
 
             const responseData = await processingResponse.json()
-            console.log('✅ Resposta do process-follow-up:', responseData)
+            console.log('✅ [DEBUG] Resposta do process-follow-up:', JSON.stringify(responseData, null, 2))
 
             processedFollowUps.push({
               followUpId: followUp.id,
@@ -170,7 +170,7 @@ serve(async (req) => {
               timestamp: new Date().toISOString()
             })
           } catch (contactError) {
-            console.error(`❌ Erro ao processar contato ${contact.id}:`, contactError)
+            console.error(`❌ [ERROR] Erro ao processar contato ${contact.id}:`, contactError)
             errors.push({
               followUpId: followUp.id,
               contactId: contact.id,
@@ -181,8 +181,8 @@ serve(async (req) => {
         }
 
       } catch (error) {
-        console.error('❌ Erro ao processar follow-up:', error)
-        console.error('Stack do erro:', error.stack)
+        console.error('❌ [ERROR] Erro ao processar follow-up:', error)
+        console.error('[ERROR] Stack do erro:', error.stack)
         errors.push({
           followUpId: followUp.id,
           error: error.message,
@@ -191,7 +191,7 @@ serve(async (req) => {
       }
     }
 
-    console.log('📝 Registrando conclusão')
+    console.log('📝 [DEBUG] Registrando conclusão')
     await supabase
       .from('cron_logs')
       .insert([{
@@ -200,9 +200,9 @@ serve(async (req) => {
         execution_time: new Date().toISOString()
       }])
 
-    console.log(`✅ Processamento finalizado. Sucesso: ${processedFollowUps.length}, Erros: ${errors.length}`)
-    console.log('Follow-ups processados:', processedFollowUps)
-    console.log('Erros:', errors)
+    console.log(`✅ [DEBUG] Processamento finalizado. Sucesso: ${processedFollowUps.length}, Erros: ${errors.length}`)
+    console.log('[DEBUG] Follow-ups processados:', JSON.stringify(processedFollowUps, null, 2))
+    console.log('[DEBUG] Erros:', JSON.stringify(errors, null, 2))
 
     return new Response(
       JSON.stringify({ 
@@ -215,8 +215,8 @@ serve(async (req) => {
     )
 
   } catch (error) {
-    console.error('❌ Erro crítico:', error)
-    console.error('Stack do erro:', error.stack)
+    console.error('❌ [ERROR] Erro crítico:', error)
+    console.error('[ERROR] Stack do erro:', error.stack)
     return new Response(
       JSON.stringify({ 
         success: false,

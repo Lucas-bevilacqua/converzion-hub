@@ -7,23 +7,23 @@ const corsHeaders = {
 }
 
 serve(async (req) => {
-  console.log('🚀 Iniciando função process-follow-up')
+  console.log('🚀 [DEBUG] Iniciando função process-follow-up')
   
   if (req.method === 'OPTIONS') {
-    console.log('👋 Handling CORS preflight request')
+    console.log('👋 [DEBUG] Handling CORS preflight request')
     return new Response(null, { headers: corsHeaders })
   }
 
   try {
     const { contact } = await req.json()
-    console.log('📝 Dados do contato recebidos:', contact)
+    console.log('📝 [DEBUG] Dados do contato recebidos:', JSON.stringify(contact, null, 2))
     
     if (!contact) {
-      console.error('❌ Erro: Dados do contato não fornecidos')
+      console.error('❌ [ERROR] Dados do contato não fornecidos')
       throw new Error('Dados do contato não fornecidos')
     }
 
-    console.log('🔑 Inicializando cliente Supabase')
+    console.log('🔑 [DEBUG] Inicializando cliente Supabase')
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
@@ -33,18 +33,19 @@ serve(async (req) => {
     if (contact.ConversationId?.startsWith('follow-up-sent-')) {
       currentMessageIndex = parseInt(contact.ConversationId.split('-').pop() || '-1')
     }
-    console.log(`📊 Índice atual da mensagem: ${currentMessageIndex}`)
+    console.log(`📊 [DEBUG] Índice atual da mensagem: ${currentMessageIndex}`)
 
     const nextMessageIndex = currentMessageIndex + 1
     const manualMessages = Array.isArray(contact.followUp?.manual_messages) 
       ? contact.followUp.manual_messages 
       : []
 
-    console.log(`📝 Total de mensagens manuais: ${manualMessages.length}`)
-    console.log(`📝 Próximo índice: ${nextMessageIndex}`)
+    console.log(`📝 [DEBUG] Total de mensagens manuais: ${manualMessages.length}`)
+    console.log(`📝 [DEBUG] Próximo índice: ${nextMessageIndex}`)
+    console.log('[DEBUG] Mensagens manuais:', JSON.stringify(manualMessages, null, 2))
 
     if (nextMessageIndex >= manualMessages.length) {
-      console.log('✅ Sequência de mensagens completa')
+      console.log('✅ [DEBUG] Sequência de mensagens completa')
       return new Response(
         JSON.stringify({ success: true, message: 'Sequência completa' }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -52,12 +53,12 @@ serve(async (req) => {
     }
 
     const nextMessage = manualMessages[nextMessageIndex]
-    console.log('📝 Próxima mensagem:', nextMessage)
+    console.log('📝 [DEBUG] Próxima mensagem:', JSON.stringify(nextMessage, null, 2))
 
     const evolutionApiUrl = (Deno.env.get('EVOLUTION_API_URL') || '').replace(/\/$/, '')
-    console.log('🔗 URL da Evolution API:', evolutionApiUrl)
+    console.log('🔗 [DEBUG] URL da Evolution API:', evolutionApiUrl)
     
-    console.log('📤 Enviando mensagem via Evolution API')
+    console.log('📤 [DEBUG] Enviando mensagem via Evolution API')
     const evolutionResponse = await fetch(
       `${evolutionApiUrl}/message/sendText/${contact.followUp.instanceName}`,
       {
@@ -75,14 +76,14 @@ serve(async (req) => {
 
     if (!evolutionResponse.ok) {
       const errorText = await evolutionResponse.text()
-      console.error('❌ Erro da Evolution API:', errorText)
+      console.error('❌ [ERROR] Erro da Evolution API:', errorText)
       throw new Error(errorText)
     }
 
     const evolutionData = await evolutionResponse.json()
-    console.log('✅ Resposta da Evolution API:', evolutionData)
+    console.log('✅ [DEBUG] Resposta da Evolution API:', JSON.stringify(evolutionData, null, 2))
     
-    console.log('📝 Atualizando status do contato no Supabase')
+    console.log('📝 [DEBUG] Atualizando status do contato no Supabase')
     const updateResponse = await supabaseClient
       .from('Users_clientes')
       .update({
@@ -92,10 +93,10 @@ serve(async (req) => {
       .eq('id', contact.id)
 
     if (updateResponse.error) {
-      console.error('❌ Erro ao atualizar contato:', updateResponse.error)
+      console.error('❌ [ERROR] Erro ao atualizar contato:', updateResponse.error)
     }
 
-    console.log('📝 Registrando mensagem no histórico')
+    console.log('📝 [DEBUG] Registrando mensagem no histórico')
     const messageResponse = await supabaseClient
       .from('chat_messages')
       .insert({
@@ -107,10 +108,10 @@ serve(async (req) => {
       })
 
     if (messageResponse.error) {
-      console.error('❌ Erro ao registrar mensagem:', messageResponse.error)
+      console.error('❌ [ERROR] Erro ao registrar mensagem:', messageResponse.error)
     }
 
-    console.log('✅ Processamento concluído com sucesso')
+    console.log('✅ [DEBUG] Processamento concluído com sucesso')
     return new Response(
       JSON.stringify({ 
         success: true,
@@ -120,8 +121,8 @@ serve(async (req) => {
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   } catch (error) {
-    console.error('❌ Erro crítico:', error)
-    console.error('Stack do erro:', error.stack)
+    console.error('❌ [ERROR] Erro crítico:', error)
+    console.error('[ERROR] Stack do erro:', error.stack)
     return new Response(
       JSON.stringify({ error: error.message }),
       { 
