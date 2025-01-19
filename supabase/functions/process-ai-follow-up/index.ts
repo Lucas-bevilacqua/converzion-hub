@@ -18,7 +18,6 @@ serve(async (req) => {
   }
 
   try {
-    // Initialize Supabase client
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
     const openAiKey = Deno.env.get('OPENAI_API_KEY');
@@ -147,6 +146,26 @@ serve(async (req) => {
           continue;
         }
 
+        // Verificar se já passou o tempo de delay desde a última mensagem
+        const { data: lastMessage } = await supabase
+          .from('chat_messages')
+          .select('created_at')
+          .eq('instance_id', followUp.instance_id)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .single();
+
+        if (lastMessage) {
+          const lastMessageTime = new Date(lastMessage.created_at);
+          const delayMinutes = followUp.delay_minutes || 60;
+          const nextMessageTime = new Date(lastMessageTime.getTime() + delayMinutes * 60000);
+
+          if (nextMessageTime > new Date()) {
+            console.log(`[${executionId}] ⏳ Ainda não passou o tempo de delay para:`, followUp.instance_id);
+            continue;
+          }
+        }
+
         // Fetch message history
         console.log(`[${executionId}] 📚 Fetching chat history...`);
         const { data: chatHistory, error: chatError } = await supabase
@@ -163,6 +182,46 @@ serve(async (req) => {
             followUpId: followUp.id,
             error: chatError
           });
+          continue;
+        }
+
+        // Verificar se já atingiu o número máximo de tentativas
+        const { data: followUpMessages } = await supabase
+          .from('chat_messages')
+          .select('*')
+          .eq('instance_id', followUp.instance_id)
+          .eq('sender_type', 'follow_up')
+          .order('created_at', { ascending: false });
+
+        if (followUpMessages && followUpMessages.length >= (followUp.max_attempts || 3)) {
+          console.log(`[${executionId}] ⚠️ Máximo de tentativas atingido para:`, followUp.instance_id);
+          continue;
+        }
+
+        // Verificar se recebeu resposta (se stop_on_reply estiver ativo)
+        if (followUp.stop_on_reply) {
+          const hasReply = chatHistory?.some(msg => 
+            msg.sender_type === 'user' && 
+            msg.created_at > (followUpMessages?.[0]?.created_at || '')
+          );
+
+          if (hasReply) {
+            console.log(`[${executionId}] ✋ Usuário já respondeu para:`, followUp.instance_id);
+            continue;
+          }
+        }
+
+        // Verificar palavras-chave de parada
+        const stopKeywords = followUp.stop_on_keyword || [];
+        const hasStopKeyword = chatHistory?.some(msg => 
+          msg.sender_type === 'user' && 
+          stopKeywords.some(keyword => 
+            msg.content.toLowerCase().includes(keyword.toLowerCase())
+          )
+        );
+
+        if (hasStopKeyword) {
+          console.log(`[${executionId}] 🚫 Palavra-chave de parada encontrada para:`, followUp.instance_id);
           continue;
         }
 
