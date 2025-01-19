@@ -8,20 +8,20 @@ const corsHeaders = {
 }
 
 serve(async (req) => {
+  // Handle CORS
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
   }
 
   try {
-    const currentTimestamp = Date.now()
-    console.log(`🚀 Starting follow-up contacts processing at timestamp: ${currentTimestamp}`)
+    const currentTimestamp = new Date().toISOString()
+    console.log(`🚀 Starting follow-up contacts processing at: ${currentTimestamp}`)
     
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    // Log the initialization
     console.log('📝 Initialized Supabase client')
 
     // Buscar follow-ups ativos
@@ -45,11 +45,28 @@ serve(async (req) => {
 
     console.log(`✅ Found ${followUps?.length || 0} active follow-ups`)
 
+    // Log de execução na tabela cron_logs
+    const { error: logError } = await supabase
+      .from('cron_logs')
+      .insert([
+        {
+          job_name: 'get-follow-up-contacts-job',
+          status: 'executed',
+          execution_time: new Date().toISOString()
+        }
+      ])
+
+    if (logError) {
+      console.error('❌ Error logging execution:', logError)
+    }
+
     if (!followUps?.length) {
+      console.log('ℹ️ No active follow-ups found')
       return new Response(
         JSON.stringify({ 
           success: true,
           timestamp: currentTimestamp,
+          message: 'No active follow-ups found',
           processed: [],
           errors: [] 
         }),
@@ -87,21 +104,26 @@ serve(async (req) => {
           throw contactsError
         }
 
+        console.log(`📊 Found ${contacts?.length || 0} contacts to process for instance ${followUp.instance?.name}`)
+
         if (!contacts?.length) {
           console.log('⚠️ No contacts found for follow-up')
           continue
         }
 
-        console.log(`📊 Found ${contacts.length} contacts to process`)
-
         // Verificar última mensagem
-        const { data: lastMessage } = await supabase
+        const { data: lastMessage, error: messageError } = await supabase
           .from('chat_messages')
           .select('created_at')
           .eq('instance_id', followUp.instance_id)
           .order('created_at', { ascending: false })
           .limit(1)
           .single()
+
+        if (messageError && !messageError.message.includes('No rows found')) {
+          console.error('❌ Error fetching last message:', messageError)
+          throw messageError
+        }
 
         if (lastMessage) {
           const lastMessageTime = new Date(lastMessage.created_at)
@@ -110,6 +132,7 @@ serve(async (req) => {
 
           console.log(`⏰ Last message time: ${lastMessageTime.toISOString()}`)
           console.log(`⏰ Next message time: ${nextMessageTime.toISOString()}`)
+          console.log(`⏰ Current time: ${new Date().toISOString()}`)
 
           if (nextMessageTime > new Date()) {
             console.log('⏳ Waiting for delay time to pass')
@@ -120,7 +143,8 @@ serve(async (req) => {
         processedFollowUps.push({
           followUpId: followUp.id,
           instanceId: followUp.instance_id,
-          timestamp: currentTimestamp
+          contactsCount: contacts.length,
+          timestamp: new Date().toISOString()
         })
 
       } catch (error) {
@@ -128,7 +152,7 @@ serve(async (req) => {
         errors.push({
           followUpId: followUp.id,
           error: error.message,
-          timestamp: currentTimestamp
+          timestamp: new Date().toISOString()
         })
       }
     }
@@ -150,7 +174,7 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({ 
         success: false,
-        timestamp: Date.now(),
+        timestamp: new Date().toISOString(),
         error: error.message 
       }),
       { 
