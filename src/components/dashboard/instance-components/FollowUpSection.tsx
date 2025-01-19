@@ -76,6 +76,8 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
   const { toast } = useToast()
   const queryClient = useQueryClient()
 
+  console.log('🔄 [DEBUG] Iniciando FollowUpSection para instância:', instanceId)
+
   const { data: followUp, isLoading } = useQuery({
     queryKey: ['follow-up', instanceId],
     queryFn: async () => {
@@ -248,7 +250,7 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
       console.error('❌ [ERROR] Erro na mutação de salvamento:', error)
       toast({
         title: "Erro",
-        description: "Não foi possível salvar as configurações.",
+        description: "Não foi possível salvar as configurações. Por favor, tente novamente.",
         variant: "destructive",
       })
     }
@@ -538,7 +540,7 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
                 setFormData({
                   is_active: followUp.is_active || false,
                   follow_up_type: followUp.follow_up_type || "manual",
-                  delay_minutes: followUp.delay_minutes || 3, // Changed from 10 to 3
+                  delay_minutes: followUp.delay_minutes || 1,
                   template_message: followUp.template_message || '',
                   schedule_start_time: followUp.schedule_start_time || '09:00',
                   schedule_end_time: followUp.schedule_end_time || '18:00',
