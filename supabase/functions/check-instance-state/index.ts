@@ -60,30 +60,38 @@ serve(async (req) => {
     const url = `${evolutionApiUrl}/instance/connectionState/${instance.name}`
     console.log('Making request to:', url)
 
-    const response = await fetch(url, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-        'apikey': evolutionApiKey,
-      },
-    })
+    try {
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': evolutionApiKey,
+        },
+      })
 
-    if (!response.ok) {
-      const errorText = await response.text()
-      console.error('Error from Evolution API:', errorText)
+      if (!response.ok) {
+        const errorText = await response.text()
+        console.error('Error from Evolution API:', errorText)
+        return new Response(
+          JSON.stringify({ error: 'Failed to check instance state', details: errorText }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: response.status }
+        )
+      }
+
+      const data = await response.json()
+      console.log('Instance state response:', data)
+
       return new Response(
-        JSON.stringify({ error: 'Failed to check instance state', details: errorText }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: response.status }
+        JSON.stringify(data),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    } catch (fetchError) {
+      console.error('Error fetching from Evolution API:', fetchError)
+      return new Response(
+        JSON.stringify({ error: 'Failed to connect to Evolution API', details: fetchError.message }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 503 }
       )
     }
-
-    const data = await response.json()
-    console.log('Instance state response:', data)
-
-    return new Response(
-      JSON.stringify(data),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    )
 
   } catch (error) {
     console.error('Error in check-instance-state:', error)
