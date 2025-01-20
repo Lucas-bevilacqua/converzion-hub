@@ -164,6 +164,7 @@ export type Database = {
       cron_logs: {
         Row: {
           details: string | null
+          details_json: Json | null
           execution_time: string | null
           id: number
           job_name: string | null
@@ -171,6 +172,7 @@ export type Database = {
         }
         Insert: {
           details?: string | null
+          details_json?: Json | null
           execution_time?: string | null
           id?: number
           job_name?: string | null
@@ -178,6 +180,7 @@ export type Database = {
         }
         Update: {
           details?: string | null
+          details_json?: Json | null
           execution_time?: string | null
           id?: number
           job_name?: string | null
