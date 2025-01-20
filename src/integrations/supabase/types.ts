@@ -733,6 +733,12 @@ export type Database = {
         }
         Returns: boolean
       }
+      set_service_key: {
+        Args: {
+          service_key: string
+        }
+        Returns: undefined
+      }
       set_supabase_service_key: {
         Args: {
           service_key: string
