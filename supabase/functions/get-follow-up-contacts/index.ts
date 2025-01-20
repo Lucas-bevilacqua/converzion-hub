@@ -40,17 +40,24 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    // Log inicial
-    console.log('📝 [DEBUG] Registrando início da execução')
-    await supabaseClient
+    // Log inicial detalhado
+    console.log('📝 [DEBUG] Registrando início da execução com timestamp:', new Date().toISOString())
+    
+    // Registrar no banco
+    const { error: logError } = await supabaseClient
       .from('cron_logs')
       .insert({
         job_name: 'get-follow-up-contacts',
         status: 'iniciado',
-        execution_time: new Date().toISOString()
+        execution_time: new Date().toISOString(),
+        details: 'Iniciando busca de follow-ups ativos'
       })
 
-    // Buscar follow-ups ativos
+    if (logError) {
+      console.error('❌ [ERROR] Erro ao registrar log inicial:', logError)
+    }
+
+    // Buscar follow-ups ativos com mais logs
     console.log('🔍 [DEBUG] Buscando follow-ups ativos')
     const { data: followUps, error: followUpsError } = await supabaseClient
       .from('instance_follow_ups')
@@ -66,20 +73,26 @@ serve(async (req) => {
       .eq('is_active', true)
 
     if (followUpsError) {
+      console.error('❌ [ERROR] Erro ao buscar follow-ups:', followUpsError)
       throw followUpsError
     }
+
+    console.log(`✅ [DEBUG] Encontrados ${followUps?.length || 0} follow-ups ativos`)
 
     const processedFollowUps = []
     const errors = []
 
     for (const followUp of (followUps as FollowUp[] || [])) {
       try {
+        console.log(`📱 [DEBUG] Processando follow-up para instância: ${followUp.instance?.name}`)
+        
         if (!followUp.instance?.connection_status || followUp.instance.connection_status !== 'connected') {
           console.log(`⚠️ [AVISO] Instância ${followUp.instance?.name} não está conectada`)
           continue
         }
 
-        // Buscar contatos
+        // Buscar contatos com mais logs
+        console.log(`🔍 [DEBUG] Buscando contatos para instância: ${followUp.instance.name}`)
         const { data: contacts, error: contactsError } = await supabaseClient
           .from('Users_clientes')
           .select('*')
@@ -88,6 +101,7 @@ serve(async (req) => {
           .order('last_message_time', { ascending: true, nullsFirst: true })
 
         if (contactsError) {
+          console.error(`❌ [ERROR] Erro ao buscar contatos para ${followUp.instance.name}:`, contactsError)
           throw contactsError
         }
 
@@ -95,8 +109,11 @@ serve(async (req) => {
 
         for (const contact of (contacts as Contact[] || [])) {
           try {
+            console.log(`👤 [DEBUG] Processando contato: ${contact.TelefoneClientes}`)
+            
             const processFollowUpUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/process-follow-up`
             
+            console.log(`🔄 [DEBUG] Enviando requisição para ${processFollowUpUrl}`)
             const processingResponse = await fetch(
               processFollowUpUrl,
               {
@@ -120,7 +137,9 @@ serve(async (req) => {
             )
 
             if (!processingResponse.ok) {
-              throw new Error(`Erro ao processar follow-up: ${await processingResponse.text()}`)
+              const errorText = await processingResponse.text()
+              console.error(`❌ [ERROR] Erro ao processar follow-up para ${contact.TelefoneClientes}:`, errorText)
+              throw new Error(`Erro ao processar follow-up: ${errorText}`)
             }
 
             const responseData = await processingResponse.json()
@@ -134,7 +153,7 @@ serve(async (req) => {
             })
 
           } catch (contactError) {
-            console.error(`❌ [ERRO] Falha ao processar contato ${contact.id}:`, contactError)
+            console.error(`❌ [ERROR] Falha ao processar contato ${contact.id}:`, contactError)
             errors.push({
               followUpId: followUp.id,
               contactId: contact.id,
@@ -144,7 +163,7 @@ serve(async (req) => {
           }
         }
       } catch (error) {
-        console.error(`❌ [ERRO] Falha ao processar follow-up ${followUp.id}:`, error)
+        console.error(`❌ [ERROR] Falha ao processar follow-up ${followUp.id}:`, error)
         errors.push({
           followUpId: followUp.id,
           error: error.message,
@@ -153,17 +172,22 @@ serve(async (req) => {
       }
     }
 
-    // Log final
+    // Log final detalhado
+    const finalLog = {
+      processed: processedFollowUps.length,
+      errors: errors.length,
+      timestamp: new Date().toISOString()
+    }
+    
+    console.log('📝 [DEBUG] Finalizando execução:', finalLog)
+    
     await supabaseClient
       .from('cron_logs')
       .insert({
         job_name: 'get-follow-up-contacts',
         status: 'completado',
         execution_time: new Date().toISOString(),
-        details: JSON.stringify({
-          processed: processedFollowUps.length,
-          errors: errors.length
-        })
+        details: JSON.stringify(finalLog)
       })
 
     return new Response(
@@ -177,7 +201,7 @@ serve(async (req) => {
     )
 
   } catch (error) {
-    console.error('❌ [ERRO CRÍTICO]:', error)
+    console.error('❌ [ERROR CRÍTICO]:', error)
     
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
@@ -189,7 +213,11 @@ serve(async (req) => {
       .insert({
         job_name: 'get-follow-up-contacts',
         status: `erro: ${error.message}`,
-        execution_time: new Date().toISOString()
+        execution_time: new Date().toISOString(),
+        details: JSON.stringify({
+          error: error.message,
+          stack: error.stack
+        })
       })
 
     return new Response(
