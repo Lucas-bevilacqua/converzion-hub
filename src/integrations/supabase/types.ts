@@ -736,6 +736,10 @@ export type Database = {
         }
         Returns: undefined
       }
+      setup_follow_up_contacts_job: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
       setup_follow_up_cron: {
         Args: Record<PropertyKey, never>
         Returns: undefined
