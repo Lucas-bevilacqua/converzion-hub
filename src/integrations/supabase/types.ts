@@ -672,6 +672,14 @@ export type Database = {
           diagnostic_info: string
         }[]
       }
+      diagnose_follow_up_system: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          check_name: string
+          status: string
+          details: Json
+        }[]
+      }
       diagnose_service_key: {
         Args: Record<PropertyKey, never>
         Returns: {

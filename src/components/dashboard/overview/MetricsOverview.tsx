@@ -6,18 +6,23 @@ import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend } fro
 import { useAuth } from "@/contexts/auth/AuthContext"
 import { format } from "date-fns"
 import { ptBR } from "date-fns/locale"
+import { Skeleton } from "@/components/ui/skeleton"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { AlertCircle } from "lucide-react"
 
 export function MetricsOverview() {
   const { user } = useAuth()
 
-  const { data: metrics } = useQuery({
+  const { data: metrics, isLoading, error } = useQuery({
     queryKey: ['instance-metrics', user?.id],
     queryFn: async () => {
       console.log('Fetching metrics for user:', user?.id)
+      if (!user?.id) throw new Error('No user ID available')
+
       const { data, error } = await supabase
         .from('instance_metrics')
         .select('*')
-        .eq('user_id', user?.id)
+        .eq('user_id', user.id)
         .order('created_at', { ascending: true })
         .limit(7)
 
@@ -26,14 +31,50 @@ export function MetricsOverview() {
         throw error
       }
 
+      console.log('Metrics data received:', data)
       return data?.map(metric => ({
         ...metric,
         date: format(new Date(metric.created_at), 'dd/MM', { locale: ptBR }),
       }))
     },
     enabled: !!user?.id,
-    refetchInterval: 30000 // Atualiza a cada 30 segundos
+    retry: 3,
+    retryDelay: 1000,
+    staleTime: 30000 // 30 seconds
   })
+
+  if (isLoading) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Métricas dos Últimos 7 Dias</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="h-[300px] w-full">
+            <Skeleton className="w-full h-full" />
+          </div>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  if (error) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Métricas dos Últimos 7 Dias</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>
+              Erro ao carregar métricas. Por favor, tente novamente mais tarde.
+            </AlertDescription>
+          </Alert>
+        </CardContent>
+      </Card>
+    )
+  }
 
   return (
     <Card>
