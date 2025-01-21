@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { supabase } from "@/integrations/supabase/client"
 import { Switch } from "@/components/ui/switch"
@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { useToast } from "@/components/ui/use-toast"
 import { Calendar, Users, Check, X, ExternalLink, Key, Webhook, Brain } from "lucide-react"
-import { InstanceTool, ToolType } from "@/types/instance-tools"
+import { InstanceTool, ToolType, TOOL_CONFIGS } from "@/types/instance-tools"
 import {
   Collapsible,
   CollapsibleContent,
@@ -33,481 +33,275 @@ interface InstanceToolsSectionProps {
   instanceId: string;
 }
 
-const TOOL_ICONS: Record<ToolType, any> = {
-  calendar: Calendar,
-  crm: Users,
-  n8n: Webhook,
-  langchain: Brain,
-};
-
-const TOOL_LABELS: Record<ToolType, string> = {
-  calendar: "Calendário",
-  crm: "CRM",
-  n8n: "n8n (Automação)",
-  langchain: "LangChain (IA)",
-};
-
-const TOOL_DESCRIPTIONS: Record<ToolType, string> = {
-  calendar: "Conecte seu sistema de agendamentos para que seus clientes possam marcar horários automaticamente pelo WhatsApp",
-  crm: "Conecte seu CRM para registrar automaticamente informações dos seus clientes",
-  n8n: "Conecte o n8n para criar automações personalizadas com seu WhatsApp",
-  langchain: "Configure o LangChain para respostas mais inteligentes e personalizadas",
-};
-
-const TOOL_PROVIDERS = {
-  calendar: [
-    { id: 'google', name: 'Google Calendar', setupUrl: 'https://calendar.google.com/calendar/embedhelper' },
-    { id: 'outlook', name: 'Outlook Calendar', setupUrl: 'https://outlook.office.com/calendar/view/month' },
-    { id: 'calendly', name: 'Calendly', setupUrl: 'https://calendly.com/app/settings/integrations' },
-  ],
-  crm: [
-    { id: 'hubspot', name: 'HubSpot', setupUrl: 'https://app.hubspot.com/api-key' },
-    { id: 'pipedrive', name: 'Pipedrive', setupUrl: 'https://app.pipedrive.com/settings/api' },
-  ],
-  n8n: [
-    { id: 'n8n', name: 'n8n', setupUrl: 'https://docs.n8n.io/hosting/installation/docker/' },
-  ],
-  langchain: [
-    { 
-      id: 'langchain', 
-      name: 'LangChain', 
-      setupUrl: 'https://js.langchain.com/docs/get_started/introduction' 
-    },
-  ],
-};
-
-const TOOL_SETUP_GUIDES = {
-  calendar: {
-    title: "Como configurar o Calendário",
-    steps: [
-      "1. Acesse sua conta do serviço de calendário escolhido",
-      "2. Vá em Configurações > Integrações",
-      "3. Gere uma chave de API ou token de acesso",
-      "4. Cole a chave aqui para ativar a integração"
-    ],
-    docsUrl: "https://support.google.com/calendar/answer/37083",
-    autoSetupAvailable: true,
-  },
-  crm: {
-    title: "Como configurar o CRM",
-    steps: [
-      "1. Acesse seu CRM (HubSpot, Pipedrive, etc)",
-      "2. Vá nas configurações de API/Integrações",
-      "3. Gere uma nova chave de API",
-      "4. Copie a chave de API gerada",
-      "5. Configure a chave aqui para sincronizar contatos"
-    ],
-    docsUrl: "https://knowledge.hubspot.com/pt/integrations/how-do-i-get-my-hubspot-api-key",
-    autoSetupAvailable: true,
-  },
-  n8n: {
-    title: "Como configurar o n8n",
-    steps: [
-      "1. Acesse seu painel do n8n",
-      "2. Crie um novo workflow",
-      "3. Adicione um trigger de webhook",
-      "4. Copie a URL do webhook",
-      "5. Cole a URL aqui para ativar a integração"
-    ],
-    docsUrl: "https://docs.n8n.io/integrations/builtin/trigger-nodes/webhook/",
-    autoSetupAvailable: true,
-  },
-  langchain: {
-    title: "Como configurar o LangChain",
-    steps: [
-      "1. Configure seu modelo de linguagem preferido",
-      "2. Defina as configurações de temperatura e tokens",
-      "3. Personalize o prompt do sistema",
-      "4. Teste a integração"
-    ],
-    docsUrl: "https://js.langchain.com/docs/get_started/introduction",
-    autoSetupAvailable: true,
-  },
-};
-
 export function InstanceToolsSection({ instanceId }: InstanceToolsSectionProps) {
-  const { toast } = useToast();
-  const [isUpdating, setIsUpdating] = useState(false);
-  const [selectedTool, setSelectedTool] = useState<ToolType | null>(null);
-  const [credentialDialog, setCredentialDialog] = useState(false);
-  const [credentials, setCredentials] = useState("");
-  const [selectedProvider, setSelectedProvider] = useState("");
-  const queryClient = useQueryClient();
+  const { toast } = useToast()
+  const queryClient = useQueryClient()
+  const [selectedTool, setSelectedTool] = useState<ToolType | null>(null)
+  const [showAddDialog, setShowAddDialog] = useState(false)
+  const [webhookUrl, setWebhookUrl] = useState("")
+  const [webhookSecret, setWebhookSecret] = useState("")
 
-  const { data: tools, isLoading } = useQuery({
+  const { data: tools = [], isLoading } = useQuery({
     queryKey: ['instance-tools', instanceId],
     queryFn: async () => {
-      console.log('Fetching tools for instance:', instanceId);
       const { data, error } = await supabase
         .from('instance_tools')
         .select('*')
-        .eq('instance_id', instanceId);
+        .eq('instance_id', instanceId)
 
-      if (error) {
-        console.error('Error fetching tools:', error);
-        throw error;
-      }
-
-      return data as InstanceTool[];
+      if (error) throw error
+      return data as InstanceTool[]
     },
-  });
+  })
 
-  const updateToolMutation = useMutation({
-    mutationFn: async ({ 
-      toolType, 
-      isActive,
-      credentials,
-      provider
-    }: { 
-      toolType: ToolType; 
-      isActive: boolean;
-      credentials?: string;
-      provider?: string;
-    }) => {
-      console.log('Iniciando atualização da ferramenta:', { 
-        toolType, 
-        isActive, 
-        hasCredentials: !!credentials, 
-        provider,
-        instanceId 
-      });
-      
-      try {
-        const existingTool = tools?.find(t => t.tool_type === toolType);
-        
-        if (!instanceId) {
-          throw new Error("ID da instância não encontrado");
-        }
-
-        const settings = credentials ? { 
-          api_key: credentials,
-          provider: provider 
-        } : {};
-
-        console.log('Configurações a serem aplicadas:', {
-          isActive,
-          hasSettings: Object.keys(settings).length > 0,
-          existingTool: !!existingTool
-        });
-
-        if (existingTool) {
-          console.log('Atualizando ferramenta existente:', existingTool.id);
-          const { error, data } = await supabase
-            .from('instance_tools')
-            .update({ 
-              is_active: isActive,
-              settings: credentials ? settings : existingTool.settings,
-              updated_at: new Date().toISOString()
-            })
-            .eq('id', existingTool.id)
-            .select();
-
-          if (error) {
-            console.error('Erro ao atualizar ferramenta:', error);
-            throw new Error(error.message);
+  const addToolMutation = useMutation({
+    mutationFn: async (toolType: ToolType) => {
+      const { data, error } = await supabase
+        .from('instance_tools')
+        .insert([
+          {
+            instance_id: instanceId,
+            tool_type: toolType,
+            is_active: true,
+            settings: {},
+            webhook_url: toolType === ToolType.WEBHOOK ? webhookUrl : undefined,
+            webhook_secret: toolType === ToolType.WEBHOOK ? webhookSecret : undefined,
           }
+        ])
+        .select()
+        .single()
 
-          console.log('Ferramenta atualizada com sucesso:', data);
-        } else {
-          console.log('Criando nova ferramenta');
-          const { error, data } = await supabase
-            .from('instance_tools')
-            .insert({
-              instance_id: instanceId,
-              tool_type: toolType,
-              is_active: isActive,
-              settings: settings,
-              setup_guide: TOOL_SETUP_GUIDES[toolType]
-            })
-            .select();
-
-          if (error) {
-            console.error('Erro ao criar ferramenta:', error);
-            if (error.code === '42501') {
-              throw new Error("Você não tem permissão para configurar esta ferramenta. Verifique suas permissões.");
-            }
-            throw new Error(error.message);
-          }
-
-          console.log('Nova ferramenta criada com sucesso:', data);
-        }
-      } catch (error) {
-        console.error('Erro na mutação:', error);
-        throw error;
-      }
+      if (error) throw error
+      return data
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['instance-tools'] });
+      queryClient.invalidateQueries({ queryKey: ['instance-tools'] })
       toast({
-        title: "Sucesso",
-        description: "Ferramenta configurada com sucesso.",
-      });
-      setCredentialDialog(false);
-      setCredentials("");
-      setSelectedProvider("");
+        title: "Ferramenta adicionada",
+        description: "A ferramenta foi adicionada com sucesso.",
+      })
+      setShowAddDialog(false)
+      setSelectedTool(null)
+      setWebhookUrl("")
+      setWebhookSecret("")
     },
-    onError: (error: Error) => {
-      console.error('Erro ao atualizar ferramenta:', error);
+    onError: (error) => {
+      console.error('Erro ao adicionar ferramenta:', error)
       toast({
-        title: "Erro ao configurar ferramenta",
-        description: error.message || "Não foi possível configurar a ferramenta. Verifique suas credenciais e tente novamente.",
+        title: "Erro",
+        description: "Não foi possível adicionar a ferramenta. Tente novamente.",
         variant: "destructive",
-      });
+      })
+    }
+  })
+
+  const toggleToolMutation = useMutation({
+    mutationFn: async ({ id, is_active }: { id: string; is_active: boolean }) => {
+      const { error } = await supabase
+        .from('instance_tools')
+        .update({ is_active })
+        .eq('id', id)
+
+      if (error) throw error
     },
-  });
-
-  const handleToggleTool = async (toolType: ToolType, currentState: boolean) => {
-    try {
-      console.log('Alternando estado da ferramenta:', { toolType, currentState });
-      setIsUpdating(true);
-      
-      if (!currentState) {
-        setSelectedTool(toolType);
-        setCredentialDialog(true);
-      } else {
-        console.log('Desativando ferramenta');
-        await updateToolMutation.mutateAsync({ 
-          toolType, 
-          isActive: !currentState
-        });
-      }
-    } catch (error) {
-      console.error('Erro ao alternar ferramenta:', error);
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['instance-tools'] })
+      toast({
+        title: "Status atualizado",
+        description: "O status da ferramenta foi atualizado com sucesso.",
+      })
+    },
+    onError: (error) => {
+      console.error('Erro ao atualizar status:', error)
       toast({
         title: "Erro",
-        description: "Não foi possível alterar o status da ferramenta.",
+        description: "Não foi possível atualizar o status. Tente novamente.",
         variant: "destructive",
-      });
-    } finally {
-      setIsUpdating(false);
+      })
     }
-  };
+  })
 
-  const handleCredentialSubmit = async () => {
-    if (!selectedTool) {
+  const handleAddTool = () => {
+    if (!selectedTool) return
+
+    if (selectedTool === ToolType.WEBHOOK && (!webhookUrl || !webhookSecret)) {
       toast({
-        title: "Erro",
-        description: "Nenhuma ferramenta selecionada.",
+        title: "Campos obrigatórios",
+        description: "Por favor preencha a URL e o segredo do webhook.",
         variant: "destructive",
-      });
-      return;
+      })
+      return
     }
 
-    if (!credentials || !selectedProvider) {
-      toast({
-        title: "Erro",
-        description: "Por favor, selecione um provedor e insira suas credenciais.",
-        variant: "destructive",
-      });
-      return;
-    }
+    addToolMutation.mutate(selectedTool)
+  }
 
-    try {
-      console.log('Submetendo credenciais para ferramenta:', selectedTool);
-      setIsUpdating(true);
-      await updateToolMutation.mutateAsync({
-        toolType: selectedTool,
-        isActive: true,
-        credentials,
-        provider: selectedProvider
-      });
-    } catch (error) {
-      console.error('Erro ao submeter credenciais:', error);
-    } finally {
-      setIsUpdating(false);
+  const getToolIcon = (toolType: ToolType) => {
+    switch (toolType) {
+      case ToolType.CALENDAR:
+        return <Calendar className="h-4 w-4" />
+      case ToolType.CRM:
+        return <Users className="h-4 w-4" />
+      case ToolType.LANGCHAIN:
+        return <Brain className="h-4 w-4" />
+      case ToolType.WEBHOOK:
+        return <Webhook className="h-4 w-4" />
+      default:
+        return null
     }
-  };
+  }
+
+  const availableTools = Object.values(ToolType).filter(
+    toolType => !tools.some(tool => tool.tool_type === toolType)
+  )
 
   if (isLoading) {
-    return (
-      <div className="flex justify-center p-4">
-        <div className="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full" />
-      </div>
-    );
+    return <div>Carregando...</div>
   }
 
   return (
-    <div className="space-y-6">
-      <div className="text-sm text-muted-foreground">
-        Ative as ferramentas que deseja integrar ao seu WhatsApp. Para cada ferramenta,
-        você precisará fornecer as credenciais necessárias para a integração funcionar.
+    <div className="space-y-4">
+      <div className="flex justify-between items-center">
+        <h3 className="text-lg font-medium">Ferramentas</h3>
+        {availableTools.length > 0 && (
+          <Button onClick={() => setShowAddDialog(true)} size="sm">
+            Adicionar
+          </Button>
+        )}
       </div>
-      <div className="space-y-4">
-        {(['calendar', 'crm', 'langchain'] as ToolType[]).map((toolType) => {
-          const Icon = TOOL_ICONS[toolType];
-          const isActive = tools?.find(t => t.tool_type === toolType)?.is_active || false;
-          const guide = TOOL_SETUP_GUIDES[toolType];
 
-          return (
-            <Collapsible key={toolType}>
-              <div className="flex items-center justify-between p-4 bg-background border rounded-lg">
-                <div className="flex items-center gap-4">
-                  <div className="p-2 bg-primary/10 rounded-lg">
-                    <Icon className="h-5 w-5 text-primary" />
-                  </div>
-                  <div>
-                    <Label className="text-base font-medium">
-                      {TOOL_LABELS[toolType]}
-                    </Label>
-                    <div className="flex items-center gap-2 mt-1">
-                      {isActive ? (
-                        <Badge variant="secondary" className="flex items-center gap-1 bg-green-100 text-green-800">
-                          <Check className="h-3 w-3" />
-                          Ativo
-                        </Badge>
-                      ) : (
-                        <Badge variant="secondary" className="flex items-center gap-1">
-                          <X className="h-3 w-3" />
-                        </Badge>
-                      )}
-                    </div>
-                  </div>
-                </div>
-                <div className="flex items-center gap-4">
-                  <Switch
-                    checked={isActive}
-                    onCheckedChange={() => handleToggleTool(toolType, isActive)}
-                    disabled={isUpdating}
-                  />
-                  <CollapsibleTrigger className="hover:bg-accent rounded p-1">
-                    <svg
-                      width="15"
-                      height="15"
-                      viewBox="0 0 15 15"
-                      fill="none"
-                      xmlns="http://www.w3.org/2000/svg"
-                      className="h-4 w-4 transition-transform duration-200"
-                    >
-                      <path
-                        d="M3.13523 6.15803C3.3241 5.95657 3.64052 5.94637 3.84197 6.13523L7.5 9.56464L11.158 6.13523C11.3595 5.94637 11.6759 5.95657 11.8648 6.15803C12.0536 6.35949 12.0434 6.67591 11.842 6.86477L7.84197 10.6148C7.64964 10.7951 7.35036 10.7951 7.15803 10.6148L3.15803 6.86477C2.95657 6.67591 2.94637 6.35949 3.13523 6.15803Z"
-                        fill="currentColor"
-                        fillRule="evenodd"
-                        clipRule="evenodd"
-                      />
-                    </svg>
-                  </CollapsibleTrigger>
+      <div className="space-y-4">
+        {tools.map((tool) => (
+          <Collapsible key={tool.id}>
+            <CollapsibleTrigger className="flex items-center justify-between w-full p-4 bg-card rounded-lg hover:bg-accent">
+              <div className="flex items-center space-x-4">
+                {getToolIcon(tool.tool_type)}
+                <div>
+                  <h4 className="text-sm font-medium">
+                    {TOOL_CONFIGS[tool.tool_type].label}
+                  </h4>
+                  <p className="text-sm text-muted-foreground">
+                    {TOOL_CONFIGS[tool.tool_type].description}
+                  </p>
                 </div>
               </div>
-              <CollapsibleContent className="px-4 py-3 mt-2 bg-muted rounded-lg">
-                <div className="space-y-4">
-                  <p className="text-sm text-muted-foreground">
-                    {TOOL_DESCRIPTIONS[toolType]}
-                  </p>
-                  <div className="space-y-3">
-                    <h4 className="font-medium">{guide.title}</h4>
-                    <ul className="list-none space-y-2">
-                      {guide.steps.map((step, index) => (
-                        <li key={index} className="text-sm text-muted-foreground">
-                          {step}
-                        </li>
-                      ))}
-                    </ul>
-                    <div className="flex gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="mt-2"
-                        onClick={() => window.open(guide.docsUrl, '_blank')}
-                      >
-                        <ExternalLink className="h-4 w-4 mr-2" />
-                        Ver documentação completa
-                      </Button>
-                      {guide.autoSetupAvailable && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="mt-2"
-                          onClick={() => {
-                            setSelectedTool(toolType);
-                            setCredentialDialog(true);
-                          }}
-                        >
-                          <Key className="h-4 w-4 mr-2" />
-                          Obter credenciais
-                        </Button>
-                      )}
-                    </div>
-                  </div>
+              <div className="flex items-center space-x-4">
+                <Badge variant={tool.is_active ? "default" : "secondary"}>
+                  {tool.is_active ? (
+                    <Check className="h-3 w-3 mr-1" />
+                  ) : (
+                    <X className="h-3 w-3 mr-1" />
+                  )}
+                  {tool.is_active ? "Ativo" : "Inativo"}
+                </Badge>
+              </div>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="p-4 pt-2">
+              <div className="flex justify-between items-center">
+                <div className="flex items-center space-x-2">
+                  <Switch
+                    checked={tool.is_active}
+                    onCheckedChange={(checked) =>
+                      toggleToolMutation.mutate({ id: tool.id, is_active: checked })
+                    }
+                  />
+                  <Label>Ativo</Label>
                 </div>
-              </CollapsibleContent>
-            </Collapsible>
-          );
-        })}
+                {tool.setup_guide?.documentation_url && (
+                  <Button variant="ghost" size="sm" asChild>
+                    <a
+                      href={tool.setup_guide.documentation_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center space-x-1"
+                    >
+                      <span>Documentação</span>
+                      <ExternalLink className="h-3 w-3" />
+                    </a>
+                  </Button>
+                )}
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
+        ))}
       </div>
 
-      <Dialog open={credentialDialog} onOpenChange={setCredentialDialog}>
-        <DialogContent className="sm:max-w-md">
+      <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
+        <DialogContent>
           <DialogHeader>
-            <DialogTitle>Configurar {selectedTool && TOOL_LABELS[selectedTool]}</DialogTitle>
+            <DialogTitle>Adicionar Ferramenta</DialogTitle>
             <DialogDescription>
-              Selecione o provedor e configure as credenciais para ativar a integração.
+              Selecione uma ferramenta para adicionar à sua instância.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-4">
+
+          <div className="space-y-4">
             <div className="space-y-2">
-              <Label>Provedor</Label>
+              <Label>Ferramenta</Label>
               <Select
-                value={selectedProvider}
-                onValueChange={setSelectedProvider}
+                value={selectedTool || ""}
+                onValueChange={(value) => setSelectedTool(value as ToolType)}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Selecione um provedor" />
+                  <SelectValue placeholder="Selecione uma ferramenta" />
                 </SelectTrigger>
                 <SelectContent>
-                  {selectedTool && TOOL_PROVIDERS[selectedTool].map((provider) => (
-                    <SelectItem key={provider.id} value={provider.id}>
-                      {provider.name}
+                  {availableTools.map((toolType) => (
+                    <SelectItem key={toolType} value={toolType}>
+                      <div className="flex items-center space-x-2">
+                        {getToolIcon(toolType)}
+                        <span>{TOOL_CONFIGS[toolType].label}</span>
+                      </div>
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
-            {selectedProvider && (
-              <div className="space-y-2">
-                <Label>Chave de API</Label>
-                <Input
-                  type="password"
-                  placeholder="Cole sua chave de API aqui"
-                  value={credentials}
-                  onChange={(e) => setCredentials(e.target.value)}
-                />
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="w-full mt-2"
-                  onClick={() => {
-                    const provider = selectedTool && TOOL_PROVIDERS[selectedTool].find(p => p.id === selectedProvider);
-                    if (provider) {
-                      window.open(provider.setupUrl, '_blank');
-                    }
-                  }}
-                >
-                  <ExternalLink className="h-4 w-4 mr-2" />
-                  Obter chave de API
-                </Button>
+
+            {selectedTool === ToolType.WEBHOOK && (
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label>URL do Webhook</Label>
+                  <Input
+                    value={webhookUrl}
+                    onChange={(e) => setWebhookUrl(e.target.value)}
+                    placeholder="https://..."
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Segredo do Webhook</Label>
+                  <Input
+                    value={webhookSecret}
+                    onChange={(e) => setWebhookSecret(e.target.value)}
+                    type="password"
+                    placeholder="Digite o segredo do webhook"
+                  />
+                </div>
               </div>
             )}
-            <div className="flex justify-end gap-2">
+
+            <div className="flex justify-end space-x-2">
               <Button
                 variant="outline"
                 onClick={() => {
-                  setCredentialDialog(false);
-                  setCredentials("");
-                  setSelectedProvider("");
+                  setShowAddDialog(false)
+                  setSelectedTool(null)
+                  setWebhookUrl("")
+                  setWebhookSecret("")
                 }}
               >
                 Cancelar
               </Button>
-              <Button 
-                onClick={handleCredentialSubmit} 
-                disabled={!credentials || !selectedProvider}
+              <Button
+                onClick={handleAddTool}
+                disabled={!selectedTool || addToolMutation.isPending}
               >
-                Salvar
+                {addToolMutation.isPending ? "Adicionando..." : "Adicionar"}
               </Button>
             </div>
           </div>
         </DialogContent>
       </Dialog>
     </div>
-  );
+  )
 }
