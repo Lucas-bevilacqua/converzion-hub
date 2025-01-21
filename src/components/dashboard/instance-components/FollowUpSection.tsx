@@ -72,7 +72,7 @@ interface FollowUpData {
 }
 
 interface PostgrestError {
-  message: string;
+  message?: string;
   details?: string;
   hint?: string;
   code?: string;
@@ -146,9 +146,7 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
       } catch (error) {
         // Handle rate limiting error
         if (error instanceof Error) {
-          const postgrestError = error as unknown as PostgrestError
-          if (postgrestError?.message?.includes('ThrottlerException') || 
-              postgrestError?.response?.status === 429) {
+          if (error.message?.includes('ThrottlerException')) {
             console.log('⚠️ [RATE LIMIT] Follow-up rate limit reached')
             setIsRateLimited(true)
             
@@ -307,9 +305,7 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
       
       // Handle rate limiting error
       if (error instanceof Error) {
-        const postgrestError = error as unknown as PostgrestError
-        if (postgrestError?.message?.includes('ThrottlerException') || 
-            postgrestError?.response?.status === 429) {
+        if (error.message?.includes('ThrottlerException')) {
           setIsRateLimited(true)
           
           // Reset rate limit after 1 minute
