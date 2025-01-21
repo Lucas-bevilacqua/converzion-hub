@@ -166,52 +166,63 @@ export function InstanceToolsSection({ instanceId }: InstanceToolsSectionProps) 
     }) => {
       console.log('Updating tool:', { toolType, isActive, hasCredentials: !!credentials, provider });
       
-      const existingTool = tools?.find(t => t.tool_type === toolType);
-      const settings = credentials ? { 
-        api_key: credentials,
-        provider: provider 
-      } : {};
+      try {
+        const existingTool = tools?.find(t => t.tool_type === toolType);
+        const settings = credentials ? { 
+          api_key: credentials,
+          provider: provider 
+        } : {};
 
-      if (existingTool) {
-        const { error } = await supabase
-          .from('instance_tools')
-          .update({ 
-            is_active: isActive,
-            settings: credentials ? settings : existingTool.settings,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', existingTool.id);
+        if (existingTool) {
+          const { error } = await supabase
+            .from('instance_tools')
+            .update({ 
+              is_active: isActive,
+              settings: credentials ? settings : existingTool.settings,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', existingTool.id);
 
-        if (error) throw error;
-      } else {
-        const { error } = await supabase
-          .from('instance_tools')
-          .insert({
-            instance_id: instanceId,
-            tool_type: toolType,
-            is_active: isActive,
-            settings: settings,
-            setup_guide: TOOL_SETUP_GUIDES[toolType]
-          });
+          if (error) {
+            console.error('Error updating tool:', error);
+            throw new Error(error.message);
+          }
+        } else {
+          const { error } = await supabase
+            .from('instance_tools')
+            .insert({
+              instance_id: instanceId,
+              tool_type: toolType,
+              is_active: isActive,
+              settings: settings,
+              setup_guide: TOOL_SETUP_GUIDES[toolType]
+            });
 
-        if (error) throw error;
+          if (error) {
+            console.error('Error inserting tool:', error);
+            throw new Error(error.message);
+          }
+        }
+      } catch (error) {
+        console.error('Error in mutation:', error);
+        throw error;
       }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['instance-tools'] });
       toast({
         title: "Sucesso",
-        description: "Status da ferramenta atualizado.",
+        description: "Ferramenta configurada com sucesso.",
       });
       setCredentialDialog(false);
       setCredentials("");
       setSelectedProvider("");
     },
-    onError: (error) => {
+    onError: (error: Error) => {
       console.error('Error updating tool:', error);
       toast({
-        title: "Erro",
-        description: "Não foi possível atualizar o status da ferramenta.",
+        title: "Erro ao configurar ferramenta",
+        description: error.message || "Não foi possível configurar a ferramenta. Verifique suas credenciais e tente novamente.",
         variant: "destructive",
       });
     },
@@ -229,20 +240,50 @@ export function InstanceToolsSection({ instanceId }: InstanceToolsSectionProps) 
           isActive: !currentState
         });
       }
+    } catch (error) {
+      console.error('Error toggling tool:', error);
+      toast({
+        title: "Erro",
+        description: "Não foi possível alterar o status da ferramenta.",
+        variant: "destructive",
+      });
     } finally {
       setIsUpdating(false);
     }
   };
 
   const handleCredentialSubmit = async () => {
-    if (!selectedTool) return;
-    
-    await updateToolMutation.mutateAsync({
-      toolType: selectedTool,
-      isActive: true,
-      credentials,
-      provider: selectedProvider
-    });
+    if (!selectedTool) {
+      toast({
+        title: "Erro",
+        description: "Nenhuma ferramenta selecionada.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!credentials || !selectedProvider) {
+      toast({
+        title: "Erro",
+        description: "Por favor, selecione um provedor e insira suas credenciais.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      setIsUpdating(true);
+      await updateToolMutation.mutateAsync({
+        toolType: selectedTool,
+        isActive: true,
+        credentials,
+        provider: selectedProvider
+      });
+    } catch (error) {
+      console.error('Error submitting credentials:', error);
+    } finally {
+      setIsUpdating(false);
+    }
   };
 
   const getToolState = (toolType: ToolType) => {
