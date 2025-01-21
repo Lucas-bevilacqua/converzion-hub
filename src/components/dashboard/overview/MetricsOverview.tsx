@@ -52,6 +52,7 @@ export function MetricsOverview() {
           date: format(date, 'dd/MM/yyyy', { locale: ptBR }),
           messages_sent: dayData?.messages_sent || 0,
           messages_received: dayData?.messages_received || 0,
+          average_response_time_seconds: dayData?.average_response_time_seconds || 0,
           created_at: date.toISOString(),
         })
       }
