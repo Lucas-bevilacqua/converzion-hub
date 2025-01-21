@@ -7,6 +7,26 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+// Rate limiting configuration
+const RATE_LIMIT_WINDOW = 60000 // 1 minute in milliseconds
+const MAX_REQUESTS_PER_WINDOW = 30 // Maximum requests per minute
+const requestTimestamps: number[] = []
+
+function isRateLimited(): boolean {
+  const now = Date.now()
+  // Remove timestamps older than the window
+  while (requestTimestamps.length > 0 && requestTimestamps[0] < now - RATE_LIMIT_WINDOW) {
+    requestTimestamps.shift()
+  }
+  // Check if we're over the limit
+  if (requestTimestamps.length >= MAX_REQUESTS_PER_WINDOW) {
+    return true
+  }
+  // Add current timestamp
+  requestTimestamps.push(now)
+  return false
+}
+
 serve(async (req) => {
   const executionId = crypto.randomUUID();
   const startTime = new Date();
@@ -17,6 +37,26 @@ serve(async (req) => {
   }
 
   try {
+    // Check rate limiting
+    if (isRateLimited()) {
+      console.log(`[${executionId}] ⚠️ Rate limit exceeded`);
+      return new Response(
+        JSON.stringify({
+          error: 'Too many requests',
+          message: 'Please wait before making more requests',
+          retryAfter: Math.ceil(RATE_LIMIT_WINDOW / 1000)
+        }),
+        { 
+          status: 429,
+          headers: { 
+            ...corsHeaders,
+            'Content-Type': 'application/json',
+            'Retry-After': Math.ceil(RATE_LIMIT_WINDOW / 1000).toString()
+          }
+        }
+      );
+    }
+
     console.log(`[${executionId}] 🔑 Initializing Supabase client`);
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
@@ -65,6 +105,9 @@ serve(async (req) => {
     for (const followUp of followUps || []) {
       try {
         console.log(`[${executionId}] Processing follow-up for instance: ${followUp.instance?.name}`);
+
+        // Add a small delay between processing each follow-up
+        await new Promise(resolve => setTimeout(resolve, 1000));
 
         // Verificar se a instância está conectada
         if (followUp.instance?.connection_status !== 'connected') {
@@ -245,7 +288,7 @@ serve(async (req) => {
 
     const endTime = new Date();
     const executionTime = endTime.getTime() - startTime.getTime();
-    console.log(`[${executionId}] ⏱️ Tempo total de execução: ${executionTime}ms`);
+    console.log(`[${executionId}] ⏱️ Total execution time: ${executionTime}ms`);
 
     // Log de conclusão
     console.log(`[${executionId}] 📝 Registrando conclusão da execução`);
@@ -277,7 +320,7 @@ serve(async (req) => {
     );
 
   } catch (error) {
-    console.error(`[${executionId}] ❌ Erro crítico:`, error);
+    console.error(`[${executionId}] ❌ Critical error:`, error);
     
     const endTime = new Date();
     const executionTime = endTime.getTime() - startTime.getTime();
