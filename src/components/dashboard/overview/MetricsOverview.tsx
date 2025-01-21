@@ -102,11 +102,20 @@ export function MetricsOverview() {
   const totalMessagesSent = metrics?.reduce((acc, curr) => acc + (curr.messages_sent || 0), 0) || 0
   const totalMessagesReceived = metrics?.reduce((acc, curr) => acc + (curr.messages_received || 0), 0) || 0
   
-  // Calculate average response time only from days with actual messages
-  const daysWithMessages = metrics?.filter(day => day.messages_sent > 0 || day.messages_received > 0) || []
-  const averageResponseTime = daysWithMessages.length > 0
-    ? Math.round(daysWithMessages.reduce((acc, curr) => acc + (curr.average_response_time_seconds || 0), 0) / daysWithMessages.length)
+  // Calcular tempo médio de resposta apenas dos dias que tiveram interações
+  const daysWithInteractions = metrics?.filter(day => 
+    day.messages_sent > 0 && 
+    day.messages_received > 0 && 
+    day.average_response_time_seconds > 0
+  ) || []
+  
+  console.log('Dias com interações:', daysWithInteractions)
+  
+  const averageResponseTime = daysWithInteractions.length > 0
+    ? Math.round(daysWithInteractions.reduce((acc, curr) => acc + curr.average_response_time_seconds, 0) / daysWithInteractions.length)
     : 0
+
+  console.log('Tempo médio de resposta calculado (segundos):', averageResponseTime)
 
   const formatResponseTime = (seconds: number) => {
     if (!seconds) return '0s'
