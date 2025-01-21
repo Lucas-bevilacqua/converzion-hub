@@ -6,6 +6,11 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+const EVOLUTION_API_URL = Deno.env.get('EVOLUTION_API_URL')
+const EVOLUTION_API_KEY = Deno.env.get('EVOLUTION_API_KEY')
+const SUPABASE_URL = Deno.env.get('SUPABASE_URL')
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -13,81 +18,63 @@ serve(async (req) => {
   }
 
   try {
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    )
-
-    // Verify authentication
-    const authHeader = req.headers.get('Authorization')
-    if (!authHeader) {
-      throw new Error('No authorization header')
-    }
-
-    const { data: { user }, error: userError } = await supabaseClient.auth.getUser(
-      authHeader.replace('Bearer ', '')
-    )
-
-    if (userError || !user) {
-      throw userError || new Error('User not found')
-    }
-
     const { instanceId } = await req.json()
     console.log('Disconnecting instance:', instanceId)
 
+    if (!instanceId) {
+      throw new Error('Instance ID is required')
+    }
+
+    // Initialize Supabase client
+    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+
     // Get instance details
-    const { data: instance, error: instanceError } = await supabaseClient
+    const { data: instance, error: instanceError } = await supabase
       .from('evolution_instances')
       .select('*')
       .eq('id', instanceId)
       .single()
 
     if (instanceError || !instance) {
-      throw instanceError || new Error('Instance not found')
+      console.error('Error fetching instance:', instanceError)
+      throw new Error('Instance not found')
     }
 
-    // Call Evolution API to logout
-    const evolutionApiUrl = Deno.env.get('EVOLUTION_API_URL')
-    const evolutionApiKey = Deno.env.get('EVOLUTION_API_KEY')
-    
-    if (!evolutionApiUrl || !evolutionApiKey) {
-      throw new Error('Evolution API configuration not found')
-    }
+    // Clean the base URL by removing trailing slashes
+    const cleanBaseUrl = EVOLUTION_API_URL?.replace(/\/+$/, '')
+    console.log('Clean base URL:', cleanBaseUrl)
 
-    const baseUrl = evolutionApiUrl.replace(/\/+$/, '')
-    const logoutUrl = `${baseUrl}/instance/logout/${instanceId}`
-    console.log('Logout URL:', logoutUrl)
-    
-    const evolutionResponse = await fetch(logoutUrl, {
+    // Call Evolution API to disconnect instance
+    const logoutResponse = await fetch(`${cleanBaseUrl}/instance/logout/${instance.name}`, {
       method: 'DELETE',
       headers: {
-        'apikey': evolutionApiKey,
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        'apikey': EVOLUTION_API_KEY
       }
     })
 
-    if (!evolutionResponse.ok) {
-      const errorText = await evolutionResponse.text()
-      console.error('Evolution API logout error:', errorText)
-      
-      // If instance doesn't exist in Evolution API, we still want to update our database
-      if (evolutionResponse.status !== 404) {
-        throw new Error(`Evolution API returned status ${evolutionResponse.status}: ${errorText}`)
-      }
+    if (!logoutResponse.ok) {
+      const error = await logoutResponse.text()
+      console.error('Error disconnecting instance:', error)
+      throw new Error(`Evolution API error: ${error}`)
     }
 
     // Update instance status in database
-    const { error: updateError } = await supabaseClient
+    const { error: updateError } = await supabase
       .from('evolution_instances')
       .update({
         connection_status: 'disconnected',
         qr_code: null,
-        last_qr_update: null,
-        updated_at: new Date().toISOString()
+        last_qr_update: null
       })
       .eq('id', instanceId)
 
-    if (updateError) throw updateError
+    if (updateError) {
+      console.error('Error updating instance status:', updateError)
+      throw updateError
+    }
+
+    console.log('Instance disconnected successfully:', instanceId)
 
     return new Response(
       JSON.stringify({ success: true }),
@@ -96,10 +83,7 @@ serve(async (req) => {
   } catch (error) {
     console.error('Error in disconnect-evolution-instance:', error)
     return new Response(
-      JSON.stringify({ 
-        error: error.message,
-        details: error.cause || error.stack
-      }),
+      JSON.stringify({ error: error.message }),
       { 
         status: 400, 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
