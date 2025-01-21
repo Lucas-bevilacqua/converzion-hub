@@ -333,7 +333,7 @@ export function InstanceToolsSection({ instanceId }: InstanceToolsSectionProps) 
         você precisará fornecer as credenciais necessárias para a integração funcionar.
       </div>
       <div className="space-y-4">
-        {['calendar', 'crm', 'langchain'].map((toolType) => {
+        {(['calendar', 'crm', 'langchain'] as ToolType[]).map((toolType) => {
           const Icon = TOOL_ICONS[toolType];
           const isActive = tools?.find(t => t.tool_type === toolType)?.is_active || false;
           const guide = TOOL_SETUP_GUIDES[toolType];
