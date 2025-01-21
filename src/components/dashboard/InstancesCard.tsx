@@ -1,5 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { useQuery } from "@tanstack/react-query"
+import { Loader2 } from "lucide-react"
 import { supabase } from "@/integrations/supabase/client"
 import { useAuth } from "@/contexts/auth/AuthContext"
 import { useState } from "react"
@@ -29,7 +29,10 @@ export function InstancesCard() {
         .eq('user_id', user?.id)
         .single()
 
-      if (error) throw error
+      if (error) {
+        console.error('Error fetching subscription:', error)
+        throw error
+      }
       return data
     },
     enabled: !!user?.id
@@ -38,13 +41,26 @@ export function InstancesCard() {
   const { data: instances = [], refetch: refetchInstances } = useQuery({
     queryKey: ['instances', user?.id],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('evolution_instances')
-        .select('*')
-        .eq('user_id', user?.id)
+      try {
+        const { data, error } = await supabase
+          .from('evolution_instances')
+          .select('*')
+          .eq('user_id', user?.id)
 
-      if (error) throw error
-      return data as EvolutionInstance[]
+        if (error) {
+          console.error('Error fetching instances:', error)
+          throw error
+        }
+        return data as EvolutionInstance[]
+      } catch (error) {
+        console.error('Error in instances query:', error)
+        toast({
+          title: "Erro",
+          description: "Não foi possível carregar as instâncias. Tente novamente.",
+          variant: "destructive",
+        })
+        return []
+      }
     },
     enabled: !!user?.id
   })
@@ -96,9 +112,10 @@ export function InstancesCard() {
       refetchInstances()
     } catch (error) {
       console.error('Erro ao desconectar instância:', error)
+      const errorMessage = error instanceof Error ? error.message : "Falha ao desconectar número. Tente novamente."
       toast({
         title: "Erro",
-        description: "Falha ao desconectar número. Tente novamente.",
+        description: errorMessage,
         variant: "destructive",
       })
     }
