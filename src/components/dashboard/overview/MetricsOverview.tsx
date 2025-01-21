@@ -101,9 +101,15 @@ export function MetricsOverview() {
 
   const totalMessagesSent = metrics?.reduce((acc, curr) => acc + (curr.messages_sent || 0), 0) || 0
   const totalMessagesReceived = metrics?.reduce((acc, curr) => acc + (curr.messages_received || 0), 0) || 0
-  const averageResponseTime = Math.round(metrics?.reduce((acc, curr) => acc + (curr.average_response_time_seconds || 0), 0) / (metrics?.length || 1)) || 0
+  
+  // Calculate average response time only from days with actual messages
+  const daysWithMessages = metrics?.filter(day => day.messages_sent > 0 || day.messages_received > 0) || []
+  const averageResponseTime = daysWithMessages.length > 0
+    ? Math.round(daysWithMessages.reduce((acc, curr) => acc + (curr.average_response_time_seconds || 0), 0) / daysWithMessages.length)
+    : 0
 
   const formatResponseTime = (seconds: number) => {
+    if (!seconds) return '0s'
     if (seconds < 60) return `${seconds}s`
     const minutes = Math.floor(seconds / 60)
     const remainingSeconds = seconds % 60
