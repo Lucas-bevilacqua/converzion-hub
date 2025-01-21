@@ -7,76 +7,45 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// Increased rate limiting configuration for cron jobs
-const RATE_LIMIT_WINDOW = 60000 // 1 minute in milliseconds
-const MAX_REQUESTS_PER_WINDOW = 60 // Increased to 60 requests per minute
+// Configuração de rate limiting
+const RATE_LIMIT_WINDOW = 60000 // 1 minuto em milissegundos
+const MAX_REQUESTS_PER_WINDOW = 60 // 60 requisições por minuto
 const requestTimestamps: number[] = []
 
 function isRateLimited(): boolean {
   const now = Date.now()
-  // Remove timestamps older than the window
   while (requestTimestamps.length > 0 && requestTimestamps[0] < now - RATE_LIMIT_WINDOW) {
     requestTimestamps.shift()
   }
-  // Check if we're over the limit
   if (requestTimestamps.length >= MAX_REQUESTS_PER_WINDOW) {
     return true
   }
-  // Add current timestamp
   requestTimestamps.push(now)
   return false
 }
 
-serve(async (req) => {
+// Função principal de processamento
+async function processFollowUps() {
   const executionId = crypto.randomUUID();
   const startTime = new Date();
-  console.log(`[${executionId}] 🚀 Starting process-ai-follow-up function at ${startTime.toISOString()}`);
-  
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
-  }
+  console.log(`[${executionId}] 🔄 Iniciando processamento contínuo de follow-ups`);
 
   try {
-    // Check rate limiting
-    if (isRateLimited()) {
-      console.log(`[${executionId}] ⚠️ Rate limit exceeded`);
-      return new Response(
-        JSON.stringify({
-          error: 'Too many requests',
-          message: 'Please wait before making more requests',
-          retryAfter: Math.ceil(RATE_LIMIT_WINDOW / 1000)
-        }),
-        { 
-          status: 429,
-          headers: { 
-            ...corsHeaders,
-            'Content-Type': 'application/json',
-            'Retry-After': Math.ceil(RATE_LIMIT_WINDOW / 1000).toString()
-          }
-        }
-      );
-    }
-
-    console.log(`[${executionId}] 🔑 Initializing Supabase client`);
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    // Log de início da execução
-    console.log(`[${executionId}] 📝 Registrando início da execução`);
-    await supabase
-      .from('ai_follow_up_job_logs')
-      .insert({
-        status: 'started',
-        details: {
-          execution_id: executionId,
-          start_time: startTime.toISOString()
-        }
-      });
+    // Log de início
+    await supabase.from('ai_follow_up_job_logs').insert({
+      status: 'started',
+      details: {
+        execution_id: executionId,
+        start_time: startTime.toISOString()
+      }
+    });
 
-    // Buscar follow-ups ativos do tipo AI
-    console.log(`[${executionId}] 🔍 Buscando follow-ups ativos`);
+    // Buscar e processar follow-ups
     const { data: followUps, error: followUpsError } = await supabase
       .from('instance_follow_ups')
       .select(`
@@ -93,11 +62,10 @@ serve(async (req) => {
       .eq('follow_up_type', 'ai_generated');
 
     if (followUpsError) {
-      console.error(`[${executionId}] ❌ Erro ao buscar follow-ups:`, followUpsError);
       throw followUpsError;
     }
 
-    console.log(`[${executionId}] ✅ Encontrados ${followUps?.length || 0} follow-ups ativos`);
+    console.log(`[${executionId}] 📝 Encontrados ${followUps?.length || 0} follow-ups para processar`);
 
     const processedFollowUps = [];
     const errors = [];
@@ -288,78 +256,75 @@ serve(async (req) => {
 
     const endTime = new Date();
     const executionTime = endTime.getTime() - startTime.getTime();
-    console.log(`[${executionId}] ⏱️ Total execution time: ${executionTime}ms`);
 
     // Log de conclusão
-    console.log(`[${executionId}] 📝 Registrando conclusão da execução`);
-    await supabase
-      .from('ai_follow_up_job_logs')
-      .insert({
-        status: 'completed',
-        details: {
-          execution_id: executionId,
-          start_time: startTime.toISOString(),
-          end_time: endTime.toISOString(),
-          execution_time_ms: executionTime,
-          follow_ups_found: followUps?.length || 0,
-          processed: processedFollowUps,
-          errors: errors
-        }
-      });
-
-    return new Response(
-      JSON.stringify({ 
-        success: true,
+    await supabase.from('ai_follow_up_job_logs').insert({
+      status: 'completed',
+      details: {
         execution_id: executionId,
+        start_time: startTime.toISOString(),
+        end_time: endTime.toISOString(),
         execution_time_ms: executionTime,
-        follow_ups_found: followUps?.length || 0,
-        processed: processedFollowUps,
-        errors: errors
-      }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+        follow_ups_found: followUps?.length || 0
+      }
+    });
 
   } catch (error) {
-    console.error(`[${executionId}] ❌ Critical error:`, error);
-    
-    const endTime = new Date();
-    const executionTime = endTime.getTime() - startTime.getTime();
-    
-    // Log do erro
-    try {
-      const supabase = createClient(
-        Deno.env.get('SUPABASE_URL') ?? '',
-        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-      );
-      
-      await supabase
-        .from('ai_follow_up_job_logs')
-        .insert({
-          status: 'error',
-          details: {
-            execution_id: executionId,
-            error: error.message,
-            stack: error.stack,
-            start_time: startTime.toISOString(),
-            end_time: endTime.toISOString(),
-            execution_time_ms: executionTime
-          }
-        });
-    } catch (logError) {
-      console.error(`[${executionId}] ❌ Erro ao registrar log:`, logError);
-    }
-
-    return new Response(
-      JSON.stringify({ 
-        success: false,
-        error: error.message,
-        execution_id: executionId,
-        execution_time_ms: executionTime
-      }),
-      { 
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-      }
+    console.error(`[${executionId}] ❌ Erro no processamento:`, error);
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
+
+    await supabase.from('ai_follow_up_job_logs').insert({
+      status: 'error',
+      details: {
+        execution_id: executionId,
+        error: error.message,
+        stack: error.stack,
+        time: new Date().toISOString()
+      }
+    });
   }
+}
+
+// Iniciar o loop contínuo com intervalo
+let isProcessing = false;
+const INTERVAL = 60000; // 1 minuto
+
+setInterval(async () => {
+  if (!isProcessing) {
+    isProcessing = true;
+    try {
+      await processFollowUps();
+    } finally {
+      isProcessing = false;
+    }
+  } else {
+    console.log('🔄 Processamento anterior ainda em andamento, pulando esta iteração');
+  }
+}, INTERVAL);
+
+// Endpoint para verificação de status
+serve(async (req) => {
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  return new Response(
+    JSON.stringify({ 
+      status: 'running',
+      rate_limit: {
+        window: RATE_LIMIT_WINDOW,
+        max_requests: MAX_REQUESTS_PER_WINDOW,
+        current_requests: requestTimestamps.length
+      }
+    }),
+    { 
+      headers: { 
+        ...corsHeaders, 
+        'Content-Type': 'application/json' 
+      } 
+    }
+  );
 });
