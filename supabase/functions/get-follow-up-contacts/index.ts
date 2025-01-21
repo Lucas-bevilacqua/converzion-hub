@@ -58,6 +58,7 @@ serve(async (req) => {
     }
 
     console.log(`✅ [DEBUG] Encontrados ${followUps?.length || 0} follow-ups ativos`)
+    console.log('📝 [DEBUG] Follow-ups encontrados:', JSON.stringify(followUps, null, 2))
 
     const processedFollowUps = []
     const errors = []
@@ -86,6 +87,7 @@ serve(async (req) => {
         }
 
         console.log(`📊 [DEBUG] Encontrados ${contacts?.length || 0} contatos para a instância ${followUp.instance.name}`)
+        console.log('📝 [DEBUG] Contatos encontrados:', JSON.stringify(contacts, null, 2))
 
         for (const contact of (contacts || [])) {
           try {
@@ -116,13 +118,15 @@ serve(async (req) => {
               }
             )
 
+            const responseText = await processingResponse.text()
+            console.log('📝 [DEBUG] Resposta da requisição:', responseText)
+
             if (!processingResponse.ok) {
-              const errorText = await processingResponse.text()
-              console.error(`❌ [ERROR] Erro ao processar follow-up para ${contact.TelefoneClientes}:`, errorText)
-              throw new Error(`Erro ao processar follow-up: ${errorText}`)
+              console.error(`❌ [ERROR] Erro ao processar follow-up para ${contact.TelefoneClientes}:`, responseText)
+              throw new Error(`Erro ao processar follow-up: ${responseText}`)
             }
 
-            const responseData = await processingResponse.json()
+            const responseData = JSON.parse(responseText)
             console.log('✅ [DEBUG] Follow-up processado:', responseData)
 
             processedFollowUps.push({
