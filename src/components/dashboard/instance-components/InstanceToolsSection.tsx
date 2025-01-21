@@ -164,53 +164,31 @@ export function InstanceToolsSection({ instanceId }: InstanceToolsSectionProps) 
       credentials?: string;
       provider?: string;
     }) => {
-      console.log('Iniciando atualização da ferramenta:', { 
-        toolType, 
-        isActive, 
-        hasCredentials: !!credentials, 
-        provider,
-        instanceId 
-      });
+      console.log('Updating tool:', { toolType, isActive, hasCredentials: !!credentials, provider });
       
       try {
         const existingTool = tools?.find(t => t.tool_type === toolType);
-        
-        if (!instanceId) {
-          throw new Error("ID da instância não encontrado");
-        }
-
         const settings = credentials ? { 
           api_key: credentials,
           provider: provider 
         } : {};
 
-        console.log('Configurações a serem aplicadas:', {
-          isActive,
-          hasSettings: Object.keys(settings).length > 0,
-          existingTool: !!existingTool
-        });
-
         if (existingTool) {
-          console.log('Atualizando ferramenta existente:', existingTool.id);
-          const { error, data } = await supabase
+          const { error } = await supabase
             .from('instance_tools')
             .update({ 
               is_active: isActive,
               settings: credentials ? settings : existingTool.settings,
               updated_at: new Date().toISOString()
             })
-            .eq('id', existingTool.id)
-            .select();
+            .eq('id', existingTool.id);
 
           if (error) {
-            console.error('Erro ao atualizar ferramenta:', error);
+            console.error('Error updating tool:', error);
             throw new Error(error.message);
           }
-
-          console.log('Ferramenta atualizada com sucesso:', data);
         } else {
-          console.log('Criando nova ferramenta');
-          const { error, data } = await supabase
+          const { error } = await supabase
             .from('instance_tools')
             .insert({
               instance_id: instanceId,
@@ -218,21 +196,15 @@ export function InstanceToolsSection({ instanceId }: InstanceToolsSectionProps) 
               is_active: isActive,
               settings: settings,
               setup_guide: TOOL_SETUP_GUIDES[toolType]
-            })
-            .select();
+            });
 
           if (error) {
-            console.error('Erro ao criar ferramenta:', error);
-            if (error.code === '42501') {
-              throw new Error("Você não tem permissão para configurar esta ferramenta. Verifique suas permissões.");
-            }
+            console.error('Error inserting tool:', error);
             throw new Error(error.message);
           }
-
-          console.log('Nova ferramenta criada com sucesso:', data);
         }
       } catch (error) {
-        console.error('Erro na mutação:', error);
+        console.error('Error in mutation:', error);
         throw error;
       }
     },
@@ -247,7 +219,7 @@ export function InstanceToolsSection({ instanceId }: InstanceToolsSectionProps) 
       setSelectedProvider("");
     },
     onError: (error: Error) => {
-      console.error('Erro ao atualizar ferramenta:', error);
+      console.error('Error updating tool:', error);
       toast({
         title: "Erro ao configurar ferramenta",
         description: error.message || "Não foi possível configurar a ferramenta. Verifique suas credenciais e tente novamente.",
@@ -258,21 +230,18 @@ export function InstanceToolsSection({ instanceId }: InstanceToolsSectionProps) 
 
   const handleToggleTool = async (toolType: ToolType, currentState: boolean) => {
     try {
-      console.log('Alternando estado da ferramenta:', { toolType, currentState });
       setIsUpdating(true);
-      
       if (!currentState) {
         setSelectedTool(toolType);
         setCredentialDialog(true);
       } else {
-        console.log('Desativando ferramenta');
         await updateToolMutation.mutateAsync({ 
           toolType, 
           isActive: !currentState
         });
       }
     } catch (error) {
-      console.error('Erro ao alternar ferramenta:', error);
+      console.error('Error toggling tool:', error);
       toast({
         title: "Erro",
         description: "Não foi possível alterar o status da ferramenta.",
@@ -303,7 +272,6 @@ export function InstanceToolsSection({ instanceId }: InstanceToolsSectionProps) 
     }
 
     try {
-      console.log('Submetendo credenciais para ferramenta:', selectedTool);
       setIsUpdating(true);
       await updateToolMutation.mutateAsync({
         toolType: selectedTool,
@@ -312,11 +280,18 @@ export function InstanceToolsSection({ instanceId }: InstanceToolsSectionProps) 
         provider: selectedProvider
       });
     } catch (error) {
-      console.error('Erro ao submeter credenciais:', error);
+      console.error('Error submitting credentials:', error);
     } finally {
       setIsUpdating(false);
     }
   };
+
+  const getToolState = (toolType: ToolType) => {
+    const tool = tools?.find(t => t.tool_type === toolType);
+    return tool?.is_active || false;
+  };
+
+  const availableTools: ToolType[] = ['calendar', 'crm', 'langchain'];
 
   if (isLoading) {
     return (
@@ -333,9 +308,9 @@ export function InstanceToolsSection({ instanceId }: InstanceToolsSectionProps) 
         você precisará fornecer as credenciais necessárias para a integração funcionar.
       </div>
       <div className="space-y-4">
-        {['calendar', 'crm', 'langchain'].map((toolType) => {
+        {availableTools.map((toolType) => {
           const Icon = TOOL_ICONS[toolType];
-          const isActive = tools?.find(t => t.tool_type === toolType)?.is_active || false;
+          const isActive = getToolState(toolType);
           const guide = TOOL_SETUP_GUIDES[toolType];
 
           return (
