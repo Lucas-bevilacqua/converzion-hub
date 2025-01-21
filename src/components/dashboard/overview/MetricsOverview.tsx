@@ -52,7 +52,6 @@ export function MetricsOverview() {
           date: format(date, 'dd/MM/yyyy', { locale: ptBR }),
           messages_sent: dayData?.messages_sent || 0,
           messages_received: dayData?.messages_received || 0,
-          average_response_time_seconds: dayData?.average_response_time_seconds || 0,
           created_at: date.toISOString(),
         })
       }
@@ -101,28 +100,6 @@ export function MetricsOverview() {
 
   const totalMessagesSent = metrics?.reduce((acc, curr) => acc + (curr.messages_sent || 0), 0) || 0
   const totalMessagesReceived = metrics?.reduce((acc, curr) => acc + (curr.messages_received || 0), 0) || 0
-  
-  // Calcular tempo médio de resposta do bot apenas dos dias que tiveram mensagens
-  const daysWithMessages = metrics?.filter(day => 
-    day.messages_received > 0 && 
-    day.average_response_time_seconds > 0
-  ) || []
-  
-  console.log('Dias com mensagens:', daysWithMessages)
-  
-  const averageResponseTime = daysWithMessages.length > 0
-    ? Math.round(daysWithMessages.reduce((acc, curr) => acc + curr.average_response_time_seconds, 0) / daysWithMessages.length)
-    : 0
-
-  console.log('Tempo médio de resposta do bot (segundos):', averageResponseTime)
-
-  const formatResponseTime = (seconds: number) => {
-    if (!seconds) return '0s'
-    if (seconds < 60) return `${seconds}s`
-    const minutes = Math.floor(seconds / 60)
-    const remainingSeconds = seconds % 60
-    return `${minutes}min ${remainingSeconds}s`
-  }
 
   return (
     <Card className="relative overflow-hidden bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
@@ -225,7 +202,7 @@ export function MetricsOverview() {
           </ChartContainer>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
           <div className="space-y-2 bg-gray-50 dark:bg-gray-900 p-4 rounded-lg border border-gray-200 dark:border-gray-700">
             <p className="text-sm text-gray-600 dark:text-gray-400">Total de Mensagens Enviadas</p>
             <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
@@ -236,12 +213,6 @@ export function MetricsOverview() {
             <p className="text-sm text-gray-600 dark:text-gray-400">Total de Mensagens Recebidas</p>
             <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
               {totalMessagesReceived.toLocaleString()}
-            </p>
-          </div>
-          <div className="space-y-2 bg-gray-50 dark:bg-gray-900 p-4 rounded-lg border border-gray-200 dark:border-gray-700">
-            <p className="text-sm text-gray-600 dark:text-gray-400">Tempo Médio de Resposta</p>
-            <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-              {formatResponseTime(averageResponseTime)}
             </p>
           </div>
         </div>
