@@ -7,6 +7,7 @@ const corsHeaders = {
 }
 
 serve(async (req) => {
+  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
   }
@@ -17,6 +18,7 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
+    // Verify authentication
     const authHeader = req.headers.get('Authorization')
     if (!authHeader) {
       throw new Error('No authorization header')
@@ -53,8 +55,6 @@ serve(async (req) => {
     }
 
     const baseUrl = evolutionApiUrl.replace(/\/+$/, '')
-    
-    // Use instance ID instead of name for the API call
     const logoutUrl = `${baseUrl}/instance/logout/${instanceId}`
     console.log('Logout URL:', logoutUrl)
     
