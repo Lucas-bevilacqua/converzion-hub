@@ -67,9 +67,6 @@ async function processFollowUps() {
 
     console.log(`[${executionId}] 📝 Encontrados ${followUps?.length || 0} follow-ups para processar`);
 
-    const processedFollowUps = [];
-    const errors = [];
-
     for (const followUp of followUps || []) {
       try {
         console.log(`[${executionId}] Processing follow-up for instance: ${followUp.instance?.name}`);
@@ -239,18 +236,8 @@ async function processFollowUps() {
           throw saveError;
         }
 
-        processedFollowUps.push({
-          instanceId: followUp.instance_id,
-          messageId: evolutionData.key?.id,
-          message: followUpMessage
-        });
-
       } catch (error) {
         console.error(`[${executionId}] ❌ Error processing follow-up for instance ${followUp.instance?.name}:`, error);
-        errors.push({
-          instanceId: followUp.instance_id,
-          error: error.message
-        });
       }
     }
 
