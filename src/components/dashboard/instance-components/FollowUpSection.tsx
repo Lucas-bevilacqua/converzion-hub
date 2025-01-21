@@ -304,7 +304,9 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
       console.error('❌ [ERROR] Erro na mutação de salvamento:', error)
       
       // Handle rate limiting error
-      if (error?.message?.includes('ThrottlerException') || error?.status === 429) {
+      const postgrestError = error as PostgrestError;
+      if (postgrestError?.message?.includes('ThrottlerException') || 
+          postgrestError?.response?.status === 429) {
         setIsRateLimited(true)
         
         // Reset rate limit after 1 minute
