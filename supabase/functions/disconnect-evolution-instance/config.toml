@@ -1,5 +1,4 @@
-[build]
-command = ""
+project_id = "vodexhppkasbulogmcqb"
 
-[deploy]
-allowed_http_methods = ["POST", "OPTIONS"]
+[functions.disconnect-evolution-instance]
+verify_jwt = false
