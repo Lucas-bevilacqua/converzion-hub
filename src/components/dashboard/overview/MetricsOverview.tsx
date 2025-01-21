@@ -40,7 +40,7 @@ export function MetricsOverview() {
     enabled: !!user?.id,
     retry: 3,
     retryDelay: 1000,
-    staleTime: 30000 // 30 seconds
+    staleTime: 30000
   })
 
   if (isLoading) {
@@ -77,21 +77,21 @@ export function MetricsOverview() {
   }
 
   return (
-    <Card className="bg-white dark:bg-gray-800">
-      <CardHeader>
+    <Card className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
+      <CardHeader className="border-b border-gray-200 dark:border-gray-700">
         <CardTitle className="text-lg font-semibold text-gray-900 dark:text-gray-100">
           Métricas dos Últimos 7 Dias
         </CardTitle>
       </CardHeader>
-      <CardContent>
+      <CardContent className="pt-6">
         <div className="h-[300px] w-full">
           <ChartContainer
             className="w-full"
             config={{
               messages_sent: {
                 theme: {
-                  light: "#0EA5E9",
-                  dark: "#38BDF8",
+                  light: "#F97316",
+                  dark: "#FB923C",
                 },
                 label: "Mensagens Enviadas",
               },
@@ -104,8 +104,8 @@ export function MetricsOverview() {
               },
               response_time: {
                 theme: {
-                  light: "#F59E0B",
-                  dark: "#FBBF24",
+                  light: "#8B5CF6",
+                  dark: "#A78BFA",
                 },
                 label: "Tempo de Resposta (s)",
               }
@@ -139,12 +139,13 @@ export function MetricsOverview() {
                   stroke="#94A3B8"
                 />
                 <Tooltip 
-                  cursor={{ fill: 'rgba(0,0,0,0.1)' }}
+                  cursor={{ fill: 'rgba(0,0,0,0.05)' }}
                   contentStyle={{
                     backgroundColor: 'white',
                     border: '1px solid #E2E8F0',
                     borderRadius: '6px',
-                    padding: '8px'
+                    padding: '8px',
+                    boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
                   }}
                   formatter={(value: number, name: string) => [
                     value,
@@ -183,19 +184,19 @@ export function MetricsOverview() {
         </div>
 
         <div className="grid grid-cols-3 gap-4 mt-6">
-          <div className="space-y-2 bg-gray-50 dark:bg-gray-900 p-4 rounded-lg">
+          <div className="space-y-2 bg-gray-50 dark:bg-gray-900 p-4 rounded-lg border border-gray-200 dark:border-gray-700">
             <p className="text-sm text-gray-600 dark:text-gray-400">Total de Mensagens Enviadas</p>
             <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
               {metrics?.reduce((acc, curr) => acc + (curr.messages_sent || 0), 0)}
             </p>
           </div>
-          <div className="space-y-2 bg-gray-50 dark:bg-gray-900 p-4 rounded-lg">
+          <div className="space-y-2 bg-gray-50 dark:bg-gray-900 p-4 rounded-lg border border-gray-200 dark:border-gray-700">
             <p className="text-sm text-gray-600 dark:text-gray-400">Total de Mensagens Recebidas</p>
             <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
               {metrics?.reduce((acc, curr) => acc + (curr.messages_received || 0), 0)}
             </p>
           </div>
-          <div className="space-y-2 bg-gray-50 dark:bg-gray-900 p-4 rounded-lg">
+          <div className="space-y-2 bg-gray-50 dark:bg-gray-900 p-4 rounded-lg border border-gray-200 dark:border-gray-700">
             <p className="text-sm text-gray-600 dark:text-gray-400">Tempo Médio de Resposta</p>
             <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
               {Math.round(metrics?.reduce((acc, curr) => acc + (curr.average_response_time_seconds || 0), 0) / (metrics?.length || 1))}s
