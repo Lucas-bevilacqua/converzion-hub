@@ -8,6 +8,7 @@ import { NewInstanceForm } from "./instance-components/NewInstanceForm"
 import { useToast } from "@/components/ui/use-toast"
 import { useInstanceMutations } from "./instance-components/InstanceMutations"
 import type { EvolutionInstance } from "@/integrations/supabase/database-types/evolution-instances"
+import { useQuery } from "@tanstack/react-query"
 
 export function InstancesCard() {
   const { user } = useAuth()
