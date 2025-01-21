@@ -77,16 +77,16 @@ export function MetricsOverview() {
   }
 
   return (
-    <Card className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
+    <Card className="relative overflow-hidden bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
       <CardHeader className="border-b border-gray-200 dark:border-gray-700">
         <CardTitle className="text-lg font-semibold text-gray-900 dark:text-gray-100">
           Métricas dos Últimos 7 Dias
         </CardTitle>
       </CardHeader>
-      <CardContent className="pt-6">
-        <div className="h-[300px] w-full">
+      <CardContent className="p-6">
+        <div className="min-h-[300px] w-full">
           <ChartContainer
-            className="w-full"
+            className="w-full h-full"
             config={{
               messages_sent: {
                 theme: {
@@ -111,10 +111,10 @@ export function MetricsOverview() {
               }
             }}
           >
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height={300}>
               <BarChart 
                 data={metrics}
-                margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
+                margin={{ top: 20, right: 30, left: 0, bottom: 5 }}
               >
                 <XAxis
                   dataKey="date"
@@ -122,6 +122,7 @@ export function MetricsOverview() {
                   tickLine={false}
                   axisLine={true}
                   stroke="#94A3B8"
+                  dy={10}
                 />
                 <YAxis 
                   fontSize={12}
@@ -129,6 +130,7 @@ export function MetricsOverview() {
                   axisLine={true}
                   yAxisId="messages"
                   stroke="#94A3B8"
+                  dx={-10}
                 />
                 <YAxis 
                   fontSize={12}
@@ -137,6 +139,7 @@ export function MetricsOverview() {
                   yAxisId="time"
                   orientation="right"
                   stroke="#94A3B8"
+                  dx={10}
                 />
                 <Tooltip 
                   cursor={{ fill: 'rgba(0,0,0,0.05)' }}
@@ -183,7 +186,7 @@ export function MetricsOverview() {
           </ChartContainer>
         </div>
 
-        <div className="grid grid-cols-3 gap-4 mt-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
           <div className="space-y-2 bg-gray-50 dark:bg-gray-900 p-4 rounded-lg border border-gray-200 dark:border-gray-700">
             <p className="text-sm text-gray-600 dark:text-gray-400">Total de Mensagens Enviadas</p>
             <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
