@@ -102,6 +102,13 @@ export function MetricsOverview() {
   const totalMessagesReceived = metrics?.reduce((acc, curr) => acc + (curr.messages_received || 0), 0) || 0
   const averageResponseTime = Math.round(metrics?.reduce((acc, curr) => acc + (curr.average_response_time_seconds || 0), 0) / (metrics?.length || 1)) || 0
 
+  const formatResponseTime = (seconds: number) => {
+    if (seconds < 60) return `${seconds}s`
+    const minutes = Math.floor(seconds / 60)
+    const remainingSeconds = seconds % 60
+    return `${minutes}min ${remainingSeconds}s`
+  }
+
   return (
     <Card className="relative overflow-hidden bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
       <CardHeader className="border-b border-gray-200 dark:border-gray-700">
@@ -219,7 +226,7 @@ export function MetricsOverview() {
           <div className="space-y-2 bg-gray-50 dark:bg-gray-900 p-4 rounded-lg border border-gray-200 dark:border-gray-700">
             <p className="text-sm text-gray-600 dark:text-gray-400">Tempo Médio de Resposta</p>
             <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-              {averageResponseTime}s
+              {formatResponseTime(averageResponseTime)}
             </p>
           </div>
         </div>
