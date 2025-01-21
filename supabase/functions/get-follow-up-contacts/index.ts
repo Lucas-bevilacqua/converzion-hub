@@ -7,26 +7,6 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-interface FollowUp {
-  id: string;
-  instance_id: string;
-  is_active: boolean;
-  follow_up_type: 'manual' | 'ai_generated';
-  instance: {
-    id: string;
-    name: string;
-    user_id: string;
-    connection_status: string;
-  };
-}
-
-interface Contact {
-  id: string;
-  TelefoneClientes: string;
-  ConversationId: string | null;
-  NomeDaEmpresa: string;
-}
-
 serve(async (req) => {
   console.log('🚀 [DEBUG] Iniciando função get-follow-up-contacts')
   
@@ -82,7 +62,7 @@ serve(async (req) => {
     const processedFollowUps = []
     const errors = []
 
-    for (const followUp of (followUps as FollowUp[] || [])) {
+    for (const followUp of (followUps || [])) {
       try {
         console.log(`📱 [DEBUG] Processando follow-up para instância: ${followUp.instance?.name}`)
         
@@ -107,7 +87,7 @@ serve(async (req) => {
 
         console.log(`📊 [DEBUG] Encontrados ${contacts?.length || 0} contatos para a instância ${followUp.instance.name}`)
 
-        for (const contact of (contacts as Contact[] || [])) {
+        for (const contact of (contacts || [])) {
           try {
             console.log(`👤 [DEBUG] Processando contato: ${contact.TelefoneClientes}`)
             
