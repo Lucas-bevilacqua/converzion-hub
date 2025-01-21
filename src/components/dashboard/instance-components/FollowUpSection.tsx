@@ -137,7 +137,7 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
         // Handle rate limiting error
         if (error?.message?.includes('ThrottlerException') || 
             error?.message?.includes('429') || 
-            (error as any)?.status === 429) {
+            error?.response?.status === 429) {
           console.log('⚠️ [RATE LIMIT] Follow-up rate limit reached')
           setIsRateLimited(true)
           
