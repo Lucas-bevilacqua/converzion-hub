@@ -27,7 +27,16 @@ export const useInstanceMutations = () => {
     mutationFn: async (instanceId: string) => {
       console.log('Disconnecting instance:', instanceId)
       
-      // First, delete all chat messages for this instance
+      const { data, error } = await supabase.functions.invoke('disconnect-evolution-instance', {
+        body: { instanceId }
+      })
+
+      if (error) {
+        console.error('Error disconnecting instance:', error)
+        throw error
+      }
+
+      // Delete chat messages after successful disconnect
       const { error: chatMessagesError } = await supabase
         .from('chat_messages')
         .delete()
@@ -38,22 +47,7 @@ export const useInstanceMutations = () => {
         throw chatMessagesError
       }
 
-      // Then call the disconnect function
-      const response = await fetch('/functions/v1/disconnect-evolution-instance', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`
-        },
-        body: JSON.stringify({ instanceId })
-      })
-
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.message || 'Failed to disconnect instance')
-      }
-
-      return response.json()
+      return data
     }
   })
 
