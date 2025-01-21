@@ -71,6 +71,16 @@ interface FollowUpData {
   system_prompt?: string;
 }
 
+interface PostgrestError {
+  message: string;
+  details: string;
+  hint: string;
+  code: string;
+  response?: {
+    status?: number;
+  }
+}
+
 export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
   const { user } = useAuth()
   const { toast } = useToast()
@@ -135,9 +145,9 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
         return data as unknown as FollowUpData
       } catch (error: any) {
         // Handle rate limiting error
-        if (error?.message?.includes('ThrottlerException') || 
-            error?.message?.includes('429') || 
-            error?.response?.status === 429) {
+        const postgrestError = error as PostgrestError;
+        if (postgrestError?.message?.includes('ThrottlerException') || 
+            postgrestError?.response?.status === 429) {
           console.log('⚠️ [RATE LIMIT] Follow-up rate limit reached')
           setIsRateLimited(true)
           
