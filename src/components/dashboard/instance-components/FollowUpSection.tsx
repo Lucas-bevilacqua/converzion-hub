@@ -145,24 +145,26 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
         return data as unknown as FollowUpData
       } catch (error) {
         // Handle rate limiting error
-        const postgrestError = error as unknown as PostgrestError;
-        if (postgrestError?.message?.includes('ThrottlerException') || 
-            postgrestError?.response?.status === 429) {
-          console.log('⚠️ [RATE LIMIT] Follow-up rate limit reached')
-          setIsRateLimited(true)
-          
-          // Clear any existing timeout
-          if (rateLimitTimeout.current) {
-            clearTimeout(rateLimitTimeout.current)
+        if (error instanceof Error) {
+          const postgrestError = error as unknown as PostgrestError
+          if (postgrestError?.message?.includes('ThrottlerException') || 
+              postgrestError?.response?.status === 429) {
+            console.log('⚠️ [RATE LIMIT] Follow-up rate limit reached')
+            setIsRateLimited(true)
+            
+            // Clear any existing timeout
+            if (rateLimitTimeout.current) {
+              clearTimeout(rateLimitTimeout.current)
+            }
+            
+            // Reset rate limit after 1 minute
+            rateLimitTimeout.current = setTimeout(() => {
+              console.log('✅ [RATE LIMIT] Resetting rate limit')
+              setIsRateLimited(false)
+            }, 60000)
+            
+            throw new Error('Rate limit reached. Please wait a minute before trying again.')
           }
-          
-          // Reset rate limit after 1 minute
-          rateLimitTimeout.current = setTimeout(() => {
-            console.log('✅ [RATE LIMIT] Resetting rate limit')
-            setIsRateLimited(false)
-          }, 60000)
-          
-          throw new Error('Rate limit reached. Please wait a minute before trying again.')
         }
         throw error
       }
@@ -304,22 +306,24 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
       console.error('❌ [ERROR] Erro na mutação de salvamento:', error)
       
       // Handle rate limiting error
-      const postgrestError = error as unknown as PostgrestError;
-      if (postgrestError?.message?.includes('ThrottlerException') || 
-          postgrestError?.response?.status === 429) {
-        setIsRateLimited(true)
-        
-        // Reset rate limit after 1 minute
-        setTimeout(() => {
-          setIsRateLimited(false)
-        }, 60000)
-        
-        toast({
-          title: "Rate Limit Reached",
-          description: "Too many requests. Please wait a minute before trying again.",
-          variant: "destructive",
-        })
-        return
+      if (error instanceof Error) {
+        const postgrestError = error as unknown as PostgrestError
+        if (postgrestError?.message?.includes('ThrottlerException') || 
+            postgrestError?.response?.status === 429) {
+          setIsRateLimited(true)
+          
+          // Reset rate limit after 1 minute
+          setTimeout(() => {
+            setIsRateLimited(false)
+          }, 60000)
+          
+          toast({
+            title: "Rate Limit Reached",
+            description: "Too many requests. Please wait a minute before trying again.",
+            variant: "destructive",
+          })
+          return
+        }
       }
 
       toast({
