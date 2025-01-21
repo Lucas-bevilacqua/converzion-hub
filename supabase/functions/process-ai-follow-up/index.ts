@@ -44,7 +44,8 @@ serve(async (req) => {
           id,
           name,
           user_id,
-          phone_number
+          phone_number,
+          connection_status
         )
       `)
       .eq('is_active', true)
@@ -64,6 +65,12 @@ serve(async (req) => {
       try {
         console.log(`[${executionId}] Processing follow-up for instance: ${followUp.instance?.name}`);
 
+        // Verificar se a instância está conectada
+        if (followUp.instance?.connection_status !== 'connected') {
+          console.log(`[${executionId}] ⚠️ Instance ${followUp.instance?.name} is not connected, skipping`);
+          continue;
+        }
+
         // Verificar última mensagem
         const { data: lastMessage } = await supabase
           .from('chat_messages')
@@ -79,7 +86,7 @@ serve(async (req) => {
           const nextMessageTime = new Date(lastMessageTime.getTime() + delayMinutes * 60000);
 
           if (nextMessageTime > new Date()) {
-            console.log(`[${executionId}] Waiting for delay time to pass`);
+            console.log(`[${executionId}] ⏳ Waiting for delay time to pass for instance ${followUp.instance?.name}`);
             continue;
           }
         }
@@ -93,7 +100,7 @@ serve(async (req) => {
           .order('created_at', { ascending: false });
 
         if (followUpMessages && followUpMessages.length >= (followUp.max_attempts || 3)) {
-          console.log(`[${executionId}] Max attempts reached`);
+          console.log(`[${executionId}] 🔄 Max attempts reached for instance ${followUp.instance?.name}`);
           continue;
         }
 
@@ -108,7 +115,7 @@ serve(async (req) => {
             .order('created_at', { ascending: false });
 
           if (userReplies?.length > 0) {
-            console.log(`[${executionId}] User has replied, stopping follow-up`);
+            console.log(`[${executionId}] ✋ User has replied for instance ${followUp.instance?.name}, stopping follow-up`);
             continue;
           }
         }
@@ -129,12 +136,12 @@ serve(async (req) => {
         );
 
         if (hasStopKeyword) {
-          console.log(`[${executionId}] Stop keyword found, skipping`);
+          console.log(`[${executionId}] 🛑 Stop keyword found for instance ${followUp.instance?.name}, skipping`);
           continue;
         }
 
         // Gerar mensagem com OpenAI
-        console.log(`[${executionId}] Generating message with OpenAI`);
+        console.log(`[${executionId}] 🤖 Generating message with OpenAI for instance ${followUp.instance?.name}`);
         const openAiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
           method: 'POST',
           headers: {
@@ -162,14 +169,16 @@ serve(async (req) => {
         });
 
         if (!openAiResponse.ok) {
-          throw new Error(await openAiResponse.text());
+          const errorText = await openAiResponse.text();
+          console.error(`[${executionId}] ❌ OpenAI error for instance ${followUp.instance?.name}:`, errorText);
+          throw new Error(errorText);
         }
 
         const aiData = await openAiResponse.json();
         const followUpMessage = aiData.choices[0].message.content;
 
         // Enviar mensagem via Evolution API
-        console.log(`[${executionId}] Sending message via Evolution API`);
+        console.log(`[${executionId}] 📤 Sending message via Evolution API for instance ${followUp.instance?.name}`);
         const evolutionApiUrl = (Deno.env.get('EVOLUTION_API_URL') || '').replace(/\/$/, '');
         const evolutionResponse = await fetch(
           `${evolutionApiUrl}/message/sendText/${followUp.instance.name}`,
@@ -187,10 +196,13 @@ serve(async (req) => {
         );
 
         if (!evolutionResponse.ok) {
-          throw new Error(await evolutionResponse.text());
+          const errorText = await evolutionResponse.text();
+          console.error(`[${executionId}] ❌ Evolution API error for instance ${followUp.instance?.name}:`, errorText);
+          throw new Error(errorText);
         }
 
         const evolutionData = await evolutionResponse.json();
+        console.log(`[${executionId}] ✅ Message sent successfully for instance ${followUp.instance?.name}`);
 
         // Salvar mensagem no histórico
         const { error: saveError } = await supabase
@@ -204,16 +216,18 @@ serve(async (req) => {
           });
 
         if (saveError) {
+          console.error(`[${executionId}] ❌ Error saving message for instance ${followUp.instance?.name}:`, saveError);
           throw saveError;
         }
 
         processedFollowUps.push({
           instanceId: followUp.instance_id,
-          messageId: evolutionData.key?.id
+          messageId: evolutionData.key?.id,
+          message: followUpMessage
         });
 
       } catch (error) {
-        console.error(`[${executionId}] Error processing follow-up:`, error);
+        console.error(`[${executionId}] ❌ Error processing follow-up for instance ${followUp.instance?.name}:`, error);
         errors.push({
           instanceId: followUp.instance_id,
           error: error.message
@@ -249,6 +263,11 @@ serve(async (req) => {
     
     // Log do erro
     try {
+      const supabase = createClient(
+        Deno.env.get('SUPABASE_URL') ?? '',
+        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+      );
+      
       await supabase
         .from('ai_follow_up_job_logs')
         .insert({
