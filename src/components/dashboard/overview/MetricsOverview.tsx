@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { ChartContainer } from "@/components/ui/chart"
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, Legend } from "recharts"
 import { useAuth } from "@/contexts/auth/AuthContext"
-import { format } from "date-fns"
+import { format, subDays } from "date-fns"
 import { ptBR } from "date-fns/locale"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Alert, AlertDescription } from "@/components/ui/alert"
@@ -19,12 +19,17 @@ export function MetricsOverview() {
       console.log('Fetching metrics for user:', user?.id)
       if (!user?.id) throw new Error('No user ID available')
 
+      // Calculate date range (last 7 days)
+      const endDate = new Date()
+      const startDate = subDays(endDate, 7)
+
       const { data, error } = await supabase
         .from('instance_metrics')
         .select('*')
         .eq('user_id', user.id)
+        .gte('created_at', startDate.toISOString())
+        .lte('created_at', endDate.toISOString())
         .order('created_at', { ascending: true })
-        .limit(7)
 
       if (error) {
         console.error('Error fetching metrics:', error)
@@ -32,10 +37,25 @@ export function MetricsOverview() {
       }
 
       console.log('Metrics data received:', data)
-      return data?.map(metric => ({
-        ...metric,
-        date: format(new Date(metric.created_at), 'dd/MM', { locale: ptBR }),
-      }))
+      
+      // Format dates and ensure we have data for all 7 days
+      const formattedData = []
+      for (let i = 6; i >= 0; i--) {
+        const date = subDays(new Date(), i)
+        const dayData = data?.find(m => 
+          format(new Date(m.created_at), 'yyyy-MM-dd') === format(date, 'yyyy-MM-dd')
+        )
+        
+        formattedData.push({
+          date: format(date, 'dd/MM', { locale: ptBR }),
+          messages_sent: dayData?.messages_sent || 0,
+          messages_received: dayData?.messages_received || 0,
+          average_response_time_seconds: dayData?.average_response_time_seconds || 0,
+          created_at: date.toISOString(),
+        })
+      }
+
+      return formattedData
     },
     enabled: !!user?.id,
     retry: 3,
