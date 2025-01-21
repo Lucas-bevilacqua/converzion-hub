@@ -169,7 +169,11 @@ export function MetricsOverview() {
                     padding: '8px',
                     boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
                   }}
-                  formatter={(value: number) => [value]}
+                  formatter={(value: number, name: string) => {
+                    const formattedName = name === "messages_sent" ? "Mensagens Enviadas" : "Mensagens Recebidas"
+                    return [value, formattedName]
+                  }}
+                  labelFormatter={(label) => `Data: ${label}`}
                 />
                 <Legend 
                   wrapperStyle={{
@@ -179,7 +183,7 @@ export function MetricsOverview() {
                 <Line
                   type="monotone"
                   dataKey="messages_sent"
-                  name="Mensagens Enviadas"
+                  name="messages_sent"
                   stroke="var(--color-messages_sent)"
                   strokeWidth={2}
                   dot={{ fill: "var(--color-messages_sent)" }}
@@ -188,7 +192,7 @@ export function MetricsOverview() {
                 <Line
                   type="monotone"
                   dataKey="messages_received"
-                  name="Mensagens Recebidas"
+                  name="messages_received"
                   stroke="var(--color-messages_received)"
                   strokeWidth={2}
                   dot={{ fill: "var(--color-messages_received)" }}
