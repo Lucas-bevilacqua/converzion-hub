@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { ChartContainer } from "@/components/ui/chart"
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, Legend } from "recharts"
 import { useAuth } from "@/contexts/auth/AuthContext"
-import { format, subDays } from "date-fns"
+import { format, subDays, startOfDay, endOfDay } from "date-fns"
 import { ptBR } from "date-fns/locale"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Alert, AlertDescription } from "@/components/ui/alert"
@@ -20,8 +20,10 @@ export function MetricsOverview() {
       if (!user?.id) throw new Error('No user ID available')
 
       // Calculate date range (last 7 days)
-      const endDate = new Date()
-      const startDate = subDays(endDate, 7)
+      const endDate = endOfDay(new Date())
+      const startDate = startOfDay(subDays(endDate, 6)) // 6 days ago to include today
+
+      console.log('Fetching metrics from', startDate, 'to', endDate)
 
       const { data, error } = await supabase
         .from('instance_metrics')
@@ -47,7 +49,7 @@ export function MetricsOverview() {
         )
         
         formattedData.push({
-          date: format(date, 'dd/MM', { locale: ptBR }),
+          date: format(date, 'dd/MM/yyyy', { locale: ptBR }),
           messages_sent: dayData?.messages_sent || 0,
           messages_received: dayData?.messages_received || 0,
           average_response_time_seconds: dayData?.average_response_time_seconds || 0,
@@ -55,6 +57,7 @@ export function MetricsOverview() {
         })
       }
 
+      console.log('Formatted data:', formattedData)
       return formattedData
     },
     enabled: !!user?.id,
@@ -147,6 +150,9 @@ export function MetricsOverview() {
                   axisLine={true}
                   stroke="#94A3B8"
                   dy={10}
+                  angle={-45}
+                  textAnchor="end"
+                  height={60}
                 />
                 <YAxis 
                   fontSize={12}
