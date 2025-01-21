@@ -9,7 +9,7 @@ const corsHeaders = {
 
 serve(async (req) => {
   const requestId = crypto.randomUUID()
-  console.log(`[${requestId}] 🚀 Starting get-follow-up-contacts function`)
+  console.log(`[${requestId}] 🚀 Iniciando função get-follow-up-contacts`)
   
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
@@ -21,27 +21,25 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    // Log initial details
-    const startTime = new Date().toISOString()
-    console.log(`[${requestId}] 📝 Execution started at ${startTime}`)
+    // Log início
+    console.log(`[${requestId}] 📝 Verificando credenciais e configurações`)
     
-    // Register execution start
+    // Registrar execução
     const { error: logError } = await supabaseClient
       .from('cron_logs')
       .insert({
         job_name: 'get-follow-up-contacts',
         status: 'started',
-        execution_time: startTime,
-        details: 'Starting follow-up contacts search',
+        details: 'Iniciando busca de contatos para follow-up',
         details_json: { request_id: requestId }
       })
 
     if (logError) {
-      console.error(`[${requestId}] ❌ Error logging start:`, logError)
+      console.error(`[${requestId}] ❌ Erro ao registrar log:`, logError)
     }
 
-    // Fetch active follow-ups
-    console.log(`[${requestId}] 🔍 Fetching active follow-ups`)
+    // Buscar follow-ups ativos
+    console.log(`[${requestId}] 🔍 Buscando follow-ups ativos`)
     const { data: followUps, error: followUpsError } = await supabaseClient
       .from('instance_follow_ups')
       .select(`
@@ -56,25 +54,25 @@ serve(async (req) => {
       .eq('is_active', true)
 
     if (followUpsError) {
-      throw new Error(`Error fetching follow-ups: ${followUpsError.message}`)
+      throw new Error(`Erro ao buscar follow-ups: ${followUpsError.message}`)
     }
 
-    console.log(`[${requestId}] ✅ Found ${followUps?.length || 0} active follow-ups`)
+    console.log(`[${requestId}] ✅ Encontrados ${followUps?.length || 0} follow-ups ativos`)
 
     const processedFollowUps = []
     const errors = []
 
     for (const followUp of (followUps || [])) {
       try {
-        console.log(`[${requestId}] 📱 Processing follow-up for instance: ${followUp.instance?.name}`)
+        console.log(`[${requestId}] 📱 Processando follow-up para instância: ${followUp.instance?.name}`)
         
         if (!followUp.instance?.connection_status || followUp.instance.connection_status !== 'connected') {
-          console.log(`[${requestId}] ⚠️ Instance ${followUp.instance?.name} not connected, skipping`)
+          console.log(`[${requestId}] ⚠️ Instância ${followUp.instance?.name} não conectada, pulando`)
           continue
         }
 
-        // Fetch contacts
-        console.log(`[${requestId}] 🔍 Fetching contacts for instance: ${followUp.instance.name}`)
+        // Buscar contatos
+        console.log(`[${requestId}] 🔍 Buscando contatos para instância: ${followUp.instance.name}`)
         const { data: contacts, error: contactsError } = await supabaseClient
           .from('Users_clientes')
           .select('*')
@@ -83,18 +81,18 @@ serve(async (req) => {
           .order('last_message_time', { ascending: true, nullsFirst: true })
 
         if (contactsError) {
-          throw new Error(`Error fetching contacts: ${contactsError.message}`)
+          throw new Error(`Erro ao buscar contatos: ${contactsError.message}`)
         }
 
-        console.log(`[${requestId}] 📊 Found ${contacts?.length || 0} contacts for instance ${followUp.instance.name}`)
+        console.log(`[${requestId}] 📊 Encontrados ${contacts?.length || 0} contatos para instância ${followUp.instance.name}`)
 
         for (const contact of (contacts || [])) {
           try {
-            console.log(`[${requestId}] 👤 Processing contact: ${contact.TelefoneClientes}`)
+            console.log(`[${requestId}] 👤 Processando contato: ${contact.TelefoneClientes}`)
             
             const processFollowUpUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/process-follow-up`
             
-            console.log(`[${requestId}] 🔄 Sending request to ${processFollowUpUrl}`)
+            console.log(`[${requestId}] 🔄 Enviando requisição para ${processFollowUpUrl}`)
             const processingResponse = await fetch(
               processFollowUpUrl,
               {
@@ -119,11 +117,11 @@ serve(async (req) => {
 
             if (!processingResponse.ok) {
               const errorText = await processingResponse.text()
-              throw new Error(`Error processing follow-up: ${errorText}`)
+              throw new Error(`Erro ao processar follow-up: ${errorText}`)
             }
 
             const responseData = await processingResponse.json()
-            console.log(`[${requestId}] ✅ Follow-up processed:`, responseData)
+            console.log(`[${requestId}] ✅ Follow-up processado:`, responseData)
 
             processedFollowUps.push({
               followUpId: followUp.id,
@@ -133,7 +131,7 @@ serve(async (req) => {
             })
 
           } catch (contactError) {
-            console.error(`[${requestId}] ❌ Failed to process contact ${contact.id}:`, contactError)
+            console.error(`[${requestId}] ❌ Falha ao processar contato ${contact.id}:`, contactError)
             errors.push({
               followUpId: followUp.id,
               contactId: contact.id,
@@ -143,7 +141,7 @@ serve(async (req) => {
           }
         }
       } catch (error) {
-        console.error(`[${requestId}] ❌ Failed to process follow-up ${followUp.id}:`, error)
+        console.error(`[${requestId}] ❌ Falha ao processar follow-up ${followUp.id}:`, error)
         errors.push({
           followUpId: followUp.id,
           error: error.message,
@@ -152,26 +150,24 @@ serve(async (req) => {
       }
     }
 
-    // Log completion
+    // Log conclusão
     const endTime = new Date().toISOString()
     const finalLog = {
       request_id: requestId,
       processed: processedFollowUps.length,
       errors: errors.length,
-      startTime,
       endTime,
-      duration: new Date(endTime).getTime() - new Date(startTime).getTime()
+      duration: new Date(endTime).getTime() - new Date().getTime()
     }
     
-    console.log(`[${requestId}] 📝 Execution completed:`, finalLog)
+    console.log(`[${requestId}] 📝 Execução concluída:`, finalLog)
     
     await supabaseClient
       .from('cron_logs')
       .insert({
         job_name: 'get-follow-up-contacts',
         status: 'completed',
-        execution_time: endTime,
-        details: 'Follow-up contacts processing completed',
+        details: 'Processamento de follow-up concluído',
         details_json: finalLog
       })
 
@@ -180,8 +176,6 @@ serve(async (req) => {
         success: true,
         processed: processedFollowUps,
         errors,
-        startTime,
-        endTime,
         request_id: requestId
       }),
       { 
@@ -193,7 +187,7 @@ serve(async (req) => {
     )
 
   } catch (error) {
-    console.error(`[${requestId}] ❌ Critical error:`, error)
+    console.error(`[${requestId}] ❌ Erro crítico:`, error)
     
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
@@ -205,8 +199,7 @@ serve(async (req) => {
       .insert({
         job_name: 'get-follow-up-contacts',
         status: 'error',
-        execution_time: new Date().toISOString(),
-        details: 'Function execution failed',
+        details: 'Falha na execução da função',
         details_json: {
           request_id: requestId,
           error: error.message,
