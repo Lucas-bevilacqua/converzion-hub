@@ -1,0 +1,2 @@
+[functions.test-follow-up-cron]
+verify_jwt = false
