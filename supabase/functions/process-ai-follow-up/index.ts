@@ -253,7 +253,8 @@ serve(async (req) => {
       JSON.stringify({ 
         success: true,
         processed: processedFollowUps,
-        errors 
+        errors,
+        execution_id: executionId
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
@@ -286,7 +287,8 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({ 
         success: false,
-        error: error.message 
+        error: error.message,
+        execution_id: executionId
       }),
       { 
         status: 500,
