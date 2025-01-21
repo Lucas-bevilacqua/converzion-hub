@@ -122,7 +122,7 @@ export function InstanceToolsSection({ instanceId }: InstanceToolsSectionProps) 
   const handleAddTool = () => {
     if (!selectedTool) return
 
-    if (selectedTool === ToolType.WEBHOOK && (!webhookUrl || !webhookSecret)) {
+    if (selectedTool === ToolType.N8N && (!webhookUrl || !webhookSecret)) {
       toast({
         title: "Campos obrigatórios",
         description: "Por favor preencha a URL e o segredo do webhook.",
@@ -260,7 +260,7 @@ export function InstanceToolsSection({ instanceId }: InstanceToolsSectionProps) 
               </Select>
             </div>
 
-            {selectedTool === ToolType.WEBHOOK && (
+            {selectedTool === ToolType.N8N && (
               <div className="space-y-4">
                 <div className="space-y-2">
                   <Label>URL do Webhook</Label>
