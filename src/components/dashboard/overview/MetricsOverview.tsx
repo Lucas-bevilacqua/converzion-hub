@@ -150,7 +150,6 @@ export function MetricsOverview() {
                   fontSize={12}
                   tickLine={false}
                   axisLine={true}
-                  yAxisId="messages"
                   stroke="#94A3B8"
                   dx={-10}
                   label={{ 
@@ -179,6 +178,9 @@ export function MetricsOverview() {
                   wrapperStyle={{
                     paddingTop: '20px'
                   }}
+                  formatter={(value) => {
+                    return value === "messages_sent" ? "Mensagens Enviadas" : "Mensagens Recebidas"
+                  }}
                 />
                 <Line
                   type="monotone"
@@ -187,7 +189,6 @@ export function MetricsOverview() {
                   stroke="var(--color-messages_sent)"
                   strokeWidth={2}
                   dot={{ fill: "var(--color-messages_sent)" }}
-                  yAxisId="messages"
                 />
                 <Line
                   type="monotone"
@@ -196,7 +197,6 @@ export function MetricsOverview() {
                   stroke="var(--color-messages_received)"
                   strokeWidth={2}
                   dot={{ fill: "var(--color-messages_received)" }}
-                  yAxisId="messages"
                 />
               </LineChart>
             </ResponsiveContainer>
