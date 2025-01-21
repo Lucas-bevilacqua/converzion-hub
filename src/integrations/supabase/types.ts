@@ -259,6 +259,30 @@ export type Database = {
           },
         ]
       }
+      follow_up_executions: {
+        Row: {
+          details: Json | null
+          execution_time: string | null
+          id: string
+          next_scheduled_run: string | null
+          status: string | null
+        }
+        Insert: {
+          details?: Json | null
+          execution_time?: string | null
+          id?: string
+          next_scheduled_run?: string | null
+          status?: string | null
+        }
+        Update: {
+          details?: Json | null
+          execution_time?: string | null
+          id?: string
+          next_scheduled_run?: string | null
+          status?: string | null
+        }
+        Relationships: []
+      }
       instance_configurations: {
         Row: {
           created_at: string | null
@@ -810,6 +834,14 @@ export type Database = {
           http_status_code: number
           response_text: string
           error_text: string
+        }[]
+      }
+      test_follow_up_service_key: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          check_name: string
+          status: string
+          details: Json
         }[]
       }
       test_service_key_config: {
