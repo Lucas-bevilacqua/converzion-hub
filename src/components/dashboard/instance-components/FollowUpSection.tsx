@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { supabase } from "@/integrations/supabase/client"
 import { Switch } from "@/components/ui/switch"
@@ -76,53 +76,91 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
   const { toast } = useToast()
   const queryClient = useQueryClient()
 
+  // Add rate limiting state
+  const [isRateLimited, setIsRateLimited] = useState(false)
+  const rateLimitTimeout = useRef<NodeJS.Timeout>()
+
   console.log('🔄 [DEBUG] Iniciando FollowUpSection para instância:', instanceId)
 
-  const { data: followUp, isLoading } = useQuery({
+  const { data: followUp, isLoading, error } = useQuery({
     queryKey: ['follow-up', instanceId],
     queryFn: async () => {
       console.log('🔍 [DEBUG] Buscando configurações de follow-up para instância:', instanceId)
-      const { data, error } = await supabase
-        .from('instance_follow_ups')
-        .select('*')
-        .eq('instance_id', instanceId)
-        .maybeSingle()
-
-      if (error && error.code !== 'PGRST116') {
-        console.error('❌ [ERROR] Erro ao buscar follow-up:', error)
-        throw error
+      
+      if (isRateLimited) {
+        throw new Error('Rate limit reached. Please wait before making more requests.')
       }
 
-      if (data?.manual_messages) {
-        try {          
-          let parsedMessages = data.manual_messages
-          
-          if (typeof parsedMessages === 'string') {
-            try {
-              parsedMessages = JSON.parse(parsedMessages)
-            } catch (e) {
+      try {
+        const { data, error } = await supabase
+          .from('instance_follow_ups')
+          .select('*')
+          .eq('instance_id', instanceId)
+          .maybeSingle()
+
+        if (error && error.code !== 'PGRST116') {
+          console.error('❌ [ERROR] Erro ao buscar follow-up:', error)
+          throw error
+        }
+
+        if (data?.manual_messages) {
+          try {          
+            let parsedMessages = data.manual_messages
+            
+            if (typeof parsedMessages === 'string') {
+              try {
+                parsedMessages = JSON.parse(parsedMessages)
+              } catch (e) {
+                parsedMessages = []
+              }
+            }
+            
+            if (!Array.isArray(parsedMessages)) {
               parsedMessages = []
             }
-          }
-          
-          if (!Array.isArray(parsedMessages)) {
-            parsedMessages = []
-          }
-          
-          const typedMessages = parsedMessages.map((msg: any) => ({
-            message: String(msg?.message || ''),
-            delay_minutes: Number(msg?.delay_minutes || 1)
-          }))
+            
+            const typedMessages = parsedMessages.map((msg: any) => ({
+              message: String(msg?.message || ''),
+              delay_minutes: Number(msg?.delay_minutes || 1)
+            }))
 
-          data.manual_messages = typedMessages
-        } catch (e) {
-          console.error('❌ [ERROR] Erro ao processar mensagens:', e)
-          data.manual_messages = []
+            data.manual_messages = typedMessages
+          } catch (e) {
+            console.error('❌ [ERROR] Erro ao processar mensagens:', e)
+            data.manual_messages = []
+          }
         }
-      }
 
-      console.log('✅ [DEBUG] Configurações de follow-up carregadas:', data)
-      return data as unknown as FollowUpData
+        console.log('✅ [DEBUG] Configurações de follow-up carregadas:', data)
+        return data as unknown as FollowUpData
+      } catch (error: any) {
+        // Handle rate limiting error
+        if (error?.message?.includes('ThrottlerException') || error?.status === 429) {
+          console.log('⚠️ [RATE LIMIT] Follow-up rate limit reached')
+          setIsRateLimited(true)
+          
+          // Clear any existing timeout
+          if (rateLimitTimeout.current) {
+            clearTimeout(rateLimitTimeout.current)
+          }
+          
+          // Reset rate limit after 1 minute
+          rateLimitTimeout.current = setTimeout(() => {
+            console.log('✅ [RATE LIMIT] Resetting rate limit')
+            setIsRateLimited(false)
+          }, 60000)
+          
+          throw new Error('Rate limit reached. Please wait a minute before trying again.')
+        }
+        throw error
+      }
+    },
+    retry: (failureCount, error: any) => {
+      // Don't retry on rate limit errors
+      if (error?.message?.includes('Rate limit reached')) {
+        return false
+      }
+      return failureCount < 3
     }
   })
 
@@ -163,6 +201,10 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
 
   const saveMutation = useMutation({
     mutationFn: async (values: FormData) => {      
+      if (isRateLimited) {
+        throw new Error('Rate limit reached. Please wait before making more requests.')
+      }
+
       console.log('💾 [DEBUG] Salvando configurações de follow-up:', values)
       
       const manualMessages = Array.isArray(values.manual_messages) 
@@ -248,6 +290,24 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
     },
     onError: (error) => {
       console.error('❌ [ERROR] Erro na mutação de salvamento:', error)
+      
+      // Handle rate limiting error
+      if (error?.message?.includes('ThrottlerException') || error?.status === 429) {
+        setIsRateLimited(true)
+        
+        // Reset rate limit after 1 minute
+        setTimeout(() => {
+          setIsRateLimited(false)
+        }, 60000)
+        
+        toast({
+          title: "Rate Limit Reached",
+          description: "Too many requests. Please wait a minute before trying again.",
+          variant: "destructive",
+        })
+        return
+      }
+
       toast({
         title: "Erro",
         description: "Não foi possível salvar as configurações. Por favor, tente novamente.",
@@ -351,6 +411,17 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
     return (
       <div className="flex justify-center p-4">
         <div className="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full" />
+      </div>
+    )
+  }
+
+  if (isRateLimited) {
+    return (
+      <div className="flex flex-col items-center justify-center p-8 space-y-4">
+        <div className="text-destructive text-lg font-medium">Rate Limit Reached</div>
+        <p className="text-muted-foreground text-center">
+          Too many requests. Please wait a minute before trying again.
+        </p>
       </div>
     )
   }
