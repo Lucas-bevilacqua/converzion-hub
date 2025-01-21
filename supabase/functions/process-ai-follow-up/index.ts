@@ -16,12 +16,26 @@ serve(async (req) => {
   }
 
   try {
+    console.log(`[${executionId}] 🔑 Initializing Supabase client`);
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
+    // Log de início da execução
+    console.log(`[${executionId}] 📝 Registrando início da execução`);
+    await supabase
+      .from('ai_follow_up_job_logs')
+      .insert({
+        status: 'started',
+        details: {
+          execution_id: executionId,
+          start_time: new Date().toISOString()
+        }
+      });
+
     // Buscar follow-ups ativos do tipo AI
+    console.log(`[${executionId}] 🔍 Buscando follow-ups ativos`);
     const { data: followUps, error: followUpsError } = await supabase
       .from('instance_follow_ups')
       .select(`
@@ -37,10 +51,11 @@ serve(async (req) => {
       .eq('follow_up_type', 'ai_generated');
 
     if (followUpsError) {
+      console.error(`[${executionId}] ❌ Erro ao buscar follow-ups:`, followUpsError);
       throw followUpsError;
     }
 
-    console.log(`[${executionId}] Found ${followUps?.length || 0} active AI follow-ups`);
+    console.log(`[${executionId}] ✅ Encontrados ${followUps?.length || 0} follow-ups ativos`);
 
     const processedFollowUps = [];
     const errors = [];
@@ -206,9 +221,10 @@ serve(async (req) => {
       }
     }
 
-    // Registrar execução
+    // Log de conclusão
+    console.log(`[${executionId}] 📝 Registrando conclusão da execução`);
     await supabase
-      .from('ai_follow_up_logs')
+      .from('ai_follow_up_job_logs')
       .insert({
         status: errors.length > 0 ? 'completed with errors' : 'completed successfully',
         details: {
@@ -229,7 +245,25 @@ serve(async (req) => {
     );
 
   } catch (error) {
-    console.error(`[${executionId}] Critical error:`, error);
+    console.error(`[${executionId}] ❌ Erro crítico:`, error);
+    
+    // Log do erro
+    try {
+      await supabase
+        .from('ai_follow_up_job_logs')
+        .insert({
+          status: 'error',
+          details: {
+            execution_id: executionId,
+            error: error.message,
+            stack: error.stack,
+            time: new Date().toISOString()
+          }
+        });
+    } catch (logError) {
+      console.error(`[${executionId}] ❌ Erro ao registrar log:`, logError);
+    }
+
     return new Response(
       JSON.stringify({ 
         success: false,
