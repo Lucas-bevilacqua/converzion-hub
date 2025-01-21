@@ -6,11 +6,6 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-const EVOLUTION_API_URL = Deno.env.get('EVOLUTION_API_URL')
-const EVOLUTION_API_KEY = Deno.env.get('EVOLUTION_API_KEY')
-const SUPABASE_URL = Deno.env.get('SUPABASE_URL')
-const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
-
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -26,7 +21,9 @@ serve(async (req) => {
     }
 
     // Initialize Supabase client
-    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    const supabase = createClient(supabaseUrl, supabaseKey)
 
     // Get instance details
     const { data: instance, error: instanceError } = await supabase
@@ -40,16 +37,23 @@ serve(async (req) => {
       throw new Error('Instance not found')
     }
 
-    // Clean the base URL by removing trailing slashes
-    const cleanBaseUrl = EVOLUTION_API_URL?.replace(/\/+$/, '')
-    console.log('Clean base URL:', cleanBaseUrl)
-
     // Call Evolution API to disconnect instance
+    const evolutionApiUrl = Deno.env.get('EVOLUTION_API_URL')
+    const evolutionApiKey = Deno.env.get('EVOLUTION_API_KEY')
+
+    if (!evolutionApiUrl || !evolutionApiKey) {
+      throw new Error('Evolution API configuration missing')
+    }
+
+    // Clean the base URL by removing trailing slashes
+    const cleanBaseUrl = evolutionApiUrl.replace(/\/+$/, '')
+    console.log('Calling Evolution API to disconnect instance:', instance.name)
+
     const logoutResponse = await fetch(`${cleanBaseUrl}/instance/logout/${instance.name}`, {
       method: 'DELETE',
       headers: {
         'Content-Type': 'application/json',
-        'apikey': EVOLUTION_API_KEY
+        'apikey': evolutionApiKey
       }
     })
 
