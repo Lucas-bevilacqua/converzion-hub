@@ -1,8 +1,10 @@
 export enum ToolType {
   CALENDAR = 'calendar',
   CRM = 'crm',
-  LANGCHAIN = 'langchain',
-  WEBHOOK = 'webhook'
+  PAYMENT = 'payment',
+  CUSTOM = 'custom',
+  N8N = 'n8n',
+  LANGCHAIN = 'langchain'
 }
 
 export interface InstanceTool {
@@ -39,9 +41,19 @@ export const TOOL_CONFIGS = {
     label: 'LangChain',
     description: 'Integração com LangChain para processamento de linguagem natural'
   },
-  [ToolType.WEBHOOK]: {
+  [ToolType.N8N]: {
     icon: 'Webhook',
-    label: 'Webhook',
-    description: 'Integração via webhooks personalizados'
+    label: 'n8n',
+    description: 'Integração com n8n para automações'
+  },
+  [ToolType.PAYMENT]: {
+    icon: 'CreditCard',
+    label: 'Pagamento',
+    description: 'Integração com sistemas de pagamento'
+  },
+  [ToolType.CUSTOM]: {
+    icon: 'Settings',
+    label: 'Personalizado',
+    description: 'Integração personalizada'
   }
 } as const;

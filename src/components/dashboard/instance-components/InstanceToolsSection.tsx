@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { useToast } from "@/components/ui/use-toast"
-import { Calendar, Users, Check, X, ExternalLink, Key, Webhook, Brain } from "lucide-react"
+import { Calendar, Users, Check, X, ExternalLink, Key, Webhook, Brain, CreditCard, Settings } from "lucide-react"
 import { InstanceTool, ToolType, TOOL_CONFIGS } from "@/types/instance-tools"
 import {
   Collapsible,
@@ -58,16 +58,14 @@ export function InstanceToolsSection({ instanceId }: InstanceToolsSectionProps) 
     mutationFn: async (toolType: ToolType) => {
       const { data, error } = await supabase
         .from('instance_tools')
-        .insert([
-          {
-            instance_id: instanceId,
-            tool_type: toolType,
-            is_active: true,
-            settings: {},
-            webhook_url: toolType === ToolType.WEBHOOK ? webhookUrl : undefined,
-            webhook_secret: toolType === ToolType.WEBHOOK ? webhookSecret : undefined,
-          }
-        ])
+        .insert({
+          instance_id: instanceId,
+          tool_type: toolType,
+          is_active: true,
+          settings: {},
+          webhook_url: toolType === ToolType.N8N ? webhookUrl : undefined,
+          webhook_secret: toolType === ToolType.N8N ? webhookSecret : undefined,
+        })
         .select()
         .single()
 
@@ -144,8 +142,12 @@ export function InstanceToolsSection({ instanceId }: InstanceToolsSectionProps) 
         return <Users className="h-4 w-4" />
       case ToolType.LANGCHAIN:
         return <Brain className="h-4 w-4" />
-      case ToolType.WEBHOOK:
+      case ToolType.N8N:
         return <Webhook className="h-4 w-4" />
+      case ToolType.PAYMENT:
+        return <CreditCard className="h-4 w-4" />
+      case ToolType.CUSTOM:
+        return <Settings className="h-4 w-4" />
       default:
         return null
     }
