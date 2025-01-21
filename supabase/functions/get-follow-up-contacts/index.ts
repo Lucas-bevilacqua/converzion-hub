@@ -21,7 +21,8 @@ serve(async (req) => {
     )
 
     // Log inicial detalhado
-    console.log('📝 [DEBUG] Registrando início da execução com timestamp:', new Date().toISOString())
+    const startTime = new Date().toISOString()
+    console.log(`📝 [DEBUG] Iniciando execução em ${startTime}`)
     
     // Registrar no banco
     const { error: logError } = await supabaseClient
@@ -29,7 +30,7 @@ serve(async (req) => {
       .insert({
         job_name: 'get-follow-up-contacts',
         status: 'iniciado',
-        execution_time: new Date().toISOString(),
+        execution_time: startTime,
         details: 'Iniciando busca de follow-ups ativos'
       })
 
@@ -53,12 +54,10 @@ serve(async (req) => {
       .eq('is_active', true)
 
     if (followUpsError) {
-      console.error('❌ [ERROR] Erro ao buscar follow-ups:', followUpsError)
-      throw followUpsError
+      throw new Error(`Erro ao buscar follow-ups: ${followUpsError.message}`)
     }
 
     console.log(`✅ [DEBUG] Encontrados ${followUps?.length || 0} follow-ups ativos`)
-    console.log('📝 [DEBUG] Follow-ups encontrados:', JSON.stringify(followUps, null, 2))
 
     const processedFollowUps = []
     const errors = []
@@ -82,12 +81,10 @@ serve(async (req) => {
           .order('last_message_time', { ascending: true, nullsFirst: true })
 
         if (contactsError) {
-          console.error(`❌ [ERROR] Erro ao buscar contatos para ${followUp.instance.name}:`, contactsError)
-          throw contactsError
+          throw new Error(`Erro ao buscar contatos: ${contactsError.message}`)
         }
 
         console.log(`📊 [DEBUG] Encontrados ${contacts?.length || 0} contatos para a instância ${followUp.instance.name}`)
-        console.log('📝 [DEBUG] Contatos encontrados:', JSON.stringify(contacts, null, 2))
 
         for (const contact of (contacts || [])) {
           try {
@@ -118,15 +115,12 @@ serve(async (req) => {
               }
             )
 
-            const responseText = await processingResponse.text()
-            console.log('📝 [DEBUG] Resposta da requisição:', responseText)
-
             if (!processingResponse.ok) {
-              console.error(`❌ [ERROR] Erro ao processar follow-up para ${contact.TelefoneClientes}:`, responseText)
-              throw new Error(`Erro ao processar follow-up: ${responseText}`)
+              const errorText = await processingResponse.text()
+              throw new Error(`Erro ao processar follow-up: ${errorText}`)
             }
 
-            const responseData = JSON.parse(responseText)
+            const responseData = await processingResponse.json()
             console.log('✅ [DEBUG] Follow-up processado:', responseData)
 
             processedFollowUps.push({
@@ -157,10 +151,12 @@ serve(async (req) => {
     }
 
     // Log final detalhado
+    const endTime = new Date().toISOString()
     const finalLog = {
       processed: processedFollowUps.length,
       errors: errors.length,
-      timestamp: new Date().toISOString()
+      startTime,
+      endTime
     }
     
     console.log('📝 [DEBUG] Finalizando execução:', finalLog)
@@ -170,7 +166,7 @@ serve(async (req) => {
       .insert({
         job_name: 'get-follow-up-contacts',
         status: 'completado',
-        execution_time: new Date().toISOString(),
+        execution_time: endTime,
         details: JSON.stringify(finalLog)
       })
 
@@ -179,9 +175,15 @@ serve(async (req) => {
         success: true,
         processed: processedFollowUps,
         errors,
-        timestamp: new Date().toISOString()
+        startTime,
+        endTime
       }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { 
+        headers: { 
+          ...corsHeaders, 
+          'Content-Type': 'application/json' 
+        } 
+      }
     )
 
   } catch (error) {
@@ -196,7 +198,7 @@ serve(async (req) => {
       .from('cron_logs')
       .insert({
         job_name: 'get-follow-up-contacts',
-        status: `erro: ${error.message}`,
+        status: 'erro',
         execution_time: new Date().toISOString(),
         details: JSON.stringify({
           error: error.message,
@@ -212,7 +214,10 @@ serve(async (req) => {
       }),
       { 
         status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        headers: { 
+          ...corsHeaders, 
+          'Content-Type': 'application/json' 
+        } 
       }
     )
   }
