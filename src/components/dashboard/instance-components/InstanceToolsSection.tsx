@@ -33,21 +33,21 @@ interface InstanceToolsSectionProps {
   instanceId: string;
 }
 
-const TOOL_ICONS = {
+const TOOL_ICONS: Record<ToolType, any> = {
   calendar: Calendar,
   crm: Users,
   n8n: Webhook,
   langchain: Brain,
-} as const;
+};
 
-const TOOL_LABELS = {
+const TOOL_LABELS: Record<ToolType, string> = {
   calendar: "Calendário",
   crm: "CRM",
   n8n: "n8n (Automação)",
   langchain: "LangChain (IA)",
 };
 
-const TOOL_DESCRIPTIONS = {
+const TOOL_DESCRIPTIONS: Record<ToolType, string> = {
   calendar: "Conecte seu sistema de agendamentos para que seus clientes possam marcar horários automaticamente pelo WhatsApp",
   crm: "Conecte seu CRM para registrar automaticamente informações dos seus clientes",
   n8n: "Conecte o n8n para criar automações personalizadas com seu WhatsApp",
