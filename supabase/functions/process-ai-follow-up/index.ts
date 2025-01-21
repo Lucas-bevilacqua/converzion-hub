@@ -9,7 +9,8 @@ const corsHeaders = {
 
 serve(async (req) => {
   const executionId = crypto.randomUUID();
-  console.log(`[${executionId}] 🚀 Starting process-ai-follow-up function`);
+  const startTime = new Date();
+  console.log(`[${executionId}] 🚀 Starting process-ai-follow-up function at ${startTime.toISOString()}`);
   
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -30,7 +31,7 @@ serve(async (req) => {
         status: 'started',
         details: {
           execution_id: executionId,
-          start_time: new Date().toISOString()
+          start_time: startTime.toISOString()
         }
       });
 
@@ -235,32 +236,40 @@ serve(async (req) => {
       }
     }
 
+    const endTime = new Date();
+    const executionTime = endTime.getTime() - startTime.getTime();
+    console.log(`[${executionId}] ⏱️ Tempo total de execução: ${executionTime}ms`);
+
     // Log de conclusão
     console.log(`[${executionId}] 📝 Registrando conclusão da execução`);
     await supabase
       .from('ai_follow_up_job_logs')
       .insert({
-        status: errors.length > 0 ? 'completed with errors' : 'completed successfully',
+        status: 'completed',
         details: {
           execution_id: executionId,
-          processed: processedFollowUps,
-          errors,
-          end_time: new Date().toISOString()
+          start_time: startTime.toISOString(),
+          end_time: endTime.toISOString(),
+          execution_time_ms: executionTime,
+          follow_ups_found: followUps?.length || 0
         }
       });
 
     return new Response(
       JSON.stringify({ 
         success: true,
-        processed: processedFollowUps,
-        errors,
-        execution_id: executionId
+        execution_id: executionId,
+        execution_time_ms: executionTime,
+        follow_ups_found: followUps?.length || 0
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
   } catch (error) {
     console.error(`[${executionId}] ❌ Erro crítico:`, error);
+    
+    const endTime = new Date();
+    const executionTime = endTime.getTime() - startTime.getTime();
     
     // Log do erro
     try {
@@ -277,7 +286,9 @@ serve(async (req) => {
             execution_id: executionId,
             error: error.message,
             stack: error.stack,
-            time: new Date().toISOString()
+            start_time: startTime.toISOString(),
+            end_time: endTime.toISOString(),
+            execution_time_ms: executionTime
           }
         });
     } catch (logError) {
@@ -288,7 +299,8 @@ serve(async (req) => {
       JSON.stringify({ 
         success: false,
         error: error.message,
-        execution_id: executionId
+        execution_id: executionId,
+        execution_time_ms: executionTime
       }),
       { 
         status: 500,
