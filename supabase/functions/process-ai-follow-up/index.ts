@@ -86,6 +86,10 @@ serve(async (req) => {
           const delayMinutes = followUp.delay_minutes || 60;
           const nextMessageTime = new Date(lastMessageTime.getTime() + delayMinutes * 60000);
 
+          console.log(`[${executionId}] ⏰ Last message time: ${lastMessageTime.toISOString()}`);
+          console.log(`[${executionId}] ⏰ Next message time: ${nextMessageTime.toISOString()}`);
+          console.log(`[${executionId}] ⏰ Current time: ${new Date().toISOString()}`);
+
           if (nextMessageTime > new Date()) {
             console.log(`[${executionId}] ⏳ Waiting for delay time to pass for instance ${followUp.instance?.name}`);
             continue;
@@ -166,17 +170,20 @@ serve(async (req) => {
               }
             ],
             temperature: 0.7,
+            max_tokens: 150
           }),
         });
 
         if (!openAiResponse.ok) {
           const errorText = await openAiResponse.text();
           console.error(`[${executionId}] ❌ OpenAI error for instance ${followUp.instance?.name}:`, errorText);
-          throw new Error(errorText);
+          throw new Error(`OpenAI API error: ${errorText}`);
         }
 
         const aiData = await openAiResponse.json();
         const followUpMessage = aiData.choices[0].message.content;
+
+        console.log(`[${executionId}] 📝 Generated message:`, followUpMessage);
 
         // Enviar mensagem via Evolution API
         console.log(`[${executionId}] 📤 Sending message via Evolution API for instance ${followUp.instance?.name}`);
@@ -199,7 +206,7 @@ serve(async (req) => {
         if (!evolutionResponse.ok) {
           const errorText = await evolutionResponse.text();
           console.error(`[${executionId}] ❌ Evolution API error for instance ${followUp.instance?.name}:`, errorText);
-          throw new Error(errorText);
+          throw new Error(`Evolution API error: ${errorText}`);
         }
 
         const evolutionData = await evolutionResponse.json();
@@ -251,7 +258,9 @@ serve(async (req) => {
           start_time: startTime.toISOString(),
           end_time: endTime.toISOString(),
           execution_time_ms: executionTime,
-          follow_ups_found: followUps?.length || 0
+          follow_ups_found: followUps?.length || 0,
+          processed: processedFollowUps,
+          errors: errors
         }
       });
 
@@ -260,7 +269,9 @@ serve(async (req) => {
         success: true,
         execution_id: executionId,
         execution_time_ms: executionTime,
-        follow_ups_found: followUps?.length || 0
+        follow_ups_found: followUps?.length || 0,
+        processed: processedFollowUps,
+        errors: errors
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
