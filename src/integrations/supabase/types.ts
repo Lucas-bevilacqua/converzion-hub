@@ -328,12 +328,15 @@ export type Database = {
         Row: {
           created_at: string
           delay_minutes: number | null
+          execution_count: number | null
           follow_up_type: Database["public"]["Enums"]["follow_up_type"] | null
           id: string
           instance_id: string
           is_active: boolean | null
+          last_execution_time: string | null
           manual_messages: Json | null
           max_attempts: number | null
+          next_execution_time: string | null
           schedule_days: number[] | null
           schedule_end_time: string | null
           schedule_start_time: string | null
@@ -347,12 +350,15 @@ export type Database = {
         Insert: {
           created_at?: string
           delay_minutes?: number | null
+          execution_count?: number | null
           follow_up_type?: Database["public"]["Enums"]["follow_up_type"] | null
           id?: string
           instance_id: string
           is_active?: boolean | null
+          last_execution_time?: string | null
           manual_messages?: Json | null
           max_attempts?: number | null
+          next_execution_time?: string | null
           schedule_days?: number[] | null
           schedule_end_time?: string | null
           schedule_start_time?: string | null
@@ -366,12 +372,15 @@ export type Database = {
         Update: {
           created_at?: string
           delay_minutes?: number | null
+          execution_count?: number | null
           follow_up_type?: Database["public"]["Enums"]["follow_up_type"] | null
           id?: string
           instance_id?: string
           is_active?: boolean | null
+          last_execution_time?: string | null
           manual_messages?: Json | null
           max_attempts?: number | null
+          next_execution_time?: string | null
           schedule_days?: number[] | null
           schedule_end_time?: string | null
           schedule_start_time?: string | null
