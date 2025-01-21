@@ -161,6 +161,12 @@ export function MetricsOverview() {
                   yAxisId="messages"
                   stroke="#94A3B8"
                   dx={-10}
+                  label={{ 
+                    value: 'Quantidade de Mensagens', 
+                    angle: -90, 
+                    position: 'insideLeft',
+                    style: { textAnchor: 'middle' }
+                  }}
                 />
                 <YAxis 
                   fontSize={12}
@@ -170,6 +176,12 @@ export function MetricsOverview() {
                   orientation="right"
                   stroke="#94A3B8"
                   dx={10}
+                  label={{ 
+                    value: 'Tempo de Resposta (segundos)', 
+                    angle: 90, 
+                    position: 'insideRight',
+                    style: { textAnchor: 'middle' }
+                  }}
                 />
                 <Tooltip 
                   cursor={{ stroke: 'rgba(0,0,0,0.05)', strokeWidth: 2 }}
