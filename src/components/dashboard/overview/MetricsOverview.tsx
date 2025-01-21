@@ -102,20 +102,19 @@ export function MetricsOverview() {
   const totalMessagesSent = metrics?.reduce((acc, curr) => acc + (curr.messages_sent || 0), 0) || 0
   const totalMessagesReceived = metrics?.reduce((acc, curr) => acc + (curr.messages_received || 0), 0) || 0
   
-  // Calcular tempo médio de resposta apenas dos dias que tiveram interações
-  const daysWithInteractions = metrics?.filter(day => 
-    day.messages_sent > 0 && 
+  // Calcular tempo médio de resposta do bot apenas dos dias que tiveram mensagens
+  const daysWithMessages = metrics?.filter(day => 
     day.messages_received > 0 && 
     day.average_response_time_seconds > 0
   ) || []
   
-  console.log('Dias com interações:', daysWithInteractions)
+  console.log('Dias com mensagens:', daysWithMessages)
   
-  const averageResponseTime = daysWithInteractions.length > 0
-    ? Math.round(daysWithInteractions.reduce((acc, curr) => acc + curr.average_response_time_seconds, 0) / daysWithInteractions.length)
+  const averageResponseTime = daysWithMessages.length > 0
+    ? Math.round(daysWithMessages.reduce((acc, curr) => acc + curr.average_response_time_seconds, 0) / daysWithMessages.length)
     : 0
 
-  console.log('Tempo médio de resposta calculado (segundos):', averageResponseTime)
+  console.log('Tempo médio de resposta do bot (segundos):', averageResponseTime)
 
   const formatResponseTime = (seconds: number) => {
     if (!seconds) return '0s'
