@@ -22,24 +22,26 @@ export function InstanceListItem({ instance, onConnect }: InstanceListItemProps)
   const { data: stateData } = useQuery({
     queryKey: ['instanceState', instance.id],
     queryFn: async () => {
-      console.log('Checking state for instance:', instance.id)
+      console.log('Verificando estado da instância:', instance.id)
       try {
         const { data, error } = await supabase.functions.invoke('check-instance-state', {
           body: { instanceId: instance.id }
         })
         
         if (error) {
-          console.error('Error checking instance state:', error)
+          console.error('Erro ao verificar estado da instância:', error)
           toast({
-            title: "Error",
-            description: "Failed to check instance state. Please try again.",
+            title: "Erro",
+            description: "Falha ao verificar estado da instância. Tente novamente.",
             variant: "destructive",
           })
           throw error
         }
+        
+        console.log('Estado da instância recebido:', data)
         return data
       } catch (error) {
-        console.error('Error in state check:', error)
+        console.error('Erro na verificação de estado:', error)
         return null
       }
     },
@@ -51,7 +53,7 @@ export function InstanceListItem({ instance, onConnect }: InstanceListItemProps)
   // Disconnect mutation
   const disconnectMutation = useMutation({
     mutationFn: async () => {
-      console.log('Disconnecting instance:', instance.id)
+      console.log('Desconectando instância:', instance.id)
       const { data, error } = await supabase.functions.invoke('disconnect-evolution-instance', {
         body: { instanceId: instance.id }
       })
@@ -60,23 +62,25 @@ export function InstanceListItem({ instance, onConnect }: InstanceListItemProps)
       return data
     },
     onSuccess: () => {
+      console.log('Instância desconectada com sucesso:', instance.id)
       queryClient.invalidateQueries({ queryKey: ['instances'] })
       toast({
-        title: "Success",
-        description: "Instance disconnected successfully",
+        title: "Sucesso",
+        description: "Instância desconectada com sucesso",
       })
     },
     onError: (error) => {
-      console.error('Error disconnecting instance:', error)
+      console.error('Erro ao desconectar instância:', error)
       toast({
-        title: "Error",
-        description: "Failed to disconnect instance. Please try again.",
+        title: "Erro",
+        description: "Falha ao desconectar instância. Tente novamente.",
         variant: "destructive",
       })
     }
   })
 
   const connectionStatus = stateData?.state || instance.connection_status
+  console.log('Status atual da conexão:', connectionStatus)
 
   return (
     <div className="flex items-center justify-between p-4 border rounded-lg bg-white hover:shadow-sm transition-shadow">
@@ -88,7 +92,7 @@ export function InstanceListItem({ instance, onConnect }: InstanceListItemProps)
           <p className="font-medium">{instance.name}</p>
           <p className="text-sm text-muted-foreground">{instance.phone_number}</p>
           <p className="text-sm text-muted-foreground">
-            Status: {connectionStatus || 'Unknown'}
+            Status: {connectionStatus || 'Desconhecido'}
           </p>
         </div>
       </div>
@@ -108,7 +112,7 @@ export function InstanceListItem({ instance, onConnect }: InstanceListItemProps)
             disabled={disconnectMutation.isPending}
           >
             <LogOut className="mr-2 h-4 w-4" />
-            Disconnect
+            Desconectar
           </Button>
         ) : (
           <Button
@@ -117,7 +121,7 @@ export function InstanceListItem({ instance, onConnect }: InstanceListItemProps)
             className="min-w-[120px]"
           >
             <QrCode className="mr-2 h-4 w-4" />
-            Connect
+            Conectar
           </Button>
         )}
       </div>
