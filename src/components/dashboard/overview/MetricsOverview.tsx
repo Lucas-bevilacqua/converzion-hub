@@ -118,9 +118,9 @@ export function MetricsOverview() {
 
   const formatResponseTime = (seconds: number) => {
     if (!seconds) return '0s'
-    if (seconds < 60) return `${seconds}s`
     const minutes = Math.floor(seconds / 60)
     const remainingSeconds = seconds % 60
+    if (minutes === 0) return `${remainingSeconds}s`
     return `${minutes}min ${remainingSeconds}s`
   }
 
