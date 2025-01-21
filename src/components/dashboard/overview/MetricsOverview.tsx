@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query"
 import { supabase } from "@/integrations/supabase/client"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { ChartContainer } from "@/components/ui/chart"
-import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend } from "recharts"
+import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, Legend } from "recharts"
 import { useAuth } from "@/contexts/auth/AuthContext"
 import { format } from "date-fns"
 import { ptBR } from "date-fns/locale"
@@ -76,6 +76,10 @@ export function MetricsOverview() {
     )
   }
 
+  const totalMessagesSent = metrics?.reduce((acc, curr) => acc + (curr.messages_sent || 0), 0) || 0
+  const totalMessagesReceived = metrics?.reduce((acc, curr) => acc + (curr.messages_received || 0), 0) || 0
+  const averageResponseTime = Math.round(metrics?.reduce((acc, curr) => acc + (curr.average_response_time_seconds || 0), 0) / (metrics?.length || 1)) || 0
+
   return (
     <Card className="relative overflow-hidden bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
       <CardHeader className="border-b border-gray-200 dark:border-gray-700">
@@ -112,7 +116,7 @@ export function MetricsOverview() {
             }}
           >
             <ResponsiveContainer width="100%" height={300}>
-              <BarChart 
+              <LineChart
                 data={metrics}
                 margin={{ top: 20, right: 30, left: 0, bottom: 5 }}
               >
@@ -142,7 +146,7 @@ export function MetricsOverview() {
                   dx={10}
                 />
                 <Tooltip 
-                  cursor={{ fill: 'rgba(0,0,0,0.05)' }}
+                  cursor={{ stroke: 'rgba(0,0,0,0.05)', strokeWidth: 2 }}
                   contentStyle={{
                     backgroundColor: 'white',
                     border: '1px solid #E2E8F0',
@@ -160,28 +164,34 @@ export function MetricsOverview() {
                     paddingTop: '20px'
                   }}
                 />
-                <Bar
+                <Line
+                  type="monotone"
                   dataKey="messages_sent"
                   name="Mensagens Enviadas"
-                  fill="var(--color-messages_sent)"
-                  radius={[4, 4, 0, 0]}
+                  stroke="var(--color-messages_sent)"
+                  strokeWidth={2}
+                  dot={{ fill: "var(--color-messages_sent)" }}
                   yAxisId="messages"
                 />
-                <Bar
+                <Line
+                  type="monotone"
                   dataKey="messages_received"
                   name="Mensagens Recebidas"
-                  fill="var(--color-messages_received)"
-                  radius={[4, 4, 0, 0]}
+                  stroke="var(--color-messages_received)"
+                  strokeWidth={2}
+                  dot={{ fill: "var(--color-messages_received)" }}
                   yAxisId="messages"
                 />
-                <Bar
+                <Line
+                  type="monotone"
                   dataKey="average_response_time_seconds"
                   name="Tempo de Resposta"
-                  fill="var(--color-response_time)"
-                  radius={[4, 4, 0, 0]}
+                  stroke="var(--color-response_time)"
+                  strokeWidth={2}
+                  dot={{ fill: "var(--color-response_time)" }}
                   yAxisId="time"
                 />
-              </BarChart>
+              </LineChart>
             </ResponsiveContainer>
           </ChartContainer>
         </div>
@@ -190,19 +200,19 @@ export function MetricsOverview() {
           <div className="space-y-2 bg-gray-50 dark:bg-gray-900 p-4 rounded-lg border border-gray-200 dark:border-gray-700">
             <p className="text-sm text-gray-600 dark:text-gray-400">Total de Mensagens Enviadas</p>
             <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-              {metrics?.reduce((acc, curr) => acc + (curr.messages_sent || 0), 0)}
+              {totalMessagesSent.toLocaleString()}
             </p>
           </div>
           <div className="space-y-2 bg-gray-50 dark:bg-gray-900 p-4 rounded-lg border border-gray-200 dark:border-gray-700">
             <p className="text-sm text-gray-600 dark:text-gray-400">Total de Mensagens Recebidas</p>
             <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-              {metrics?.reduce((acc, curr) => acc + (curr.messages_received || 0), 0)}
+              {totalMessagesReceived.toLocaleString()}
             </p>
           </div>
           <div className="space-y-2 bg-gray-50 dark:bg-gray-900 p-4 rounded-lg border border-gray-200 dark:border-gray-700">
             <p className="text-sm text-gray-600 dark:text-gray-400">Tempo Médio de Resposta</p>
             <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-              {Math.round(metrics?.reduce((acc, curr) => acc + (curr.average_response_time_seconds || 0), 0) / (metrics?.length || 1))}s
+              {averageResponseTime}s
             </p>
           </div>
         </div>
