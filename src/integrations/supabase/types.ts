@@ -9,6 +9,27 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      ai_follow_up_job_logs: {
+        Row: {
+          details: Json | null
+          execution_time: string | null
+          id: number
+          status: string | null
+        }
+        Insert: {
+          details?: Json | null
+          execution_time?: string | null
+          id?: number
+          status?: string | null
+        }
+        Update: {
+          details?: Json | null
+          execution_time?: string | null
+          id?: number
+          status?: string | null
+        }
+        Relationships: []
+      }
       ai_follow_up_logs: {
         Row: {
           details: Json | null
@@ -690,6 +711,10 @@ export type Database = {
       direct_endpoint_test: {
         Args: Record<PropertyKey, never>
         Returns: string
+      }
+      execute_ai_follow_up: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
       }
       execute_follow_up_contacts_real: {
         Args: Record<PropertyKey, never>
