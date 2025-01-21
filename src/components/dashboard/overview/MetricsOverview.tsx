@@ -52,7 +52,6 @@ export function MetricsOverview() {
           date: format(date, 'dd/MM/yyyy', { locale: ptBR }),
           messages_sent: dayData?.messages_sent || 0,
           messages_received: dayData?.messages_received || 0,
-          average_response_time_seconds: dayData?.average_response_time_seconds || 0,
           created_at: date.toISOString(),
         })
       }
@@ -128,13 +127,6 @@ export function MetricsOverview() {
                   dark: "#34D399",
                 },
                 label: "Mensagens Recebidas",
-              },
-              response_time: {
-                theme: {
-                  light: "#8B5CF6",
-                  dark: "#A78BFA",
-                },
-                label: "Tempo de Resposta (s)",
               }
             }}
           >
@@ -168,21 +160,6 @@ export function MetricsOverview() {
                     style: { textAnchor: 'middle' }
                   }}
                 />
-                <YAxis 
-                  fontSize={12}
-                  tickLine={false}
-                  axisLine={true}
-                  yAxisId="time"
-                  orientation="right"
-                  stroke="#94A3B8"
-                  dx={10}
-                  label={{ 
-                    value: 'Tempo de Resposta (segundos)', 
-                    angle: 90, 
-                    position: 'insideRight',
-                    style: { textAnchor: 'middle' }
-                  }}
-                />
                 <Tooltip 
                   cursor={{ stroke: 'rgba(0,0,0,0.05)', strokeWidth: 2 }}
                   contentStyle={{
@@ -192,10 +169,7 @@ export function MetricsOverview() {
                     padding: '8px',
                     boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
                   }}
-                  formatter={(value: number, name: string) => [
-                    value,
-                    name === "Tempo de Resposta" ? `${value}s` : value
-                  ]}
+                  formatter={(value: number) => [value]}
                 />
                 <Legend 
                   wrapperStyle={{
@@ -219,15 +193,6 @@ export function MetricsOverview() {
                   strokeWidth={2}
                   dot={{ fill: "var(--color-messages_received)" }}
                   yAxisId="messages"
-                />
-                <Line
-                  type="monotone"
-                  dataKey="average_response_time_seconds"
-                  name="Tempo de Resposta"
-                  stroke="var(--color-response_time)"
-                  strokeWidth={2}
-                  dot={{ fill: "var(--color-response_time)" }}
-                  yAxisId="time"
                 />
               </LineChart>
             </ResponsiveContainer>
