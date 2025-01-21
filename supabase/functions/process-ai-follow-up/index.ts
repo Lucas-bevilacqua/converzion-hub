@@ -7,9 +7,9 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// Configuração de rate limiting
-const RATE_LIMIT_WINDOW = 60000 // 1 minuto em milissegundos
-const MAX_REQUESTS_PER_WINDOW = 60 // 60 requisições por minuto
+// Rate limiting configuration
+const RATE_LIMIT_WINDOW = 60000 // 1 minute
+const MAX_REQUESTS_PER_WINDOW = 60 // 60 requests per minute
 const requestTimestamps: number[] = []
 
 function isRateLimited(): boolean {
@@ -24,11 +24,10 @@ function isRateLimited(): boolean {
   return false
 }
 
-// Função principal de processamento
 async function processFollowUps() {
   const executionId = crypto.randomUUID();
   const startTime = new Date();
-  console.log(`[${executionId}] 🔄 Iniciando processamento contínuo de follow-ups`);
+  console.log(`[${executionId}] 🔄 Starting follow-up processing`);
 
   try {
     const supabase = createClient(
@@ -36,16 +35,23 @@ async function processFollowUps() {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    // Log de início
-    await supabase.from('ai_follow_up_job_logs').insert({
-      status: 'started',
-      details: {
-        execution_id: executionId,
-        start_time: startTime.toISOString()
-      }
-    });
+    // Log execution start
+    const { error: logError } = await supabase
+      .from('follow_up_executions')
+      .insert({
+        status: 'started',
+        details: {
+          execution_id: executionId,
+          start_time: startTime.toISOString()
+        }
+      });
 
-    // Buscar e processar follow-ups
+    if (logError) {
+      console.error(`[${executionId}] ❌ Error logging execution start:`, logError);
+    }
+
+    // Fetch active follow-ups
+    console.log(`[${executionId}] 🔍 Fetching active follow-ups`);
     const { data: followUps, error: followUpsError } = await supabase
       .from('instance_follow_ups')
       .select(`
@@ -65,7 +71,7 @@ async function processFollowUps() {
       throw followUpsError;
     }
 
-    console.log(`[${executionId}] 📝 Encontrados ${followUps?.length || 0} follow-ups para processar`);
+    console.log(`[${executionId}] 📝 Found ${followUps?.length || 0} follow-ups to process`);
 
     for (const followUp of followUps || []) {
       try {
@@ -74,13 +80,13 @@ async function processFollowUps() {
         // Add a small delay between processing each follow-up
         await new Promise(resolve => setTimeout(resolve, 1000));
 
-        // Verificar se a instância está conectada
+        // Check if instance is connected
         if (followUp.instance?.connection_status !== 'connected') {
           console.log(`[${executionId}] ⚠️ Instance ${followUp.instance?.name} is not connected, skipping`);
           continue;
         }
 
-        // Verificar última mensagem
+        // Check last message
         const { data: lastMessage } = await supabase
           .from('chat_messages')
           .select('created_at')
@@ -94,8 +100,8 @@ async function processFollowUps() {
           const delayMinutes = followUp.delay_minutes || 60;
           const nextMessageTime = new Date(lastMessageTime.getTime() + delayMinutes * 60000);
 
-          console.log(`[${executionId}] ⏰ Last message time: ${lastMessageTime.toISOString()}`);
-          console.log(`[${executionId}] ⏰ Next message time: ${nextMessageTime.toISOString()}`);
+          console.log(`[${executionId}] ⏰ Last message: ${lastMessageTime.toISOString()}`);
+          console.log(`[${executionId}] ⏰ Next message: ${nextMessageTime.toISOString()}`);
           console.log(`[${executionId}] ⏰ Current time: ${new Date().toISOString()}`);
 
           if (nextMessageTime > new Date()) {
@@ -104,7 +110,7 @@ async function processFollowUps() {
           }
         }
 
-        // Verificar número de tentativas
+        // Check attempt count
         const { data: followUpMessages } = await supabase
           .from('chat_messages')
           .select('*')
@@ -117,7 +123,7 @@ async function processFollowUps() {
           continue;
         }
 
-        // Verificar se houve resposta
+        // Check for replies
         if (followUp.stop_on_reply && followUpMessages?.length > 0) {
           const { data: userReplies } = await supabase
             .from('chat_messages')
@@ -133,7 +139,7 @@ async function processFollowUps() {
           }
         }
 
-        // Verificar palavras-chave de parada
+        // Check stop keywords
         const stopKeywords = followUp.stop_on_keyword || [];
         const { data: messages } = await supabase
           .from('chat_messages')
@@ -149,11 +155,11 @@ async function processFollowUps() {
         );
 
         if (hasStopKeyword) {
-          console.log(`[${executionId}] 🛑 Stop keyword found for instance ${followUp.instance?.name}, skipping`);
+          console.log(`[${executionId}] 🛑 Stop keyword found for instance ${followUp.instance?.name}`);
           continue;
         }
 
-        // Gerar mensagem com OpenAI
+        // Generate message with OpenAI
         console.log(`[${executionId}] 🤖 Generating message with OpenAI for instance ${followUp.instance?.name}`);
         const openAiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
           method: 'POST',
@@ -162,7 +168,7 @@ async function processFollowUps() {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            model: 'gpt-4o-mini',
+            model: 'gpt-4',
             messages: [
               { 
                 role: 'system', 
@@ -193,7 +199,7 @@ async function processFollowUps() {
 
         console.log(`[${executionId}] 📝 Generated message:`, followUpMessage);
 
-        // Enviar mensagem via Evolution API
+        // Send message via Evolution API
         console.log(`[${executionId}] 📤 Sending message via Evolution API for instance ${followUp.instance?.name}`);
         const evolutionApiUrl = (Deno.env.get('EVOLUTION_API_URL') || '').replace(/\/$/, '');
         const evolutionResponse = await fetch(
@@ -220,7 +226,7 @@ async function processFollowUps() {
         const evolutionData = await evolutionResponse.json();
         console.log(`[${executionId}] ✅ Message sent successfully for instance ${followUp.instance?.name}`);
 
-        // Salvar mensagem no histórico
+        // Save message to history
         const { error: saveError } = await supabase
           .from('chat_messages')
           .insert({
@@ -244,40 +250,49 @@ async function processFollowUps() {
     const endTime = new Date();
     const executionTime = endTime.getTime() - startTime.getTime();
 
-    // Log de conclusão
-    await supabase.from('ai_follow_up_job_logs').insert({
-      status: 'completed',
-      details: {
-        execution_id: executionId,
-        start_time: startTime.toISOString(),
-        end_time: endTime.toISOString(),
-        execution_time_ms: executionTime,
-        follow_ups_found: followUps?.length || 0
-      }
-    });
+    // Log completion
+    const { error: completionError } = await supabase
+      .from('follow_up_executions')
+      .insert({
+        status: 'completed',
+        details: {
+          execution_id: executionId,
+          start_time: startTime.toISOString(),
+          end_time: endTime.toISOString(),
+          execution_time_ms: executionTime,
+          follow_ups_found: followUps?.length || 0
+        },
+        next_run_time: new Date(Date.now() + 60000).toISOString() // Schedule next run in 1 minute
+      });
+
+    if (completionError) {
+      console.error(`[${executionId}] ❌ Error logging completion:`, completionError);
+    }
 
   } catch (error) {
-    console.error(`[${executionId}] ❌ Erro no processamento:`, error);
+    console.error(`[${executionId}] ❌ Processing error:`, error);
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    await supabase.from('ai_follow_up_job_logs').insert({
-      status: 'error',
-      details: {
-        execution_id: executionId,
-        error: error.message,
-        stack: error.stack,
-        time: new Date().toISOString()
-      }
-    });
+    await supabase
+      .from('follow_up_executions')
+      .insert({
+        status: 'error',
+        details: {
+          execution_id: executionId,
+          error: error.message,
+          stack: error.stack,
+          time: new Date().toISOString()
+        }
+      });
   }
 }
 
-// Iniciar o loop contínuo com intervalo
+// Start continuous loop with interval
 let isProcessing = false;
-const INTERVAL = 60000; // 1 minuto
+const INTERVAL = 60000; // 1 minute
 
 setInterval(async () => {
   if (!isProcessing) {
@@ -288,11 +303,11 @@ setInterval(async () => {
       isProcessing = false;
     }
   } else {
-    console.log('🔄 Processamento anterior ainda em andamento, pulando esta iteração');
+    console.log('🔄 Previous processing still in progress, skipping this iteration');
   }
 }, INTERVAL);
 
-// Endpoint para verificação de status
+// Status endpoint
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });

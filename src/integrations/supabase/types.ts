@@ -264,6 +264,7 @@ export type Database = {
           details: Json | null
           execution_time: string | null
           id: string
+          next_run_time: string | null
           next_scheduled_run: string | null
           status: string | null
         }
@@ -271,6 +272,7 @@ export type Database = {
           details?: Json | null
           execution_time?: string | null
           id?: string
+          next_run_time?: string | null
           next_scheduled_run?: string | null
           status?: string | null
         }
@@ -278,6 +280,7 @@ export type Database = {
           details?: Json | null
           execution_time?: string | null
           id?: string
+          next_run_time?: string | null
           next_scheduled_run?: string | null
           status?: string | null
         }
