@@ -7,9 +7,9 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// Rate limiting configuration
+// Increased rate limiting configuration for cron jobs
 const RATE_LIMIT_WINDOW = 60000 // 1 minute in milliseconds
-const MAX_REQUESTS_PER_WINDOW = 30 // Maximum requests per minute
+const MAX_REQUESTS_PER_WINDOW = 60 // Increased to 60 requests per minute
 const requestTimestamps: number[] = []
 
 function isRateLimited(): boolean {
