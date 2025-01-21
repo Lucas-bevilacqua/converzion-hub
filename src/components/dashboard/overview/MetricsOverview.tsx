@@ -77,9 +77,11 @@ export function MetricsOverview() {
   }
 
   return (
-    <Card>
+    <Card className="bg-white dark:bg-gray-800">
       <CardHeader>
-        <CardTitle>Métricas dos Últimos 7 Dias</CardTitle>
+        <CardTitle className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+          Métricas dos Últimos 7 Dias
+        </CardTitle>
       </CardHeader>
       <CardContent>
         <div className="h-[300px] w-full">
@@ -88,14 +90,14 @@ export function MetricsOverview() {
             config={{
               messages_sent: {
                 theme: {
-                  light: "#0056D2",
-                  dark: "#60A5FA",
+                  light: "#0EA5E9",
+                  dark: "#38BDF8",
                 },
                 label: "Mensagens Enviadas",
               },
               messages_received: {
                 theme: {
-                  light: "#00C896",
+                  light: "#10B981",
                   dark: "#34D399",
                 },
                 label: "Mensagens Recebidas",
@@ -110,18 +112,23 @@ export function MetricsOverview() {
             }}
           >
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={metrics}>
+              <BarChart 
+                data={metrics}
+                margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
+              >
                 <XAxis
                   dataKey="date"
                   fontSize={12}
                   tickLine={false}
                   axisLine={true}
+                  stroke="#94A3B8"
                 />
                 <YAxis 
                   fontSize={12}
                   tickLine={false}
                   axisLine={true}
                   yAxisId="messages"
+                  stroke="#94A3B8"
                 />
                 <YAxis 
                   fontSize={12}
@@ -129,15 +136,26 @@ export function MetricsOverview() {
                   axisLine={true}
                   yAxisId="time"
                   orientation="right"
+                  stroke="#94A3B8"
                 />
                 <Tooltip 
-                  cursor={{ fill: 'transparent' }}
+                  cursor={{ fill: 'rgba(0,0,0,0.1)' }}
+                  contentStyle={{
+                    backgroundColor: 'white',
+                    border: '1px solid #E2E8F0',
+                    borderRadius: '6px',
+                    padding: '8px'
+                  }}
                   formatter={(value: number, name: string) => [
                     value,
                     name === "Tempo de Resposta" ? `${value}s` : value
                   ]}
                 />
-                <Legend />
+                <Legend 
+                  wrapperStyle={{
+                    paddingTop: '20px'
+                  }}
+                />
                 <Bar
                   dataKey="messages_sent"
                   name="Mensagens Enviadas"
@@ -165,21 +183,21 @@ export function MetricsOverview() {
         </div>
 
         <div className="grid grid-cols-3 gap-4 mt-6">
-          <div className="space-y-2">
-            <p className="text-sm text-muted-foreground">Total de Mensagens Enviadas</p>
-            <p className="text-2xl font-bold">
+          <div className="space-y-2 bg-gray-50 dark:bg-gray-900 p-4 rounded-lg">
+            <p className="text-sm text-gray-600 dark:text-gray-400">Total de Mensagens Enviadas</p>
+            <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
               {metrics?.reduce((acc, curr) => acc + (curr.messages_sent || 0), 0)}
             </p>
           </div>
-          <div className="space-y-2">
-            <p className="text-sm text-muted-foreground">Total de Mensagens Recebidas</p>
-            <p className="text-2xl font-bold">
+          <div className="space-y-2 bg-gray-50 dark:bg-gray-900 p-4 rounded-lg">
+            <p className="text-sm text-gray-600 dark:text-gray-400">Total de Mensagens Recebidas</p>
+            <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
               {metrics?.reduce((acc, curr) => acc + (curr.messages_received || 0), 0)}
             </p>
           </div>
-          <div className="space-y-2">
-            <p className="text-sm text-muted-foreground">Tempo Médio de Resposta</p>
-            <p className="text-2xl font-bold">
+          <div className="space-y-2 bg-gray-50 dark:bg-gray-900 p-4 rounded-lg">
+            <p className="text-sm text-gray-600 dark:text-gray-400">Tempo Médio de Resposta</p>
+            <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
               {Math.round(metrics?.reduce((acc, curr) => acc + (curr.average_response_time_seconds || 0), 0) / (metrics?.length || 1))}s
             </p>
           </div>
