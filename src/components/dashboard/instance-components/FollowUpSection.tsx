@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { supabase } from "@/integrations/supabase/client"
-import { useAuth } from "@/contexts/auth/AuthContext" // Added missing import
+import { useAuth } from "@/contexts/auth/AuthContext"
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
@@ -82,7 +82,7 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
 
   console.log('🔍 [DEBUG] Fetching follow-up for instance:', instanceId)
 
-  const { data: followUp, isLoading, error } = useQuery({
+  const { data: followUp, isLoading } = useQuery({
     queryKey: ['follow-up', instanceId],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -98,12 +98,18 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
 
       console.log('✅ [DEBUG] Follow-up data:', data)
 
-      // Convert manual_messages from JSON to ManualMessage[]
-      if (data && data.manual_messages) {
-        data.manual_messages = data.manual_messages as ManualMessage[]
-      }
+      // Garantir que manual_messages é um array de ManualMessage
+      const parsedData = {
+        ...data,
+        manual_messages: Array.isArray(data?.manual_messages) 
+          ? data.manual_messages.map((msg: any) => ({
+              message: msg.message || '',
+              delay_minutes: msg.delay_minutes || 1
+            }))
+          : []
+      } as FollowUpData
 
-      return data as FollowUpData
+      return parsedData
     }
   })
 
