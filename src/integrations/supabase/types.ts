@@ -722,6 +722,15 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      check_follow_up_job_status: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          job_name: string
+          last_run: string
+          status: string
+          details: string
+        }[]
+      }
       comprehensive_endpoint_test: {
         Args: Record<PropertyKey, never>
         Returns: {
