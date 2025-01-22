@@ -1,0 +1,2 @@
+[functions.test-follow-up-system]
+verify_jwt = true
