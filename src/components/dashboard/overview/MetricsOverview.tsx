@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query"
 import { supabase } from "@/integrations/supabase/client"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { ChartContainer } from "@/components/ui/chart"
-import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, Legend } from "recharts"
+import { LineChart, Line, XAxis, YAxis, Tooltip, Legend } from "recharts"
 import { useAuth } from "@/contexts/auth/AuthContext"
 import { format, subDays, startOfDay, endOfDay } from "date-fns"
 import { ptBR } from "date-fns/locale"
@@ -127,8 +127,10 @@ export function MetricsOverview() {
               }
             }}
           >
-            <ResponsiveContainer width="100%" height={300}>
+            <div style={{ width: '100%', height: 300 }}>
               <LineChart
+                width={800}
+                height={300}
                 data={metrics}
                 margin={{ top: 20, right: 30, left: 0, bottom: 5 }}
               >
@@ -200,7 +202,7 @@ export function MetricsOverview() {
                   dot={{ fill: "var(--color-messages_received)" }}
                 />
               </LineChart>
-            </ResponsiveContainer>
+            </div>
           </ChartContainer>
         </div>
 
