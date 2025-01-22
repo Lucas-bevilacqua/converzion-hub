@@ -784,6 +784,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: undefined
       }
+      process_ai_follow_up: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
       process_follow_up_contacts: {
         Args: Record<PropertyKey, never>
         Returns: undefined
