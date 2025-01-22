@@ -765,6 +765,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: undefined
       }
+      execute_follow_up_cron: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
       execute_follow_up_job: {
         Args: Record<PropertyKey, never>
         Returns: undefined
@@ -906,6 +910,17 @@ export type Database = {
           url: string
         }
         Returns: boolean
+      }
+      verify_cron_status: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          jobname: string
+          schedule: string
+          last_run: string
+          next_run: string
+          active: boolean
+          last_success: string
+        }[]
       }
     }
     Enums: {
