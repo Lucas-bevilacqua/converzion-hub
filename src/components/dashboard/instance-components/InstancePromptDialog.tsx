@@ -6,39 +6,63 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
+import { Label } from "@/components/ui/label"
 import { useState, useEffect } from "react"
+import { supabase } from "@/integrations/supabase/client"
+import { useToast } from "@/components/ui/use-toast"
 
 interface InstancePromptDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  onSave: (values: { prompt: string; objective: string }) => void
-  currentValues?: {
-    prompt: string
-    objective: string
-  }
+  instanceId: string
+  currentPrompt?: string
 }
 
 export function InstancePromptDialog({
   open,
   onOpenChange,
-  onSave,
-  currentValues,
+  instanceId,
+  currentPrompt,
 }: InstancePromptDialogProps) {
+  const { toast } = useToast()
   const [values, setValues] = useState({
     prompt: "",
-    objective: "custom",
+    objective: "custom" as const,
   })
 
   useEffect(() => {
-    if (currentValues) {
-      console.log('Updating form with current values:', currentValues)
-      setValues(currentValues)
+    if (currentPrompt) {
+      console.log('Updating form with current values:', { prompt: currentPrompt, objective: 'custom' })
+      setValues({ prompt: currentPrompt, objective: 'custom' })
     }
-  }, [currentValues])
+  }, [currentPrompt])
+
+  const handleSave = async () => {
+    try {
+      const { error } = await supabase
+        .from('evolution_instances')
+        .update({ system_prompt: values.prompt })
+        .eq('id', instanceId)
+
+      if (error) throw error
+
+      toast({
+        title: "Sucesso",
+        description: "Configurações salvas com sucesso.",
+      })
+
+      onOpenChange(false)
+    } catch (error) {
+      console.error('Erro ao salvar configurações:', error)
+      toast({
+        title: "Erro",
+        description: "Falha ao salvar configurações. Tente novamente.",
+        variant: "destructive",
+      })
+    }
+  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -54,7 +78,7 @@ export function InstancePromptDialog({
             <Label htmlFor="objective">Objetivo</Label>
             <Select
               value={values.objective}
-              onValueChange={(value) => setValues((prev) => ({ ...prev, objective: value }))}
+              onValueChange={(value) => setValues((prev) => ({ ...prev, objective: value as typeof prev.objective }))}
             >
               <SelectTrigger id="objective">
                 <SelectValue />
@@ -82,7 +106,7 @@ export function InstancePromptDialog({
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancelar
           </Button>
-          <Button onClick={() => onSave(values)}>Salvar</Button>
+          <Button onClick={handleSave}>Salvar</Button>
         </div>
       </DialogContent>
     </Dialog>
