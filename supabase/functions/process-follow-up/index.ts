@@ -6,27 +6,27 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// Rate limiting implementation
-const rateLimiter = new Map<string, number[]>();
-const RATE_LIMIT_WINDOW = 60000; // 1 minute
-const MAX_REQUESTS = 30; // Max requests per minute per instance
+const RATE_LIMIT_WINDOW = 60000
+const MAX_REQUESTS = 30
+
+const rateLimiter = new Map<string, number[]>()
 
 function isRateLimited(instanceId: string): boolean {
-  const now = Date.now();
-  const timestamps = rateLimiter.get(instanceId) || [];
-  const recentTimestamps = timestamps.filter(t => t > now - RATE_LIMIT_WINDOW);
-  rateLimiter.set(instanceId, recentTimestamps);
-  return recentTimestamps.length >= MAX_REQUESTS;
+  const now = Date.now()
+  const timestamps = rateLimiter.get(instanceId) || []
+  const recentTimestamps = timestamps.filter(t => t > now - RATE_LIMIT_WINDOW)
+  rateLimiter.set(instanceId, recentTimestamps)
+  return recentTimestamps.length >= MAX_REQUESTS
 }
 
 function addRequest(instanceId: string) {
-  const timestamps = rateLimiter.get(instanceId) || [];
-  timestamps.push(Date.now());
-  rateLimiter.set(instanceId, timestamps);
+  const timestamps = rateLimiter.get(instanceId) || []
+  timestamps.push(Date.now())
+  rateLimiter.set(instanceId, timestamps)
 }
 
 serve(async (req) => {
-  const requestId = crypto.randomUUID();
+  const requestId = crypto.randomUUID()
   console.log(`[${requestId}] 🚀 Iniciando processamento de follow-up`)
   
   if (req.method === 'OPTIONS') {
@@ -61,6 +61,30 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
+
+    // Verificar status da conexão da instância
+    const { data: instance, error: instanceError } = await supabaseClient
+      .from('evolution_instances')
+      .select('connection_status')
+      .eq('id', contact.followUp.instance_id)
+      .single()
+
+    if (instanceError) {
+      console.error(`[${requestId}] ❌ Erro ao verificar status da instância:`, instanceError)
+      throw new Error('Erro ao verificar status da instância')
+    }
+
+    if (instance.connection_status !== 'connected') {
+      console.log(`[${requestId}] ⚠️ Instância ${contact.followUp.instanceName} não conectada, pulando`)
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: 'Instance not connected',
+          requestId 
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
 
     // Get service key from secure_configurations
     const { data: keyData, error: keyError } = await supabaseClient
@@ -171,7 +195,6 @@ serve(async (req) => {
         })
     ])
 
-    // Log de sucesso
     console.log(`[${requestId}] ✅ Follow-up processado com sucesso`)
 
     return new Response(
