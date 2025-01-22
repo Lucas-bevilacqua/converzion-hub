@@ -17,7 +17,7 @@ interface InstancePromptDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   instanceId: string
-  currentPrompt?: string
+  currentPrompt?: string | null
 }
 
 export function InstancePromptDialog({
