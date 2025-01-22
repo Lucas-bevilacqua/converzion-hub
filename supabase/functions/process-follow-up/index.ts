@@ -14,11 +14,8 @@ const MAX_REQUESTS = 30; // Max requests per minute per instance
 function isRateLimited(instanceId: string): boolean {
   const now = Date.now();
   const timestamps = rateLimiter.get(instanceId) || [];
-  
-  // Remove old timestamps
   const recentTimestamps = timestamps.filter(t => t > now - RATE_LIMIT_WINDOW);
   rateLimiter.set(instanceId, recentTimestamps);
-  
   return recentTimestamps.length >= MAX_REQUESTS;
 }
 
@@ -113,6 +110,8 @@ serve(async (req) => {
 
     // Enviar mensagem via Evolution API usando a chave do banco
     const evolutionApiUrl = (Deno.env.get('EVOLUTION_API_URL') || '').replace(/\/$/, '')
+    console.log(`[${requestId}] 📝 Enviando mensagem para ${contact.TelefoneClientes} via Evolution API`)
+    
     const evolutionResponse = await fetch(
       `${evolutionApiUrl}/message/sendText/${contact.followUp.instanceName}`,
       {
@@ -131,7 +130,7 @@ serve(async (req) => {
     if (!evolutionResponse.ok) {
       const errorText = await evolutionResponse.text()
       console.error(`[${requestId}] ❌ Erro ao enviar mensagem:`, errorText)
-      throw new Error(errorText)
+      throw new Error(`Erro ao enviar mensagem: ${errorText}`)
     }
 
     const evolutionData = await evolutionResponse.json()
