@@ -34,7 +34,6 @@ serve(async (req) => {
 
     const serviceKey = keyData.config_value;
 
-    // Log início
     console.log(`[${requestId}] 📝 Verificando credenciais e configurações`);
     
     // Registrar execução
@@ -77,12 +76,19 @@ serve(async (req) => {
 
     for (const followUp of (followUps || [])) {
       try {
-        console.log(`[${requestId}] 📱 Processando follow-up para instância: ${followUp.instance?.name}`);
+        console.log(`[${requestId}] 📱 Processando follow-up tipo ${followUp.follow_up_type} para instância: ${followUp.instance?.name}`);
         
-        if (!followUp.instance?.connection_status || followUp.instance.connection_status !== 'connected') {
+        if (!followUp.instance?.connection_status || followUp.instance.connection_status === 'disconnected') {
           console.log(`[${requestId}] ⚠️ Instância ${followUp.instance?.name} não conectada, pulando`);
           continue;
         }
+
+        // Determinar qual endpoint chamar baseado no tipo de follow-up
+        const endpoint = followUp.follow_up_type === 'ai_generated' 
+          ? 'process-ai-follow-up'
+          : 'process-follow-up';
+
+        console.log(`[${requestId}] 🔄 Usando endpoint: ${endpoint} para follow-up tipo ${followUp.follow_up_type}`);
 
         // Buscar contatos
         console.log(`[${requestId}] 🔍 Buscando contatos para instância: ${followUp.instance.name}`);
@@ -101,9 +107,9 @@ serve(async (req) => {
 
         for (const contact of (contacts || [])) {
           try {
-            console.log(`[${requestId}] 👤 Processando contato: ${contact.TelefoneClientes}`);
+            console.log(`[${requestId}] 👤 Processando contato: ${contact.TelefoneClientes} com follow-up tipo ${followUp.follow_up_type}`);
             
-            const processFollowUpUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/process-follow-up`;
+            const processFollowUpUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/${endpoint}`;
             
             console.log(`[${requestId}] 🔄 Enviando requisição para ${processFollowUpUrl}`);
             const processingResponse = await fetch(
@@ -134,12 +140,13 @@ serve(async (req) => {
             }
 
             const responseData = await processingResponse.json();
-            console.log(`[${requestId}] ✅ Follow-up processado:`, responseData);
+            console.log(`[${requestId}] ✅ Follow-up tipo ${followUp.follow_up_type} processado:`, responseData);
 
             processedFollowUps.push({
               followUpId: followUp.id,
               instanceId: followUp.instance_id,
               contactId: contact.id,
+              type: followUp.follow_up_type,
               timestamp: new Date().toISOString()
             });
 
@@ -148,6 +155,7 @@ serve(async (req) => {
             errors.push({
               followUpId: followUp.id,
               contactId: contact.id,
+              type: followUp.follow_up_type,
               error: contactError.message,
               timestamp: new Date().toISOString()
             });
@@ -157,6 +165,7 @@ serve(async (req) => {
         console.error(`[${requestId}] ❌ Falha ao processar follow-up ${followUp.id}:`, error);
         errors.push({
           followUpId: followUp.id,
+          type: followUp.follow_up_type,
           error: error.message,
           timestamp: new Date().toISOString()
         });
