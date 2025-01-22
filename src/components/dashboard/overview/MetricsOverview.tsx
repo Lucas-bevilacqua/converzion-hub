@@ -19,9 +19,8 @@ export function MetricsOverview() {
       console.log('Fetching metrics for user:', user?.id)
       if (!user?.id) throw new Error('No user ID available')
 
-      // Calculate date range (last 7 days)
       const endDate = endOfDay(new Date())
-      const startDate = startOfDay(subDays(endDate, 6)) // 6 days ago to include today
+      const startDate = startOfDay(subDays(endDate, 6))
 
       console.log('Fetching metrics from', startDate, 'to', endDate)
 
@@ -40,7 +39,6 @@ export function MetricsOverview() {
 
       console.log('Metrics data received:', data)
       
-      // Format dates and ensure we have data for all 7 days
       const formattedData = []
       for (let i = 6; i >= 0; i--) {
         const date = subDays(new Date(), i)
@@ -144,6 +142,8 @@ export function MetricsOverview() {
                   angle={-45}
                   textAnchor="end"
                   height={60}
+                  scale="point"
+                  padding={{ left: 10, right: 10 }}
                 />
                 <YAxis 
                   fontSize={12}
@@ -157,6 +157,8 @@ export function MetricsOverview() {
                     position: 'insideLeft',
                     style: { textAnchor: 'middle' }
                   }}
+                  scale="linear"
+                  padding={{ top: 10, bottom: 10 }}
                 />
                 <Tooltip 
                   cursor={{ stroke: 'rgba(0,0,0,0.05)', strokeWidth: 2 }}
