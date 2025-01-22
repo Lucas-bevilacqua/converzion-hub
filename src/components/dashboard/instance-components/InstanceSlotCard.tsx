@@ -7,6 +7,8 @@ import { supabase } from "@/integrations/supabase/client"
 import { useToast } from "@/components/ui/use-toast"
 import { QRCodeDialog } from "./QRCodeDialog"
 import { InstancePromptDialog } from "./InstancePromptDialog"
+import { Dialog, DialogContent } from "@/components/ui/dialog"
+import { FollowUpSection } from "./FollowUpSection"
 
 interface InstanceSlotCardProps {
   isUsed: boolean
@@ -26,6 +28,7 @@ export function InstanceSlotCard({
   const { toast } = useToast()
   const [showQRCode, setShowQRCode] = useState(false)
   const [showPromptDialog, setShowPromptDialog] = useState(false)
+  const [showFollowUpDialog, setShowFollowUpDialog] = useState(false)
   const [qrCodeData, setQrCodeData] = useState<string | null>(null)
 
   // Query para verificar o estado do número
@@ -197,8 +200,8 @@ export function InstanceSlotCard({
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={() => setShowPromptDialog(true)}
-                title="Configurar Instância"
+                onClick={() => setShowFollowUpDialog(true)}
+                title="Configurar Follow-up"
               >
                 <Settings className="h-4 w-4" />
               </Button>
@@ -252,6 +255,12 @@ export function InstanceSlotCard({
         instanceId={instance?.id}
         currentPrompt={instance?.system_prompt}
       />
+
+      <Dialog open={showFollowUpDialog} onOpenChange={setShowFollowUpDialog}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <FollowUpSection instanceId={instance?.id} />
+        </DialogContent>
+      </Dialog>
     </>
   )
 }
