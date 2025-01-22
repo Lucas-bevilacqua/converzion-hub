@@ -65,7 +65,7 @@ serve(async (req) => {
     // Verificar status da conexão da instância
     const { data: instance, error: instanceError } = await supabaseClient
       .from('evolution_instances')
-      .select('connection_status')
+      .select('connection_status, name')
       .eq('id', contact.followUp.instance_id)
       .single()
 
@@ -74,12 +74,13 @@ serve(async (req) => {
       throw new Error('Erro ao verificar status da instância')
     }
 
-    if (instance.connection_status !== 'connected') {
-      console.log(`[${requestId}] ⚠️ Instância ${contact.followUp.instanceName} não conectada, pulando`)
+    // Modificado: Agora verifica se o status é explicitamente 'disconnected'
+    if (instance.connection_status === 'disconnected') {
+      console.log(`[${requestId}] ⚠️ Instância ${instance.name} desconectada, pulando`)
       return new Response(
         JSON.stringify({ 
           success: false, 
-          error: 'Instance not connected',
+          error: 'Instance disconnected',
           requestId 
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
