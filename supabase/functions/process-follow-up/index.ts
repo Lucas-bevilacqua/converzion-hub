@@ -74,7 +74,7 @@ serve(async (req) => {
       throw new Error('Erro ao verificar status da instância')
     }
 
-    // Modificado: Agora verifica se o status é explicitamente 'disconnected'
+    // Modificado: Agora só pula se o status for explicitamente 'disconnected'
     if (instance.connection_status === 'disconnected') {
       console.log(`[${requestId}] ⚠️ Instância ${instance.name} desconectada, pulando`)
       return new Response(
