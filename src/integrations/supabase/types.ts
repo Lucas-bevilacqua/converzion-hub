@@ -868,6 +868,14 @@ export type Database = {
           details: Json
         }[]
       }
+      test_follow_up_system: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          check_name: string
+          status: string
+          details: Json
+        }[]
+      }
       test_service_key_config: {
         Args: Record<PropertyKey, never>
         Returns: {
