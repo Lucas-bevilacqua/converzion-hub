@@ -796,6 +796,14 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: undefined
       }
+      process_follow_up_test: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          test_name: string
+          result: string
+          details: Json
+        }[]
+      }
       schedule_follow_up_contacts: {
         Args: Record<PropertyKey, never>
         Returns: undefined
