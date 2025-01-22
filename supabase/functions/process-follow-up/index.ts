@@ -29,7 +29,8 @@ function addRequest(instanceId: string) {
 }
 
 serve(async (req) => {
-  console.log('🚀 [DEBUG] Iniciando função process-follow-up')
+  const requestId = crypto.randomUUID();
+  console.log(`[${requestId}] 🚀 Iniciando processamento de follow-up`)
   
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
@@ -37,7 +38,7 @@ serve(async (req) => {
 
   try {
     const { contact } = await req.json()
-    console.log('📝 [DEBUG] Dados do contato recebidos:', JSON.stringify(contact, null, 2))
+    console.log(`[${requestId}] 📝 Dados do contato recebidos:`, JSON.stringify(contact, null, 2))
     
     if (!contact) {
       throw new Error('Dados do contato não fornecidos')
@@ -45,11 +46,12 @@ serve(async (req) => {
 
     // Rate limiting check
     if (isRateLimited(contact.followUp.instance_id)) {
-      console.log('⚠️ [RATE LIMIT] Instance hit rate limit:', contact.followUp.instance_id)
+      console.log(`[${requestId}] ⚠️ [RATE LIMIT] Instance hit rate limit:`, contact.followUp.instance_id)
       return new Response(
         JSON.stringify({ 
           success: false, 
-          error: 'Rate limit exceeded. Please try again later.' 
+          error: 'Rate limit exceeded. Please try again later.',
+          requestId 
         }),
         { 
           status: 429,
@@ -71,6 +73,7 @@ serve(async (req) => {
       .single()
 
     if (keyError || !keyData) {
+      console.error(`[${requestId}] ❌ Failed to get service key:`, keyError)
       throw new Error('Failed to get service key')
     }
 
@@ -87,19 +90,23 @@ serve(async (req) => {
       ? contact.followUp.manual_messages 
       : []
 
-    console.log(`📝 [DEBUG] Índice atual: ${currentMessageIndex}, Próximo: ${nextMessageIndex}`)
-    console.log('📝 [DEBUG] Total de mensagens:', manualMessages.length)
+    console.log(`[${requestId}] 📝 Índice atual: ${currentMessageIndex}, Próximo: ${nextMessageIndex}`)
+    console.log(`[${requestId}] 📝 Total de mensagens:`, manualMessages.length)
 
     if (nextMessageIndex >= manualMessages.length) {
-      console.log('✅ [DEBUG] Sequência de mensagens completa')
+      console.log(`[${requestId}] ✅ Sequência de mensagens completa`)
       return new Response(
-        JSON.stringify({ success: true, message: 'Sequência completa' }),
+        JSON.stringify({ 
+          success: true, 
+          message: 'Sequência completa',
+          requestId
+        }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
     const nextMessage = manualMessages[nextMessageIndex]
-    console.log('📝 [DEBUG] Próxima mensagem:', nextMessage)
+    console.log(`[${requestId}] 📝 Próxima mensagem:`, nextMessage)
 
     // Adicionar request ao rate limiter
     addRequest(contact.followUp.instance_id)
@@ -123,12 +130,12 @@ serve(async (req) => {
 
     if (!evolutionResponse.ok) {
       const errorText = await evolutionResponse.text()
-      console.error('❌ [ERROR] Erro ao enviar mensagem:', errorText)
+      console.error(`[${requestId}] ❌ Erro ao enviar mensagem:`, errorText)
       throw new Error(errorText)
     }
 
     const evolutionData = await evolutionResponse.json()
-    console.log('✅ [DEBUG] Mensagem enviada:', evolutionData)
+    console.log(`[${requestId}] ✅ Mensagem enviada:`, evolutionData)
 
     // Atualizar status do contato e métricas
     const now = new Date().toISOString()
@@ -148,7 +155,8 @@ serve(async (req) => {
         .from('instance_follow_ups')
         .update({
           last_execution_time: now,
-          execution_count: contact.followUp.execution_count + 1
+          execution_count: contact.followUp.execution_count + 1,
+          next_execution_time: new Date(Date.now() + (contact.followUp.delay_minutes * 60000)).toISOString()
         })
         .eq('id', contact.followUp.id),
 
@@ -164,19 +172,27 @@ serve(async (req) => {
         })
     ])
 
+    // Log de sucesso
+    console.log(`[${requestId}] ✅ Follow-up processado com sucesso`)
+
     return new Response(
       JSON.stringify({ 
         success: true,
         messageIndex: nextMessageIndex,
         messageId: evolutionData.key?.id,
-        executionTime: now
+        executionTime: now,
+        requestId
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   } catch (error) {
-    console.error('❌ [ERRO]:', error)
+    console.error(`[${requestId}] ❌ Erro no processamento:`, error)
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ 
+        error: error.message,
+        requestId,
+        timestamp: new Date().toISOString()
+      }),
       { 
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
