@@ -63,6 +63,19 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
+    // Get service key from secure_configurations
+    const { data: keyData, error: keyError } = await supabaseClient
+      .from('secure_configurations')
+      .select('config_value')
+      .eq('config_key', 'supabase_service_role_key')
+      .single()
+
+    if (keyError || !keyData) {
+      throw new Error('Failed to get service key')
+    }
+
+    const serviceKey = keyData.config_value
+
     // Determinar qual mensagem enviar
     let currentMessageIndex = -1
     if (contact.ConversationId?.startsWith('follow-up-sent-')) {
@@ -91,7 +104,7 @@ serve(async (req) => {
     // Adicionar request ao rate limiter
     addRequest(contact.followUp.instance_id)
 
-    // Enviar mensagem via Evolution API
+    // Enviar mensagem via Evolution API usando a chave do banco
     const evolutionApiUrl = (Deno.env.get('EVOLUTION_API_URL') || '').replace(/\/$/, '')
     const evolutionResponse = await fetch(
       `${evolutionApiUrl}/message/sendText/${contact.followUp.instanceName}`,
@@ -99,7 +112,7 @@ serve(async (req) => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'apikey': Deno.env.get('EVOLUTION_API_KEY') || '',
+          'apikey': serviceKey,
         },
         body: JSON.stringify({
           number: contact.TelefoneClientes,
