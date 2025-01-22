@@ -29,6 +29,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { ContactsTable } from "./ContactsTable"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Json } from "@/integrations/supabase/types"
 
 interface FollowUpSectionProps {
   instanceId: string
@@ -98,13 +99,13 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
 
       console.log('✅ [DEBUG] Follow-up data:', data)
 
-      // Garantir que manual_messages é um array de ManualMessage
+      // Parse manual_messages from Json to ManualMessage[]
       const parsedData = {
         ...data,
         manual_messages: Array.isArray(data?.manual_messages) 
-          ? data.manual_messages.map((msg: any) => ({
-              message: msg.message || '',
-              delay_minutes: msg.delay_minutes || 1
+          ? (data.manual_messages as Json[]).map(msg => ({
+              message: typeof msg === 'object' && msg !== null ? String(msg.message || '') : '',
+              delay_minutes: typeof msg === 'object' && msg !== null ? Number(msg.delay_minutes || 1) : 1
             }))
           : []
       } as FollowUpData
@@ -164,7 +165,7 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
         max_attempts: values.max_attempts,
         stop_on_reply: values.stop_on_reply,
         stop_on_keyword: values.stop_on_keyword,
-        manual_messages: values.manual_messages,
+        manual_messages: values.manual_messages as unknown as Json,
         system_prompt: values.system_prompt,
         updated_at: new Date().toISOString()
       }
