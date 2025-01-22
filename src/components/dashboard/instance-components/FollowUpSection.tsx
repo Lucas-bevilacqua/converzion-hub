@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { supabase } from "@/integrations/supabase/client"
+import { useAuth } from "@/contexts/auth/AuthContext" // Added missing import
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
@@ -70,12 +71,16 @@ interface FollowUpData {
   stop_on_keyword: string[];
   manual_messages: ManualMessage[];
   system_prompt?: string;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
   const { user } = useAuth()
   const { toast } = useToast()
   const queryClient = useQueryClient()
+
+  console.log('🔍 [DEBUG] Fetching follow-up for instance:', instanceId)
 
   const { data: followUp, isLoading, error } = useQuery({
     queryKey: ['follow-up', instanceId],
@@ -87,8 +92,15 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
         .maybeSingle()
 
       if (error) {
-        console.error('❌ [ERROR] Erro ao buscar follow-up:', error)
+        console.error('❌ [ERROR] Error fetching follow-up:', error)
         throw error
+      }
+
+      console.log('✅ [DEBUG] Follow-up data:', data)
+
+      // Convert manual_messages from JSON to ManualMessage[]
+      if (data && data.manual_messages) {
+        data.manual_messages = data.manual_messages as ManualMessage[]
       }
 
       return data as FollowUpData
@@ -112,6 +124,7 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
 
   useEffect(() => {
     if (followUp) {
+      console.log('🔄 [DEBUG] Updating form data with follow-up:', followUp)
       setFormData({
         is_active: followUp.is_active || false,
         follow_up_type: followUp.follow_up_type || "manual",
@@ -131,6 +144,8 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
 
   const saveMutation = useMutation({
     mutationFn: async (values: FormData) => {
+      console.log('💾 [DEBUG] Saving follow-up with values:', values)
+      
       const dataToSave = {
         instance_id: instanceId,
         is_active: values.is_active,
@@ -159,9 +174,11 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
 
       const { error } = await operation
       if (error) {
-        console.error('❌ [ERROR] Erro ao salvar follow-up:', error)
+        console.error('❌ [ERROR] Error saving follow-up:', error)
         throw error
       }
+
+      console.log('✅ [DEBUG] Follow-up saved successfully')
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['follow-up'] })
@@ -171,7 +188,7 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
       })
     },
     onError: (error) => {
-      console.error('❌ [ERROR] Erro na mutação de salvamento:', error)
+      console.error('❌ [ERROR] Error in save mutation:', error)
       toast({
         title: "Erro",
         description: "Não foi possível salvar as configurações. Por favor, tente novamente.",
