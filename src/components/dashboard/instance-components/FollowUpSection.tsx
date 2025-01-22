@@ -103,10 +103,16 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
       const parsedData = {
         ...data,
         manual_messages: Array.isArray(data?.manual_messages) 
-          ? (data.manual_messages as Json[]).map(msg => ({
-              message: typeof msg === 'object' && msg !== null ? String(msg.message || '') : '',
-              delay_minutes: typeof msg === 'object' && msg !== null ? Number(msg.delay_minutes || 1) : 1
-            }))
+          ? (data.manual_messages as Json[]).map(msg => {
+              if (typeof msg === 'object' && msg !== null) {
+                const msgObj = msg as { [key: string]: Json }
+                return {
+                  message: String(msgObj.message || ''),
+                  delay_minutes: Number(msgObj.delay_minutes || 1)
+                }
+              }
+              return { message: '', delay_minutes: 1 }
+            })
           : []
       } as FollowUpData
 
@@ -165,7 +171,10 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
         max_attempts: values.max_attempts,
         stop_on_reply: values.stop_on_reply,
         stop_on_keyword: values.stop_on_keyword,
-        manual_messages: values.manual_messages as unknown as Json,
+        manual_messages: values.manual_messages.map(msg => ({
+          message: msg.message,
+          delay_minutes: msg.delay_minutes
+        })) as unknown as Json,
         system_prompt: values.system_prompt,
         updated_at: new Date().toISOString()
       }
