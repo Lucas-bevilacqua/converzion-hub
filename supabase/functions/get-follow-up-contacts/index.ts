@@ -52,7 +52,7 @@ serve(async (req) => {
         )
       `)
       .eq('is_active', true)
-      .filter('execution_count', 'lt', 'max_attempts')
+      .lt('execution_count', 'max_attempts')
       .order('last_execution_time', { ascending: true, nullsFirst: true });
 
     if (followUpsError) {
