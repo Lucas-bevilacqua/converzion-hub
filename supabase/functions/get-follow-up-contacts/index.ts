@@ -14,7 +14,10 @@ serve(async (req) => {
   try {
     // Handle CORS preflight
     if (req.method === 'OPTIONS') {
-      return new Response(null, { headers: corsHeaders });
+      return new Response(null, { 
+        headers: corsHeaders,
+        status: 204
+      });
     }
 
     // Validate environment variables
