@@ -17,6 +17,12 @@ jobs:
         env:
           SUPABASE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: |
+          if [ -z "$SUPABASE_KEY" ]; then
+            echo "❌ Error: SUPABASE_SERVICE_ROLE_KEY is not set"
+            echo "Please add the SUPABASE_SERVICE_ROLE_KEY secret in your repository settings"
+            exit 1
+          fi
+          
           echo "Starting follow-up processing at $(date)"
           
           # Make the HTTP request and capture response
