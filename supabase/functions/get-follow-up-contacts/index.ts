@@ -10,9 +10,8 @@ const MAX_RETRIES = 3;
 const BATCH_SIZE = 3;
 const DELAY_BETWEEN_CONTACTS = 2000;
 const RETRY_DELAY = 2000;
-const INITIAL_DELAY = 1000; // Added missing constant
+const INITIAL_DELAY = 1000;
 
-// Added missing sleep utility
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 async function retryWithBackoff<T>(
@@ -69,7 +68,6 @@ serve(async (req) => {
     }
 
     console.log(`[${requestId}] 📊 Follow-ups encontrados:`, followUps?.length || 0);
-    console.log(`[${requestId}] 🔍 Detalhes dos follow-ups:`, followUps);
 
     const processedFollowUps = [];
     const errors = [];
@@ -86,25 +84,6 @@ serve(async (req) => {
           maxAttempts,
           comparison: executionCount >= maxAttempts
         });
-        
-        if (executionCount >= maxAttempts) {
-          console.log(`[${requestId}] ⚠️ Número máximo de tentativas atingido para follow-up ${followUp.id}`);
-          
-          const { error: updateError } = await supabaseClient
-            .from('instance_follow_ups')
-            .update({
-              is_active: false,
-              last_execution_time: new Date().toISOString(),
-              execution_count: executionCount
-            })
-            .eq('id', followUp.id);
-
-          if (updateError) {
-            console.error(`[${requestId}] ❌ Error updating follow-up status:`, updateError);
-          }
-          
-          continue;
-        }
 
         if (!followUp.instance?.connection_status || 
             followUp.instance.connection_status.toLowerCase() !== 'connected') {
@@ -126,12 +105,10 @@ serve(async (req) => {
         }
 
         console.log(`[${requestId}] 📱 Processando ${contacts?.length || 0} contatos`);
-        console.log(`[${requestId}] 🔍 Detalhes dos contatos:`, contacts);
 
         // Get the correct message based on execution count
         let messageToSend = '';
         if (followUp.follow_up_type === 'manual' && Array.isArray(followUp.manual_messages)) {
-          // Get message corresponding to current execution count
           const currentMessage = followUp.manual_messages[executionCount];
           if (currentMessage?.message) {
             messageToSend = currentMessage.message;
@@ -153,33 +130,32 @@ serve(async (req) => {
 
             console.log(`[${requestId}] 📝 Enviando mensagem para ${contact.TelefoneClientes}:`, messageToSend);
 
-            const { error: messageError } = await supabaseClient
-              .from('chat_messages')
-              .insert({
-                instance_id: followUp.instance_id,
-                user_id: followUp.instance.user_id,
-                content: messageToSend,
-                sender_type: 'follow_up'
-              });
+            await retryWithBackoff(async () => {
+              const { error: messageError } = await supabaseClient
+                .from('chat_messages')
+                .insert({
+                  instance_id: followUp.instance_id,
+                  user_id: followUp.instance.user_id,
+                  content: messageToSend,
+                  sender_type: 'follow_up'
+                });
 
-            if (messageError) {
-              throw messageError;
-            }
+              if (messageError) throw messageError;
+            });
 
             // Update follow-up execution count and time
-            const { error: updateError } = await supabaseClient
-              .from('instance_follow_ups')
-              .update({
-                execution_count: executionCount + 1,
-                last_execution_time: new Date().toISOString(),
-                next_execution_time: new Date(Date.now() + (followUp.delay_minutes * 60 * 1000)).toISOString()
-              })
-              .eq('id', followUp.id);
+            await retryWithBackoff(async () => {
+              const { error: updateError } = await supabaseClient
+                .from('instance_follow_ups')
+                .update({
+                  execution_count: executionCount + 1,
+                  last_execution_time: new Date().toISOString(),
+                  next_execution_time: new Date(Date.now() + (followUp.delay_minutes * 60 * 1000)).toISOString()
+                })
+                .eq('id', followUp.id);
 
-            if (updateError) {
-              console.error(`[${requestId}] ❌ Error updating follow-up:`, updateError);
-              throw updateError;
-            }
+              if (updateError) throw updateError;
+            });
 
             processedFollowUps.push({
               followUpId: followUp.id,
