@@ -50,10 +50,14 @@ serve(async (req) => {
             id,
             name,
             user_id,
-            connection_status
+            connection_status,
+            phone_number
           )
         `)
         .eq('is_active', true)
+        .gt('next_execution_time', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()) // Only get follow-ups scheduled in the last 24h
+        .lt('next_execution_time', new Date().toISOString()) // Only get follow-ups that should run now
+        .lt('execution_count', 'max_attempts') // Only get follow-ups that haven't exceeded max attempts
     });
 
     if (followUpsError) {
@@ -69,12 +73,16 @@ serve(async (req) => {
     // Process each follow-up with retry
     for (const followUp of (followUps || [])) {
       try {
-        if (!followUp.instance?.connection_status || followUp.instance.connection_status.toLowerCase() !== 'connected') {
+        if (!followUp.instance?.connection_status || 
+            followUp.instance.connection_status.toLowerCase() !== 'connected') {
           console.log(`⚠️ [DEBUG] Instance ${followUp.instance?.name} not connected, skipping`)
           continue;
         }
 
         console.log(`🔄 [DEBUG] Processing follow-up for instance ${followUp.instance.name}`)
+        console.log(`📱 [DEBUG] Phone number: ${followUp.instance.phone_number}`)
+        console.log(`⏰ [DEBUG] Next execution time: ${followUp.next_execution_time}`)
+        console.log(`📊 [DEBUG] Execution count: ${followUp.execution_count}/${followUp.max_attempts}`)
 
         const endpoint = followUp.follow_up_type === 'ai_generated' 
           ? 'process-ai-follow-up'
@@ -96,6 +104,20 @@ serve(async (req) => {
           if (response.error) throw response.error;
           return response.data;
         });
+
+        // Update follow-up execution count and time
+        const { error: updateError } = await supabaseClient
+          .from('instance_follow_ups')
+          .update({
+            execution_count: (followUp.execution_count || 0) + 1,
+            last_execution_time: new Date().toISOString(),
+            next_execution_time: new Date(Date.now() + (followUp.delay_minutes * 60 * 1000)).toISOString()
+          })
+          .eq('id', followUp.id);
+
+        if (updateError) {
+          console.error(`❌ [ERROR] Failed to update follow-up ${followUp.id}:`, updateError)
+        }
 
         processedFollowUps.push({
           followUpId: followUp.id,
