@@ -7,28 +7,42 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Rate limiting implementation
+const RATE_LIMIT = 10; // Max concurrent requests
+const activeRequests = new Set();
+
 serve(async (req) => {
   const requestId = crypto.randomUUID();
   console.log(`[${requestId}] 🚀 Starting get-follow-up-contacts function`);
-  
+
   try {
     // Handle CORS preflight
     if (req.method === 'OPTIONS') {
-      return new Response(null, { 
-        headers: corsHeaders,
-        status: 204
-      });
+      return new Response(null, { headers: corsHeaders });
     }
+
+    // Check rate limit
+    if (activeRequests.size >= RATE_LIMIT) {
+      console.log(`[${requestId}] ⚠️ Rate limit exceeded`);
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: 'Too many concurrent requests. Please try again later.'
+        }),
+        { 
+          status: 429,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
+    }
+
+    activeRequests.add(requestId);
 
     // Validate environment variables
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 
     if (!supabaseUrl || !supabaseKey) {
-      console.error(`[${requestId}] ❌ Environment variables not configured:`, {
-        hasUrl: !!supabaseUrl,
-        hasKey: !!supabaseKey
-      });
       throw new Error('Environment variables not configured');
     }
 
@@ -38,7 +52,7 @@ serve(async (req) => {
 
     // Log execution start
     console.log(`[${requestId}] 📝 Logging execution start`);
-    const { error: logError } = await supabaseClient
+    await supabaseClient
       .from('cron_logs')
       .insert({
         job_name: 'get-follow-up-contacts',
@@ -47,11 +61,7 @@ serve(async (req) => {
         details_json: { request_id: requestId }
       });
 
-    if (logError) {
-      console.error(`[${requestId}] ⚠️ Error logging start:`, logError);
-    }
-
-    // Fetch active follow-ups
+    // Fetch active follow-ups with pagination
     console.log(`[${requestId}] 🔍 Fetching active follow-ups`);
     const { data: followUps, error: followUpsError } = await supabaseClient
       .from('instance_follow_ups')
@@ -64,75 +74,46 @@ serve(async (req) => {
           connection_status
         )
       `)
-      .eq('is_active', true);
+      .eq('is_active', true)
+      .limit(5); // Process in smaller batches
 
     if (followUpsError) {
-      console.error(`[${requestId}] ❌ Error fetching follow-ups:`, followUpsError);
       throw followUpsError;
     }
 
-    console.log(`[${requestId}] ✅ Found ${followUps?.length || 0} active follow-ups:`, followUps);
+    console.log(`[${requestId}] ✅ Found ${followUps?.length || 0} active follow-ups`);
 
     const processedFollowUps = [];
     const errors = [];
 
-    // Process each follow-up
+    // Process each follow-up with resource limits
     for (const followUp of (followUps || [])) {
       try {
-        if (!followUp.instance?.connection_status || followUp.instance.connection_status.toLowerCase() !== 'connected') {
-          console.log(`[${requestId}] ⚠️ Instance ${followUp.instance?.name} not connected, skipping`);
+        if (!followUp.instance?.connection_status || 
+            followUp.instance.connection_status.toLowerCase() !== 'connected') {
           continue;
         }
 
         console.log(`[${requestId}] 🔄 Processing follow-up for instance ${followUp.instance.name}`);
 
-        // Get contacts for this instance - Note: Using both Users_clientes and users_clientes tables
-        const { data: contacts, error: contactsError } = await supabaseClient
+        const endpoint = followUp.follow_up_type === 'ai_generated' 
+          ? 'process-ai-follow-up'
+          : 'process-follow-up';
+
+        const { data: contacts } = await supabaseClient
           .from('Users_clientes')
           .select('*')
           .eq('NomeDaEmpresa', followUp.instance_id)
-          .not('TelefoneClientes', 'is', null)
-          .order('last_message_time', { ascending: true, nullsFirst: true });
+          .limit(2); // Process fewer contacts per batch
 
-        if (contactsError) {
-          console.error(`[${requestId}] ❌ Error fetching contacts:`, contactsError);
-          throw contactsError;
-        }
+        console.log(`[${requestId}] 📊 Found ${contacts?.length || 0} contacts for processing`);
 
-        // Also try lowercase table
-        const { data: contacts2, error: contacts2Error } = await supabaseClient
-          .from('users_clientes')
-          .select('*')
-          .eq('nomedaempresa', followUp.instance_id)
-          .not('telefoneclientes', 'is', null)
-          .order('last_message_time', { ascending: true, nullsFirst: true });
-
-        if (contacts2Error) {
-          console.error(`[${requestId}] ❌ Error fetching contacts from lowercase table:`, contacts2Error);
-        }
-
-        // Combine contacts from both tables
-        const allContacts = [...(contacts || []), ...(contacts2 || [])];
-        console.log(`[${requestId}] 📊 Found ${allContacts.length} contacts for processing`);
-
-        // Process each contact
-        for (const contact of allContacts) {
+        for (const contact of (contacts || [])) {
           try {
-            const endpoint = followUp.follow_up_type === 'ai_generated' 
-              ? 'process-ai-follow-up'
-              : 'process-follow-up';
-
-            console.log(`[${requestId}] 🔄 Processing contact ${contact.TelefoneClientes || contact.telefoneclientes} via ${endpoint}`);
+            console.log(`[${requestId}] 🔄 Processing contact ${contact.TelefoneClientes} via ${endpoint}`);
             
-            const processFollowUpUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/${endpoint}`;
-            
-            const response = await fetch(processFollowUpUrl, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${supabaseKey}`
-              },
-              body: JSON.stringify({
+            const response = await supabaseClient.functions.invoke(endpoint, {
+              body: { 
                 contact: {
                   ...contact,
                   followUp: {
@@ -142,125 +123,63 @@ serve(async (req) => {
                     userId: followUp.instance.user_id
                   }
                 }
-              })
+              }
             });
-
-            if (!response.ok) {
-              const errorText = await response.text();
-              console.error(`[${requestId}] ❌ Error processing contact:`, {
-                status: response.status,
-                error: errorText,
-                contact: contact.TelefoneClientes || contact.telefoneclientes
-              });
-              throw new Error(`Error processing follow-up: ${errorText}`);
-            }
-
-            const responseData = await response.json();
-            console.log(`[${requestId}] ✅ Follow-up processed successfully:`, responseData);
 
             processedFollowUps.push({
               followUpId: followUp.id,
-              instanceId: followUp.instance_id,
-              contactId: contact.id,
-              type: followUp.follow_up_type,
-              timestamp: new Date().toISOString()
+              status: 'success',
+              result: response.data
             });
 
-          } catch (contactError) {
-            console.error(`[${requestId}] ❌ Error processing contact:`, contactError);
+            // Add delay between processing contacts
+            await new Promise(resolve => setTimeout(resolve, 1000));
+
+          } catch (error) {
+            console.error(`[${requestId}] ❌ Error processing contact:`, error);
             errors.push({
               followUpId: followUp.id,
-              contactId: contact.id,
-              type: followUp.follow_up_type,
-              error: contactError.message,
-              timestamp: new Date().toISOString()
+              status: 'error',
+              error: error.message
             });
           }
         }
-      } catch (followUpError) {
-        console.error(`[${requestId}] ❌ Error processing follow-up:`, followUpError);
+      } catch (error) {
+        console.error(`[${requestId}] ❌ Error processing follow-up:`, error);
         errors.push({
           followUpId: followUp.id,
-          type: followUp.follow_up_type,
-          error: followUpError.message,
-          timestamp: new Date().toISOString()
+          status: 'error',
+          error: error.message
         });
       }
     }
-
-    // Log completion
-    const endTime = new Date().toISOString();
-    const finalLog = {
-      request_id: requestId,
-      processed: processedFollowUps.length,
-      errors: errors.length,
-      endTime,
-      duration: new Date(endTime).getTime() - new Date().getTime()
-    };
-    
-    console.log(`[${requestId}] 📝 Execution completed:`, finalLog);
-    
-    await supabaseClient
-      .from('cron_logs')
-      .insert({
-        job_name: 'get-follow-up-contacts',
-        status: 'completed',
-        details: 'Processing completed successfully',
-        details_json: finalLog
-      });
 
     return new Response(
       JSON.stringify({
         success: true,
-        processed: processedFollowUps,
-        errors,
-        request_id: requestId
+        processed: processedFollowUps.length,
+        results: [...processedFollowUps, ...errors]
       }),
       { 
-        headers: { 
-          ...corsHeaders,
-          'Content-Type': 'application/json'
-        }
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       }
     );
 
   } catch (error) {
-    console.error(`[${requestId}] ❌ Critical error in execution:`, error);
+    console.error(`[${requestId}] ❌ Critical error:`, error);
     
-    const supabaseUrl = Deno.env.get('SUPABASE_URL');
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-    
-    if (supabaseUrl && supabaseKey) {
-      const supabase = createClient(supabaseUrl, supabaseKey);
-      
-      await supabase
-        .from('cron_logs')
-        .insert({
-          job_name: 'get-follow-up-contacts',
-          status: 'error',
-          details: 'Critical error in execution',
-          details_json: {
-            request_id: requestId,
-            error: error.message,
-            stack: error.stack
-          }
-        });
-    }
-
     return new Response(
       JSON.stringify({
         success: false,
         error: error.message,
-        request_id: requestId,
-        timestamp: new Date().toISOString()
+        request_id: requestId
       }),
-      {
+      { 
         status: 500,
-        headers: {
-          ...corsHeaders,
-          'Content-Type': 'application/json'
-        }
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       }
     );
+  } finally {
+    activeRequests.delete(requestId);
   }
 });
