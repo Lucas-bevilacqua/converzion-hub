@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { useToast } from "@/components/ui/use-toast"
-import { Plus, Trash2, Users } from "lucide-react"
+import { Plus, Trash2, Users, Play } from "lucide-react"
 import {
   Select,
   SelectContent,
@@ -252,6 +252,41 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
     }
   })
 
+  // Add test mutation
+  const testMutation = useMutation({
+    mutationFn: async () => {
+      console.log('🔍 [DEBUG] Testing follow-up for instance:', instanceId)
+      
+      const { data, error } = await supabase.functions.invoke('process-follow-up', {
+        body: { 
+          instanceId,
+          test: true
+        }
+      })
+
+      if (error) {
+        console.error('❌ [ERROR] Error testing follow-up:', error)
+        throw error
+      }
+
+      return data
+    },
+    onSuccess: () => {
+      toast({
+        title: "Teste iniciado",
+        description: "O teste de follow-up foi iniciado. Verifique a aba de contatos para ver os resultados.",
+      })
+    },
+    onError: (error) => {
+      console.error('❌ [ERROR] Error in test mutation:', error)
+      toast({
+        title: "Erro",
+        description: "Não foi possível executar o teste. Por favor, tente novamente.",
+        variant: "destructive",
+      })
+    }
+  })
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -262,6 +297,15 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => testMutation.mutate()}
+            disabled={!followUp?.is_active}
+          >
+            <Play className="h-4 w-4 mr-2" />
+            Testar
+          </Button>
           <AlertDialog>
             <AlertDialogTrigger asChild>
               <Button
