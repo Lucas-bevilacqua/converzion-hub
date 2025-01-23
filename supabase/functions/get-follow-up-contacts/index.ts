@@ -39,7 +39,9 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    // Fetch active follow-ups
+    // Fetch active follow-ups with detailed logging
+    console.log(`[${requestId}] 🔍 Buscando follow-ups ativos...`);
+    
     const { data: followUps, error: followUpsError } = await supabaseClient
       .from('instance_follow_ups')
       .select(`
@@ -59,6 +61,7 @@ serve(async (req) => {
     }
 
     console.log(`[${requestId}] 📊 Follow-ups encontrados:`, followUps?.length || 0);
+    console.log(`[${requestId}] 🔍 Detalhes dos follow-ups:`, followUps);
 
     const processedFollowUps = [];
     const errors = [];
@@ -103,14 +106,22 @@ serve(async (req) => {
           continue;
         }
 
-        // Fetch contacts
-        const { data: contacts } = await supabaseClient
+        // Fetch contacts with detailed logging
+        console.log(`[${requestId}] 🔍 Buscando contatos para instância ${followUp.instance_id}`);
+        
+        const { data: contacts, error: contactsError } = await supabaseClient
           .from('Users_clientes')
           .select('*')
           .eq('NomeDaEmpresa', followUp.instance_id)
           .limit(BATCH_SIZE);
 
+        if (contactsError) {
+          console.error(`[${requestId}] ❌ Erro ao buscar contatos:`, contactsError);
+          continue;
+        }
+
         console.log(`[${requestId}] 📱 Processando ${contacts?.length || 0} contatos`);
+        console.log(`[${requestId}] 🔍 Detalhes dos contatos:`, contacts);
 
         for (const contact of (contacts || [])) {
           try {
