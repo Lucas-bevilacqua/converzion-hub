@@ -81,6 +81,28 @@ interface FollowUpData {
   updated_at?: string;
 }
 
+const MAX_RETRIES = 3;
+const INITIAL_DELAY = 1000; // 1 second
+
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+async function retryWithBackoff<T>(
+  operation: () => Promise<T>, 
+  retries: number = MAX_RETRIES,
+  delay: number = INITIAL_DELAY
+): Promise<T> {
+  try {
+    return await operation();
+  } catch (error) {
+    if (retries > 0) {
+      console.log(`🔄 [DEBUG] Retrying operation, ${retries} attempts remaining, waiting ${delay}ms`);
+      await sleep(delay);
+      return retryWithBackoff(operation, retries - 1, delay * 2);
+    }
+    throw error;
+  }
+}
+
 export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
   const { user } = useAuth()
   const { toast } = useToast()
@@ -135,24 +157,40 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
         instanceId,
         userId: user.id,
         followUpId: followUp.id
-      })
+      });
 
-      const { data, error } = await supabase.functions.invoke('get-follow-up-contacts', {
-        body: { 
-          instanceId,
-          userId: user.id,
-          followUpId: followUp.id,
-          source: 'manual-trigger'
+      return await retryWithBackoff(async () => {
+        const { data, error } = await supabase.functions.invoke('get-follow-up-contacts', {
+          body: { 
+            instanceId,
+            userId: user.id,
+            followUpId: followUp.id,
+            source: 'manual-trigger'
+          }
+        });
+
+        if (error) {
+          console.error('❌ [ERROR] Erro ao processar follow-up:', error);
+          throw error;
         }
-      })
 
-      if (error) {
-        console.error('❌ [ERROR] Erro ao processar follow-up:', error)
-        throw error
-      }
-
-      console.log('✅ [DEBUG] Follow-up processado com sucesso:', data)
-      return data
+        console.log('✅ [DEBUG] Follow-up processado com sucesso:', data);
+        return data;
+      });
+    },
+    onSuccess: () => {
+      toast({
+        title: "Sucesso",
+        description: "Follow-up processado com sucesso.",
+      });
+    },
+    onError: (error) => {
+      console.error('❌ [ERROR] Erro ao processar follow-up:', error);
+      toast({
+        title: "Erro",
+        description: "Não foi possível processar o follow-up. Tentativas esgotadas.",
+        variant: "destructive",
+      });
     }
   })
 
