@@ -65,7 +65,7 @@ serve(async (req) => {
     // Verificar status da conexão da instância
     const { data: instance, error: instanceError } = await supabaseClient
       .from('evolution_instances')
-      .select('connection_status, name')
+      .select('connection_status, name, id')
       .eq('id', contact.followUp.instance_id)
       .single()
 
@@ -134,10 +134,10 @@ serve(async (req) => {
 
     // Enviar mensagem via Evolution API usando a chave do banco
     const evolutionApiUrl = (Deno.env.get('EVOLUTION_API_URL') || '').replace(/\/$/, '')
-    console.log(`[${requestId}] 📝 Enviando mensagem para ${contact.TelefoneClientes} via Evolution API usando instância ${instance.name}`)
+    console.log(`[${requestId}] 📝 Enviando mensagem para ${contact.TelefoneClientes} via Evolution API usando instância ${instance.id}`)
     
     const evolutionResponse = await fetch(
-      `${evolutionApiUrl}/message/sendText/${instance.name}`,
+      `${evolutionApiUrl}/message/sendText/${instance.id}`,
       {
         method: 'POST',
         headers: {
