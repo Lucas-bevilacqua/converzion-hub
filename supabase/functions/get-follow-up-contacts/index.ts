@@ -130,8 +130,18 @@ serve(async (req) => {
     for (const followUp of (followUps || [])) {
       try {
         console.log(`[${requestId}] 🔄 Processando follow-up para instância ${followUp.instance?.name}`);
+        
+        // Verificar se execution_count é menor que max_attempts
+        const executionCount = followUp.execution_count || 0;
+        const maxAttempts = followUp.max_attempts || 3;
+        
+        if (executionCount >= maxAttempts) {
+          console.log(`[${requestId}] ⚠️ Número máximo de tentativas atingido para follow-up ${followUp.id}`);
+          continue;
+        }
+
         console.log(`[${requestId}] ⏰ Próxima execução agendada para: ${followUp.next_execution_time}`);
-        console.log(`[${requestId}] 📝 Tentativas: ${followUp.execution_count}/${followUp.max_attempts}`);
+        console.log(`[${requestId}] 📝 Tentativas: ${executionCount}/${maxAttempts}`);
         
         // Verificar status da conexão em tempo real
         const isConnected = await retryOperation(() => 
@@ -212,7 +222,7 @@ serve(async (req) => {
           supabaseClient
             .from('instance_follow_ups')
             .update({
-              execution_count: (followUp.execution_count || 0) + 1,
+              execution_count: executionCount + 1,
               last_execution_time: new Date().toISOString(),
               next_execution_time: new Date(Date.now() + (followUp.delay_minutes * 60 * 1000)).toISOString()
             })
