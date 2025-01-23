@@ -95,18 +95,18 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
 
       return parsedData
     },
-    refetchInterval: 30000 // Poll every 30 seconds regardless of active state for better reliability
+    refetchInterval: 30000 // Poll every 30 seconds
   })
 
   const processFollowUpQuery = useQuery({
     queryKey: ['process-follow-up', instanceId],
     queryFn: async () => {
       if (!followUp?.is_active) {
-        console.log('🔄 [DEBUG] Follow-up não está ativo, pulando processamento')
+        console.log('⏸️ [DEBUG] Follow-up não está ativo, pulando processamento')
         return null
       }
 
-      console.log('🔄 [DEBUG] Processando follow-ups pendentes')
+      console.log('🔄 [DEBUG] Iniciando processamento de follow-up')
       
       const { data: contacts } = await supabase
         .from('Users_clientes')
@@ -120,7 +120,8 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
         return null
       }
 
-      const { data, error } = await supabase.functions.invoke('process-follow-up', {
+      console.log('📤 [DEBUG] Enviando requisição para processar follow-up')
+      const { data, error } = await supabase.functions.invoke('get-follow-up-contacts', {
         body: { 
           contact: {
             ...contacts,
@@ -137,10 +138,13 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
         throw error
       }
 
+      console.log('✅ [DEBUG] Follow-up processado com sucesso:', data)
       return data
     },
-    refetchInterval: 30000, // Poll every 30 seconds regardless of active state
-    enabled: true // Always enabled to ensure continuous polling
+    refetchInterval: 30000, // Poll every 30 seconds
+    enabled: true, // Always enabled to ensure continuous polling
+    retry: true, // Retry on failure
+    retryDelay: 5000 // Wait 5 seconds before retrying on failure
   })
 
   const [formData, setFormData] = useState<FormData>({
