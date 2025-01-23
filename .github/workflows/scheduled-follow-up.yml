@@ -2,26 +2,48 @@ name: Scheduled Follow-up Processing
 
 on:
   schedule:
-    - cron: '*/5 * * * *'  # Runs every 5 minutes
+    - cron: '*/10 * * * *'  # Runs every 10 minutes
   workflow_dispatch:        # Allows manual triggering
 
 jobs:
   process-follow-ups:
+    name: Process Follow-ups
     runs-on: ubuntu-latest
+    timeout-minutes: 5      # Prevent long-running jobs
     
     steps:
       - name: Process Follow-ups
+        id: process
         env:
           SUPABASE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: |
           echo "Starting follow-up processing at $(date)"
-          curl -X POST 'https://vodexhppkasbulogmcqb.supabase.co/functions/v1/get-follow-up-contacts' \
-          -H "Authorization: Bearer ${SUPABASE_KEY}" \
-          -H "Content-Type: application/json" \
-          -H "apikey: ${SUPABASE_KEY}" \
-          --data-raw '{"scheduled":true, "source": "github-action"}' \
-          --fail \
-          --show-error \
-          --silent \
-          || echo "Error: Failed to process follow-ups"
+          
+          # Make the HTTP request and capture response
+          RESPONSE=$(curl -X POST \
+            'https://vodexhppkasbulogmcqb.supabase.co/functions/v1/get-follow-up-contacts' \
+            -H "Authorization: Bearer ${SUPABASE_KEY}" \
+            -H "Content-Type: application/json" \
+            -H "apikey: ${SUPABASE_KEY}" \
+            --data-raw '{"scheduled":true, "source": "github-action"}' \
+            --fail \
+            --show-error \
+            --silent)
+          
+          # Check curl exit code
+          if [ $? -eq 0 ]; then
+            echo "✅ Follow-up processing completed successfully"
+            echo "Response: ${RESPONSE}"
+          else
+            echo "❌ Error processing follow-ups"
+            echo "Error response: ${RESPONSE}"
+            exit 1
+          fi
+          
           echo "Completed follow-up processing at $(date)"
+      
+      - name: Handle Failure
+        if: failure()
+        run: |
+          echo "❌ Follow-up processing job failed"
+          echo "Please check the logs above for more details"
