@@ -6,9 +6,10 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// Rate limiting implementation
-const RATE_LIMIT = 10; // Max concurrent requests
-const BATCH_SIZE = 5; // Process contacts in smaller batches
+// Rate limiting implementation with reduced limits
+const RATE_LIMIT = 5; // Reduced from 10 to 5 concurrent requests
+const BATCH_SIZE = 3; // Reduced from 5 to 3 contacts per batch
+const DELAY_BETWEEN_CONTACTS = 2000; // Increased delay between contacts to 2 seconds
 const activeRequests = new Set();
 
 serve(async (req) => {
@@ -16,7 +17,6 @@ serve(async (req) => {
   console.log(`[${requestId}] 🚀 Starting get-follow-up-contacts function`);
 
   try {
-    // Handle CORS preflight
     if (req.method === 'OPTIONS') {
       return new Response(null, { headers: corsHeaders });
     }
@@ -55,7 +55,7 @@ serve(async (req) => {
         details_json: { request_id: requestId }
       });
 
-    // Fetch active follow-ups with pagination
+    // Fetch active follow-ups
     console.log(`[${requestId}] 🔍 Fetching active follow-ups`);
     const { data: followUps, error: followUpsError } = await supabaseClient
       .from('instance_follow_ups')
@@ -80,7 +80,7 @@ serve(async (req) => {
     const processedFollowUps = [];
     const errors = [];
 
-    // Process each follow-up with resource limits
+    // Process each follow-up
     for (const followUp of (followUps || [])) {
       try {
         if (!followUp.instance?.connection_status || 
@@ -108,7 +108,7 @@ serve(async (req) => {
             console.log(`[${requestId}] 🔄 Processing contact ${contact.TelefoneClientes} via ${endpoint}`);
             
             // Add delay between processing contacts
-            await new Promise(resolve => setTimeout(resolve, 1000));
+            await new Promise(resolve => setTimeout(resolve, DELAY_BETWEEN_CONTACTS));
 
             const response = await supabaseClient.functions.invoke(endpoint, {
               body: { 
@@ -149,6 +149,20 @@ serve(async (req) => {
       }
     }
 
+    // Log completion
+    await supabaseClient
+      .from('cron_logs')
+      .insert({
+        job_name: 'get-follow-up-contacts',
+        status: 'completed',
+        details: 'Function execution completed',
+        details_json: { 
+          request_id: requestId,
+          processed: processedFollowUps.length,
+          errors: errors.length
+        }
+      });
+
     return new Response(
       JSON.stringify({
         success: true,
@@ -163,6 +177,19 @@ serve(async (req) => {
   } catch (error) {
     console.error(`[${requestId}] ❌ Critical error:`, error);
     
+    // Log error
+    await supabaseClient
+      .from('cron_logs')
+      .insert({
+        job_name: 'get-follow-up-contacts',
+        status: 'error',
+        details: 'Function execution failed',
+        details_json: { 
+          request_id: requestId,
+          error: error.message
+        }
+      });
+
     return new Response(
       JSON.stringify({
         success: false,

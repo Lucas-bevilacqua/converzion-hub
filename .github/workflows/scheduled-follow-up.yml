@@ -2,9 +2,8 @@ name: Scheduled Follow-up Processing
 
 on:
   schedule:
-    # Runs every 5 minutes
-    - cron: '*/5 * * * *'
-  workflow_dispatch: # Allows manual triggering
+    - cron: '*/5 * * * *'  # Runs every 5 minutes
+  workflow_dispatch:        # Allows manual triggering
 
 jobs:
   process-follow-ups:
@@ -13,7 +12,9 @@ jobs:
     steps:
       - name: Process Follow-ups
         run: |
+          echo "Starting follow-up processing at $(date)"
           curl -X POST 'https://vodexhppkasbulogmcqb.supabase.co/functions/v1/process-follow-up' \
           -H 'Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}' \
           -H 'Content-Type: application/json' \
           --data-raw '{"scheduled":true, "source": "github-action"}'
+          echo "Completed follow-up processing at $(date)"
