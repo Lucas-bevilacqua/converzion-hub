@@ -7,9 +7,9 @@ const corsHeaders = {
 }
 
 // Rate limiting implementation with reduced limits
-const RATE_LIMIT = 5; // Reduced from 10 to 5 concurrent requests
-const BATCH_SIZE = 3; // Reduced from 5 to 3 contacts per batch
-const DELAY_BETWEEN_CONTACTS = 2000; // Increased delay between contacts to 2 seconds
+const RATE_LIMIT = 5;
+const BATCH_SIZE = 3;
+const DELAY_BETWEEN_CONTACTS = 2000;
 const activeRequests = new Set();
 
 serve(async (req) => {
@@ -17,8 +17,27 @@ serve(async (req) => {
   console.log(`[${requestId}] 🚀 Starting get-follow-up-contacts function`);
 
   try {
+    // Handle CORS preflight requests
     if (req.method === 'OPTIONS') {
       return new Response(null, { headers: corsHeaders });
+    }
+
+    // Validate authentication
+    const authHeader = req.headers.get('authorization');
+    const apiKey = req.headers.get('apikey');
+
+    if (!authHeader && !apiKey) {
+      console.error(`[${requestId}] ❌ No authorization header or apikey provided`);
+      return new Response(
+        JSON.stringify({
+          error: 'No authorization provided',
+          details: 'Please provide either an authorization header or apikey'
+        }),
+        { 
+          status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
     }
 
     // Check rate limit
