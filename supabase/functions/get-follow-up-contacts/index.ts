@@ -59,7 +59,7 @@ serve(async (req) => {
         )
       `)
       .eq('is_active', true)
-      .filter('execution_count', 'lt', 'max_attempts')
+      .lt('execution_count', 'max_attempts')
       .order('last_execution_time', { ascending: true, nullsFirst: true });
 
     if (followUpsError) {
@@ -84,6 +84,12 @@ serve(async (req) => {
           maxAttempts,
           comparison: executionCount >= maxAttempts
         });
+
+        // Skip if max attempts reached
+        if (executionCount >= maxAttempts) {
+          console.log(`[${requestId}] ⚠️ Max attempts reached for follow-up ${followUp.id}`);
+          continue;
+        }
 
         if (!followUp.instance?.connection_status || 
             followUp.instance.connection_status.toLowerCase() !== 'connected') {
