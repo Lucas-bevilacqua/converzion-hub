@@ -105,12 +105,11 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
       const parsedData = {
         ...data,
         manual_messages: Array.isArray(data?.manual_messages) 
-          ? (data.manual_messages as any[]).map(msg => {
+          ? (data.manual_messages as Record<string, any>[]).map(msg => {
               if (typeof msg === 'object' && msg !== null) {
-                const msgObj = msg as { [key: string]: any }
                 return {
-                  message: String(msgObj.message || ''),
-                  delay_minutes: Number(msgObj.delay_minutes || 1)
+                  message: String(msg.message || ''),
+                  delay_minutes: Number(msg.delay_minutes || 1)
                 }
               }
               return { message: '', delay_minutes: 1 }
@@ -119,11 +118,10 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
       } as FollowUpData
 
       return parsedData
-    },
-    refetchInterval: 30000 // Poll every 30 seconds
+    }
   })
 
-  // Separate polling query for follow-up processing
+  // Polling query that runs every 30 seconds
   useQuery({
     queryKey: ['poll-follow-up', instanceId],
     queryFn: async () => {
@@ -132,12 +130,18 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
         return null
       }
 
-      console.log('🔄 [DEBUG] Iniciando polling de follow-up')
+      console.log('🔄 [DEBUG] Iniciando polling de follow-up', {
+        instanceId,
+        userId: user?.id,
+        followUpId: followUp?.id,
+        isActive: followUp?.is_active
+      })
 
       const { data, error } = await supabase.functions.invoke('get-follow-up-contacts', {
         body: { 
           instanceId,
-          userId: user?.id
+          userId: user?.id,
+          followUpId: followUp?.id
         }
       })
 
@@ -149,10 +153,11 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
       console.log('✅ [DEBUG] Polling executado com sucesso:', data)
       return data
     },
-    refetchInterval: 30000, // Poll every 30 seconds
-    enabled: true, // Always enabled
+    refetchInterval: 30000,
+    enabled: !!followUp?.is_active && !!user?.id, // Only run when follow-up is active and user is logged in
     retry: true,
-    retryDelay: 5000
+    retryDelay: 5000,
+    staleTime: 25000 // Consider data stale after 25s to ensure regular polling
   })
 
   const [formData, setFormData] = useState<FormData>({
