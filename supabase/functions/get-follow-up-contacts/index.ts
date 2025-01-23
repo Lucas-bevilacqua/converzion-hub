@@ -9,7 +9,7 @@ const corsHeaders = {
 
 serve(async (req) => {
   const requestId = crypto.randomUUID();
-  console.log(`[${requestId}] 🚀 Iniciando função get-follow-up-contacts`);
+  console.log(`[${requestId}] 🚀 Starting get-follow-up-contacts function`);
   
   try {
     // Handle CORS preflight
@@ -17,42 +17,39 @@ serve(async (req) => {
       return new Response(null, { headers: corsHeaders });
     }
 
-    // Validate authorization
-    const authHeader = req.headers.get('authorization');
-    if (!authHeader) {
-      console.error(`[${requestId}] ❌ Requisição sem header de autorização`);
-      throw new Error('Missing authorization header');
-    }
-
-    // Initialize Supabase client
+    // Validate environment variables
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 
     if (!supabaseUrl || !supabaseKey) {
-      console.error(`[${requestId}] ❌ Variáveis de ambiente não configuradas`);
+      console.error(`[${requestId}] ❌ Environment variables not configured:`, {
+        hasUrl: !!supabaseUrl,
+        hasKey: !!supabaseKey
+      });
       throw new Error('Environment variables not configured');
     }
 
-    console.log(`[${requestId}] ✅ Variáveis de ambiente OK`);
+    console.log(`[${requestId}] ✅ Environment variables OK`);
     
     const supabaseClient = createClient(supabaseUrl, supabaseKey);
 
     // Log execution start
+    console.log(`[${requestId}] 📝 Logging execution start`);
     const { error: logError } = await supabaseClient
       .from('cron_logs')
       .insert({
         job_name: 'get-follow-up-contacts',
         status: 'started',
-        details: 'Iniciando execução da função',
+        details: 'Starting function execution',
         details_json: { request_id: requestId }
       });
 
     if (logError) {
-      console.error(`[${requestId}] ⚠️ Erro ao registrar log inicial:`, logError);
+      console.error(`[${requestId}] ⚠️ Error logging start:`, logError);
     }
 
     // Fetch active follow-ups
-    console.log(`[${requestId}] 🔍 Buscando follow-ups ativos`);
+    console.log(`[${requestId}] 🔍 Fetching active follow-ups`);
     const { data: followUps, error: followUpsError } = await supabaseClient
       .from('instance_follow_ups')
       .select(`
@@ -67,11 +64,11 @@ serve(async (req) => {
       .eq('is_active', true);
 
     if (followUpsError) {
-      console.error(`[${requestId}] ❌ Erro ao buscar follow-ups:`, followUpsError);
-      throw new Error(`Error fetching follow-ups: ${followUpsError.message}`);
+      console.error(`[${requestId}] ❌ Error fetching follow-ups:`, followUpsError);
+      throw followUpsError;
     }
 
-    console.log(`[${requestId}] ✅ Encontrados ${followUps?.length || 0} follow-ups ativos`);
+    console.log(`[${requestId}] ✅ Found ${followUps?.length || 0} active follow-ups:`, followUps);
 
     const processedFollowUps = [];
     const errors = [];
@@ -79,16 +76,12 @@ serve(async (req) => {
     // Process each follow-up
     for (const followUp of (followUps || [])) {
       try {
-        if (!followUp.instance?.connection_status || followUp.instance.connection_status === 'disconnected') {
-          console.log(`[${requestId}] ⚠️ Instância ${followUp.instance?.name} não conectada, pulando`);
+        if (!followUp.instance?.connection_status || followUp.instance.connection_status !== 'connected') {
+          console.log(`[${requestId}] ⚠️ Instance ${followUp.instance?.name} not connected, skipping`);
           continue;
         }
 
-        const endpoint = followUp.follow_up_type === 'ai_generated' 
-          ? 'process-ai-follow-up'
-          : 'process-follow-up';
-
-        console.log(`[${requestId}] 🔄 Processando follow-up tipo: ${endpoint}`);
+        console.log(`[${requestId}] 🔄 Processing follow-up for instance ${followUp.instance.name}`);
 
         // Get contacts for this instance
         const { data: contacts, error: contactsError } = await supabaseClient
@@ -99,18 +92,22 @@ serve(async (req) => {
           .order('last_message_time', { ascending: true, nullsFirst: true });
 
         if (contactsError) {
-          console.error(`[${requestId}] ❌ Erro ao buscar contatos:`, contactsError);
-          throw new Error(`Error fetching contacts: ${contactsError.message}`);
+          console.error(`[${requestId}] ❌ Error fetching contacts:`, contactsError);
+          throw contactsError;
         }
 
-        console.log(`[${requestId}] 📊 Encontrados ${contacts?.length || 0} contatos para processamento`);
+        console.log(`[${requestId}] 📊 Found ${contacts?.length || 0} contacts for processing`);
 
         // Process each contact
         for (const contact of (contacts || [])) {
           try {
-            const processFollowUpUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/${endpoint}`;
+            const endpoint = followUp.follow_up_type === 'ai_generated' 
+              ? 'process-ai-follow-up'
+              : 'process-follow-up';
+
+            console.log(`[${requestId}] 🔄 Processing contact ${contact.TelefoneClientes} via ${endpoint}`);
             
-            console.log(`[${requestId}] 🔄 Processando contato: ${contact.TelefoneClientes}`);
+            const processFollowUpUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/${endpoint}`;
             
             const response = await fetch(processFollowUpUrl, {
               method: 'POST',
@@ -133,11 +130,16 @@ serve(async (req) => {
 
             if (!response.ok) {
               const errorText = await response.text();
+              console.error(`[${requestId}] ❌ Error processing contact:`, {
+                status: response.status,
+                error: errorText,
+                contact: contact.TelefoneClientes
+              });
               throw new Error(`Error processing follow-up: ${errorText}`);
             }
 
             const responseData = await response.json();
-            console.log(`[${requestId}] ✅ Follow-up processado com sucesso:`, responseData);
+            console.log(`[${requestId}] ✅ Follow-up processed successfully:`, responseData);
 
             processedFollowUps.push({
               followUpId: followUp.id,
@@ -148,7 +150,7 @@ serve(async (req) => {
             });
 
           } catch (contactError) {
-            console.error(`[${requestId}] ❌ Erro ao processar contato:`, contactError);
+            console.error(`[${requestId}] ❌ Error processing contact:`, contactError);
             errors.push({
               followUpId: followUp.id,
               contactId: contact.id,
@@ -159,7 +161,7 @@ serve(async (req) => {
           }
         }
       } catch (followUpError) {
-        console.error(`[${requestId}] ❌ Erro ao processar follow-up:`, followUpError);
+        console.error(`[${requestId}] ❌ Error processing follow-up:`, followUpError);
         errors.push({
           followUpId: followUp.id,
           type: followUp.follow_up_type,
@@ -179,14 +181,14 @@ serve(async (req) => {
       duration: new Date(endTime).getTime() - new Date().getTime()
     };
     
-    console.log(`[${requestId}] 📝 Execução concluída:`, finalLog);
+    console.log(`[${requestId}] 📝 Execution completed:`, finalLog);
     
     await supabaseClient
       .from('cron_logs')
       .insert({
         job_name: 'get-follow-up-contacts',
         status: 'completed',
-        details: 'Processamento concluído com sucesso',
+        details: 'Processing completed successfully',
         details_json: finalLog
       });
 
@@ -206,7 +208,7 @@ serve(async (req) => {
     );
 
   } catch (error) {
-    console.error(`[${requestId}] ❌ Erro crítico na execução:`, error);
+    console.error(`[${requestId}] ❌ Critical error in execution:`, error);
     
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
@@ -219,7 +221,7 @@ serve(async (req) => {
         .insert({
           job_name: 'get-follow-up-contacts',
           status: 'error',
-          details: 'Erro crítico na execução',
+          details: 'Critical error in execution',
           details_json: {
             request_id: requestId,
             error: error.message,
