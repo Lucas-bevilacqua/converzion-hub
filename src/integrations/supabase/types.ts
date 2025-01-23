@@ -758,6 +758,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: undefined
       }
+      execute_follow_up: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
       execute_follow_up_contacts_real: {
         Args: Record<PropertyKey, never>
         Returns: undefined
