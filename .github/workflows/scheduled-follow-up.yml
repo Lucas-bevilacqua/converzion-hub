@@ -14,8 +14,8 @@ jobs:
         run: |
           echo "Starting follow-up processing at $(date)"
           curl -X POST 'https://vodexhppkasbulogmcqb.supabase.co/functions/v1/get-follow-up-contacts' \
-          -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
-          -H "Content-Type: application/json" \
+          -H 'Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}' \
+          -H 'Content-Type: application/json' \
           --data-raw '{"scheduled":true, "source": "github-action"}' \
           --fail \
           --show-error \
