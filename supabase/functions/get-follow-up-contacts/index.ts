@@ -77,7 +77,6 @@ serve(async (req) => {
           comparison: executionCount >= maxAttempts
         });
         
-        // Changed comparison to use < instead of >= to continue while we haven't hit max attempts
         if (executionCount >= maxAttempts) {
           console.log(`[${requestId}] ⚠️ Número máximo de tentativas atingido para follow-up ${followUp.id}`);
           
@@ -120,6 +119,8 @@ serve(async (req) => {
             const endpoint = followUp.follow_up_type === 'ai_generated' 
               ? 'process-ai-follow-up'
               : 'process-follow-up';
+
+            console.log(`[${requestId}] 🔄 Chamando endpoint ${endpoint} para contato ${contact.TelefoneClientes}`);
 
             const response = await retryOperation(() => 
               supabaseClient.functions.invoke(endpoint, {
