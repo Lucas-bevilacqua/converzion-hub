@@ -9,6 +9,31 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { useToast } from "@/components/ui/use-toast"
 import { Plus, Trash2, Users, Play } from "lucide-react"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/components/ui/tabs"
+import { ContactsTable } from "./ContactsTable"
 
 interface FollowUpSectionProps {
   instanceId: string
@@ -80,9 +105,9 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
       const parsedData = {
         ...data,
         manual_messages: Array.isArray(data?.manual_messages) 
-          ? (data.manual_messages as Json[]).map(msg => {
+          ? (data.manual_messages as any[]).map(msg => {
               if (typeof msg === 'object' && msg !== null) {
-                const msgObj = msg as { [key: string]: Json }
+                const msgObj = msg as { [key: string]: any }
                 return {
                   message: String(msgObj.message || ''),
                   delay_minutes: Number(msgObj.delay_minutes || 1)
@@ -98,53 +123,36 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
     refetchInterval: 30000 // Poll every 30 seconds
   })
 
-  const processFollowUpQuery = useQuery({
-    queryKey: ['process-follow-up', instanceId],
+  // Separate polling query for follow-up processing
+  useQuery({
+    queryKey: ['poll-follow-up', instanceId],
     queryFn: async () => {
       if (!followUp?.is_active) {
-        console.log('⏸️ [DEBUG] Follow-up não está ativo, pulando processamento')
+        console.log('⏸️ [DEBUG] Follow-up não está ativo, pulando polling')
         return null
       }
 
-      console.log('🔄 [DEBUG] Iniciando processamento de follow-up')
-      
-      const { data: contacts } = await supabase
-        .from('Users_clientes')
-        .select('*')
-        .eq('NomeDaEmpresa', instanceId)
-        .limit(1)
-        .maybeSingle()
+      console.log('🔄 [DEBUG] Iniciando polling de follow-up')
 
-      if (!contacts) {
-        console.log('⚠️ [DEBUG] Nenhum contato encontrado para processar')
-        return null
-      }
-
-      console.log('📤 [DEBUG] Enviando requisição para processar follow-up')
       const { data, error } = await supabase.functions.invoke('get-follow-up-contacts', {
         body: { 
-          contact: {
-            ...contacts,
-            followUp: {
-              ...followUp,
-              userId: user?.id
-            }
-          }
+          instanceId,
+          userId: user?.id
         }
       })
 
       if (error) {
-        console.error('❌ [ERROR] Erro ao processar follow-ups:', error)
+        console.error('❌ [ERROR] Erro no polling de follow-up:', error)
         throw error
       }
 
-      console.log('✅ [DEBUG] Follow-up processado com sucesso:', data)
+      console.log('✅ [DEBUG] Polling executado com sucesso:', data)
       return data
     },
     refetchInterval: 30000, // Poll every 30 seconds
-    enabled: true, // Always enabled to ensure continuous polling
-    retry: true, // Retry on failure
-    retryDelay: 5000 // Wait 5 seconds before retrying on failure
+    enabled: true, // Always enabled
+    retry: true,
+    retryDelay: 5000
   })
 
   const [formData, setFormData] = useState<FormData>({
