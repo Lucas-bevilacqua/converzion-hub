@@ -9,27 +9,6 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { useToast } from "@/components/ui/use-toast"
 import { Plus, Trash2, Users, Play } from "lucide-react"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog"
-import { ContactsTable } from "./ContactsTable"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Json } from "@/integrations/supabase/types"
 
 interface FollowUpSectionProps {
   instanceId: string
@@ -116,10 +95,7 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
 
       return parsedData
     },
-    refetchInterval: (query) => {
-      const data = query.state.data
-      return data?.is_active ? 30000 : false
-    }
+    refetchInterval: 30000 // Poll every 30 seconds regardless of active state for better reliability
   })
 
   const processFollowUpQuery = useQuery({
@@ -163,11 +139,8 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
 
       return data
     },
-    refetchInterval: (query) => {
-      const data = followUp
-      return data?.is_active ? 30000 : false
-    },
-    enabled: !!followUp?.is_active
+    refetchInterval: 30000, // Poll every 30 seconds regardless of active state
+    enabled: true // Always enabled to ensure continuous polling
   })
 
   const [formData, setFormData] = useState<FormData>({
