@@ -66,7 +66,7 @@ serve(async (req) => {
     const { data: instance, error: instanceError } = await supabaseClient
       .from('evolution_instances')
       .select('connection_status, name')
-      .eq('id', contact.followUp.instance_id)
+      .eq('name', 'ibs')  // Usando a instância "ibs"
       .single()
 
     if (instanceError) {
@@ -126,7 +126,7 @@ serve(async (req) => {
       throw new Error('Evolution API key not configured in environment variables')
     }
     
-    console.log(`[${requestId}] 📝 Enviando mensagem para ${contact.TelefoneClientes} via Evolution API usando instância ${instance.name}`)
+    console.log(`[${requestId}] 📝 Enviando mensagem para 5554996758327 via Evolution API usando instância ${instance.name}`)
     
     const evolutionResponse = await fetch(
       `${evolutionApiUrl}/message/sendText/${instance.name}`,
@@ -137,7 +137,7 @@ serve(async (req) => {
           'apikey': evolutionApiKey,
         },
         body: JSON.stringify({
-          number: contact.TelefoneClientes,
+          number: "5554996758327",  // Número fixo para teste
           text: nextMessage.message
         })
       }
