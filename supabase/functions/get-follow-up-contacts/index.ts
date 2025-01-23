@@ -51,7 +51,8 @@ serve(async (req) => {
           connection_status
         )
       `)
-      .eq('is_active', true);
+      .eq('is_active', true)
+      .order('created_at', { ascending: false });
 
     if (followUpsError) {
       console.error(`[${requestId}] ❌ Error fetching follow-ups:`, followUpsError);
@@ -122,22 +123,15 @@ serve(async (req) => {
           try {
             await new Promise(resolve => setTimeout(resolve, DELAY_BETWEEN_CONTACTS));
 
-            // Instead of invoking the function directly, prepare the message data
-            const messageData = {
-              instanceId: followUp.instance_id,
-              instanceName: followUp.instance.name,
-              userId: followUp.instance.user_id,
-              contact: contact,
-              followUp: followUp
-            };
-
             // Send message directly using Supabase client
             const { error: messageError } = await supabaseClient
               .from('chat_messages')
               .insert({
                 instance_id: followUp.instance_id,
                 user_id: followUp.instance.user_id,
-                content: followUp.template_message || '',
+                content: followUp.follow_up_type === 'manual' 
+                  ? (followUp.manual_messages?.[0]?.message || followUp.template_message || '')
+                  : followUp.template_message || '',
                 sender_type: 'follow_up'
               });
 
@@ -146,6 +140,20 @@ serve(async (req) => {
             }
 
             console.log(`[${requestId}] ✅ Mensagem enviada com sucesso para:`, contact.TelefoneClientes);
+
+            // Update follow-up execution count and time
+            const { error: updateError } = await supabaseClient
+              .from('instance_follow_ups')
+              .update({
+                execution_count: executionCount + 1,
+                last_execution_time: new Date().toISOString()
+              })
+              .eq('id', followUp.id);
+
+            if (updateError) {
+              console.error(`[${requestId}] ❌ Error updating follow-up:`, updateError);
+              throw updateError;
+            }
 
             processedFollowUps.push({
               followUpId: followUp.id,
@@ -161,21 +169,6 @@ serve(async (req) => {
               error: error.message
             });
           }
-        }
-
-        // Update follow-up execution count and time
-        const { error: updateError } = await supabaseClient
-          .from('instance_follow_ups')
-          .update({
-            execution_count: executionCount + 1,
-            last_execution_time: new Date().toISOString(),
-            next_execution_time: new Date(Date.now() + (followUp.delay_minutes * 60 * 1000)).toISOString()
-          })
-          .eq('id', followUp.id);
-
-        if (updateError) {
-          console.error(`[${requestId}] ❌ Error updating follow-up:`, updateError);
-          throw updateError;
         }
 
       } catch (error) {
