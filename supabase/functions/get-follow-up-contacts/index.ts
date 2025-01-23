@@ -6,10 +6,9 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-const RATE_LIMIT = 5;
+const MAX_RETRIES = 3;
 const BATCH_SIZE = 3;
 const DELAY_BETWEEN_CONTACTS = 2000;
-const MAX_RETRIES = 3;
 const RETRY_DELAY = 2000;
 const activeRequests = new Set();
 
@@ -26,32 +25,6 @@ async function retryOperation<T>(operation: () => Promise<T>, retries = MAX_RETR
   }
 }
 
-async function verifyInstanceConnection(evolutionApiUrl: string, evolutionApiKey: string, instanceName: string) {
-  try {
-    console.log(`🔍 [DEBUG] Verificando conexão da instância ${instanceName}`);
-    
-    const response = await fetch(`${evolutionApiUrl}/instance/connectionState/${instanceName}`, {
-      headers: {
-        'Content-Type': 'application/json',
-        'apikey': evolutionApiKey,
-      }
-    });
-
-    if (!response.ok) {
-      console.error(`❌ [ERROR] Falha ao verificar estado da instância: ${response.statusText}`);
-      throw new Error(`Falha ao verificar estado da instância: ${response.statusText}`);
-    }
-
-    const data = await response.json();
-    const isConnected = data?.instance?.state === 'open';
-    console.log(`✅ [DEBUG] Estado da instância ${instanceName}: ${isConnected ? 'conectada' : 'desconectada'}`);
-    return isConnected;
-  } catch (error) {
-    console.error(`❌ [ERROR] Erro ao verificar conexão da instância ${instanceName}:`, error);
-    return false;
-  }
-}
-
 serve(async (req) => {
   const requestId = crypto.randomUUID();
   console.log(`[${requestId}] 🚀 Iniciando função get-follow-up-contacts`);
@@ -61,48 +34,12 @@ serve(async (req) => {
       return new Response(null, { headers: corsHeaders });
     }
 
-    // Verificar autenticação
-    const authHeader = req.headers.get('authorization');
-    const apiKey = req.headers.get('apikey');
-
-    if (!authHeader && !apiKey) {
-      console.error(`[${requestId}] ❌ Sem header de autorização ou apikey`);
-      throw new Error('No authorization provided');
-    }
-
-    // Verificar rate limit
-    if (activeRequests.size >= RATE_LIMIT) {
-      console.log(`[${requestId}] ⚠️ Rate limit excedido`);
-      throw new Error('Too many concurrent requests');
-    }
-
-    activeRequests.add(requestId);
-
-    // Inicializar cliente Supabase
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    // Registrar início
-    await supabaseClient
-      .from('cron_logs')
-      .insert({
-        job_name: 'get-follow-up-contacts',
-        status: 'started',
-        details: 'Iniciando execução da função',
-        details_json: { request_id: requestId }
-      });
-
-    // Configurações da Evolution API
-    const evolutionApiUrl = Deno.env.get('EVOLUTION_API_URL')?.replace(/\/$/, '');
-    const evolutionApiKey = Deno.env.get('EVOLUTION_API_KEY');
-
-    if (!evolutionApiUrl || !evolutionApiKey) {
-      throw new Error('Evolution API configuration missing');
-    }
-
-    // Buscar follow-ups ativos
+    // Fetch active follow-ups
     const { data: followUps, error: followUpsError } = await supabaseClient
       .from('instance_follow_ups')
       .select(`
@@ -114,10 +51,10 @@ serve(async (req) => {
           connection_status
         )
       `)
-      .eq('is_active', true)
-      .lt('next_execution_time', new Date().toISOString());
+      .eq('is_active', true);
 
     if (followUpsError) {
+      console.error(`[${requestId}] ❌ Error fetching follow-ups:`, followUpsError);
       throw followUpsError;
     }
 
@@ -135,10 +72,8 @@ serve(async (req) => {
         const maxAttempts = followUp.max_attempts || 3;
         
         console.log(`[${requestId}] 📝 Verificando tentativas:`, {
-          executionCount: typeof executionCount,
-          executionCountValue: executionCount,
-          maxAttempts: typeof maxAttempts,
-          maxAttemptsValue: maxAttempts,
+          executionCount,
+          maxAttempts,
           comparison: executionCount >= maxAttempts
         });
         
@@ -147,29 +82,13 @@ serve(async (req) => {
           continue;
         }
 
-        console.log(`[${requestId}] ⏰ Próxima execução agendada para: ${followUp.next_execution_time}`);
-        console.log(`[${requestId}] 📝 Tentativas: ${executionCount}/${maxAttempts}`);
-        
-        // Verificar status da conexão em tempo real
-        const isConnected = await retryOperation(() => 
-          verifyInstanceConnection(evolutionApiUrl, evolutionApiKey, followUp.instance?.name)
-        );
-
-        if (!isConnected) {
+        if (!followUp.instance?.connection_status || 
+            followUp.instance.connection_status !== 'connected') {
           console.log(`[${requestId}] ⚠️ Instância ${followUp.instance?.name} não conectada`);
-          
-          // Atualizar status da instância se necessário
-          if (followUp.instance?.connection_status === 'connected') {
-            await supabaseClient
-              .from('evolution_instances')
-              .update({ connection_status: 'disconnected' })
-              .eq('id', followUp.instance?.id);
-          }
-          
           continue;
         }
 
-        // Buscar contatos
+        // Fetch contacts
         const { data: contacts } = await supabaseClient
           .from('Users_clientes')
           .select('*')
@@ -178,12 +97,8 @@ serve(async (req) => {
 
         console.log(`[${requestId}] 📱 Processando ${contacts?.length || 0} contatos`);
 
-        // Processar cada contato com retry
         for (const contact of (contacts || [])) {
           try {
-            console.log(`[${requestId}] 📨 Processando contato: ${contact.TelefoneClientes}`);
-            console.log(`[${requestId}] ⏱️ Última mensagem: ${contact.last_message_time}`);
-
             await new Promise(resolve => setTimeout(resolve, DELAY_BETWEEN_CONTACTS));
 
             const endpoint = followUp.follow_up_type === 'ai_generated' 
@@ -206,7 +121,7 @@ serve(async (req) => {
               })
             );
 
-            console.log(`[${requestId}] ✅ Contato processado com sucesso: ${contact.TelefoneClientes}`);
+            console.log(`[${requestId}] ✅ Contato processado com sucesso:`, contact.TelefoneClientes);
 
             processedFollowUps.push({
               followUpId: followUp.id,
@@ -224,50 +139,29 @@ serve(async (req) => {
           }
         }
 
-        // Atualizar contadores com retry
-        const updateResult = await retryOperation(() =>
-          supabaseClient
-            .from('instance_follow_ups')
-            .update({
-              execution_count: executionCount + 1,
-              last_execution_time: new Date().toISOString(),
-              next_execution_time: new Date(Date.now() + (followUp.delay_minutes * 60 * 1000)).toISOString()
-            })
-            .eq('id', followUp.id)
-        );
+        // Update follow-up execution count and time
+        const { error: updateError } = await supabaseClient
+          .from('instance_follow_ups')
+          .update({
+            execution_count: executionCount + 1,
+            last_execution_time: new Date().toISOString(),
+            next_execution_time: new Date(Date.now() + (followUp.delay_minutes * 60 * 1000)).toISOString()
+          })
+          .eq('id', followUp.id);
 
-        console.log(`[${requestId}] 🔄 Resultado da atualização:`, {
-          success: !updateResult.error,
-          error: updateResult.error,
-          newExecutionCount: executionCount + 1
-        });
-
-        console.log(`[${requestId}] ✅ Follow-up processado com sucesso para instância ${followUp.instance?.name}`);
-        console.log(`[${requestId}] ⏰ Próxima execução agendada para: ${new Date(Date.now() + (followUp.delay_minutes * 60 * 1000)).toISOString()}`);
+        if (updateError) {
+          console.error(`[${requestId}] ❌ Error updating follow-up:`, updateError);
+          throw updateError;
+        }
 
       } catch (error) {
-        console.error(`[${requestId}] ❌ Erro ao processar follow-up:`, error);
+        console.error(`[${requestId}] ❌ Error processing follow-up:`, error);
         errors.push({
           followUpId: followUp.id,
           error: error.message
         });
       }
     }
-
-    // Registrar conclusão
-    await supabaseClient
-      .from('cron_logs')
-      .insert({
-        job_name: 'get-follow-up-contacts',
-        status: errors.length ? 'completed_with_errors' : 'completed',
-        details: 'Execução finalizada',
-        details_json: { 
-          request_id: requestId,
-          processed: processedFollowUps.length,
-          errors: errors.length,
-          error_details: errors
-        }
-      });
 
     return new Response(
       JSON.stringify({
@@ -276,31 +170,17 @@ serve(async (req) => {
         errors: errors.length,
         results: [...processedFollowUps, ...errors]
       }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { 
+        headers: { 
+          ...corsHeaders,
+          'Content-Type': 'application/json'
+        }
+      }
     );
 
   } catch (error) {
-    console.error(`[${requestId}] ❌ Erro crítico:`, error);
+    console.error(`[${requestId}] ❌ Fatal error:`, error);
     
-    // Registrar erro
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    );
-    
-    await supabaseClient
-      .from('cron_logs')
-      .insert({
-        job_name: 'get-follow-up-contacts',
-        status: 'error',
-        details: 'Erro crítico na execução',
-        details_json: { 
-          request_id: requestId,
-          error: error.message,
-          stack: error.stack
-        }
-      });
-
     return new Response(
       JSON.stringify({
         success: false,
@@ -308,11 +188,12 @@ serve(async (req) => {
         request_id: requestId
       }),
       { 
-        status: error.message.includes('Too many concurrent requests') ? 429 : 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        status: 500,
+        headers: { 
+          ...corsHeaders,
+          'Content-Type': 'application/json'
+        }
       }
     );
-  } finally {
-    activeRequests.delete(requestId);
   }
 });
