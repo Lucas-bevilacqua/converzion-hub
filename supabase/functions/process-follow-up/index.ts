@@ -86,20 +86,6 @@ serve(async (req) => {
       )
     }
 
-    // Get Evolution API key from secure_configurations
-    const { data: keyData, error: keyError } = await supabaseClient
-      .from('secure_configurations')
-      .select('config_value')
-      .eq('config_key', 'evolution_api_key')
-      .single()
-
-    if (keyError || !keyData) {
-      console.error(`[${requestId}] ❌ Failed to get Evolution API key:`, keyError)
-      throw new Error('Failed to get Evolution API key')
-    }
-
-    const evolutionApiKey = keyData.config_value
-
     // Determinar qual mensagem enviar
     let currentMessageIndex = -1
     if (contact.ConversationId?.startsWith('follow-up-sent-')) {
@@ -132,8 +118,14 @@ serve(async (req) => {
     // Adicionar request ao rate limiter
     addRequest(contact.followUp.instance_id)
 
-    // Enviar mensagem via Evolution API usando a chave do banco
+    // Enviar mensagem via Evolution API usando a chave global
     const evolutionApiUrl = (Deno.env.get('EVOLUTION_API_URL') || '').replace(/\/$/, '')
+    const evolutionApiKey = Deno.env.get('EVOLUTION_API_KEY')
+    
+    if (!evolutionApiKey) {
+      throw new Error('Evolution API key not configured in environment variables')
+    }
+    
     console.log(`[${requestId}] 📝 Enviando mensagem para ${contact.TelefoneClientes} via Evolution API usando instância ${instance.name}`)
     
     const evolutionResponse = await fetch(
