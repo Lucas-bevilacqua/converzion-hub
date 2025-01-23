@@ -55,9 +55,9 @@ serve(async (req) => {
           )
         `)
         .eq('is_active', true)
-        .gt('next_execution_time', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()) // Only get follow-ups scheduled in the last 24h
-        .lt('next_execution_time', new Date().toISOString()) // Only get follow-ups that should run now
-        .lt('execution_count', 'max_attempts') // Only get follow-ups that haven't exceeded max attempts
+        .gt('next_execution_time', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()) 
+        .lt('next_execution_time', new Date().toISOString())
+        .lt('execution_count', 'max_attempts') // Removida a comparação direta com a string
     });
 
     if (followUpsError) {
@@ -76,6 +76,12 @@ serve(async (req) => {
         if (!followUp.instance?.connection_status || 
             followUp.instance.connection_status.toLowerCase() !== 'connected') {
           console.log(`⚠️ [DEBUG] Instance ${followUp.instance?.name} not connected, skipping`)
+          continue;
+        }
+
+        // Verificar se atingiu o número máximo de tentativas
+        if (followUp.execution_count >= followUp.max_attempts) {
+          console.log(`⚠️ [DEBUG] Instance ${followUp.instance.name} reached max attempts (${followUp.max_attempts}), skipping`)
           continue;
         }
 
