@@ -116,8 +116,7 @@ serve(async (req) => {
       `)
       .eq('is_active', true)
       .lt('next_execution_time', new Date().toISOString())
-      .lt('execution_count', 'max_attempts')
-      .limit(BATCH_SIZE);
+      .lt('execution_count', 'max_attempts');
 
     if (followUpsError) {
       throw followUpsError;
