@@ -81,8 +81,6 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
   const { toast } = useToast()
   const queryClient = useQueryClient()
 
-  console.log('🔍 [DEBUG] Fetching follow-up for instance:', instanceId)
-
   const { data: followUp, isLoading } = useQuery({
     queryKey: ['follow-up', instanceId],
     queryFn: async () => {
@@ -257,10 +255,33 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
     mutationFn: async () => {
       console.log('🔍 [DEBUG] Testing follow-up for instance:', instanceId)
       
+      // First get a test contact
+      const { data: contacts, error: contactsError } = await supabase
+        .from('Users_clientes')
+        .select('*')
+        .eq('NomeDaEmpresa', instanceId)
+        .limit(1)
+        .maybeSingle()
+
+      if (contactsError) {
+        console.error('❌ [ERROR] Error fetching test contact:', contactsError)
+        throw contactsError
+      }
+
+      if (!contacts) {
+        throw new Error('Nenhum contato encontrado para teste')
+      }
+
       const { data, error } = await supabase.functions.invoke('process-follow-up', {
         body: { 
-          instanceId,
-          test: true
+          contact: {
+            ...contacts,
+            followUp: {
+              ...formData,
+              instance_id: instanceId,
+              userId: user?.id
+            }
+          }
         }
       })
 
@@ -281,7 +302,7 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
       console.error('❌ [ERROR] Error in test mutation:', error)
       toast({
         title: "Erro",
-        description: "Não foi possível executar o teste. Por favor, tente novamente.",
+        description: error instanceof Error ? error.message : "Não foi possível executar o teste. Por favor, tente novamente.",
         variant: "destructive",
       })
     }
