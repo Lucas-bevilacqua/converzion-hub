@@ -128,11 +128,27 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
 
       console.log('🔄 [DEBUG] Processando follow-ups pendentes')
       
+      const { data: contacts } = await supabase
+        .from('Users_clientes')
+        .select('*')
+        .eq('NomeDaEmpresa', instanceId)
+        .limit(1)
+        .maybeSingle()
+
+      if (!contacts) {
+        console.log('⚠️ [DEBUG] Nenhum contato encontrado para processar')
+        return null
+      }
+
       const { data, error } = await supabase.functions.invoke('process-follow-up', {
         body: { 
-          instanceId,
-          userId: user?.id,
-          followUp 
+          contact: {
+            ...contacts,
+            followUp: {
+              ...followUp,
+              userId: user?.id
+            }
+          }
         }
       })
 
