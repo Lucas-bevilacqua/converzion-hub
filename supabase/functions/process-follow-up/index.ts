@@ -134,10 +134,10 @@ serve(async (req) => {
 
     // Enviar mensagem via Evolution API usando a chave do banco
     const evolutionApiUrl = (Deno.env.get('EVOLUTION_API_URL') || '').replace(/\/$/, '')
-    console.log(`[${requestId}] 📝 Enviando mensagem para ${contact.TelefoneClientes} via Evolution API usando instância ${contact.followUp.instance_id}`)
+    console.log(`[${requestId}] 📝 Enviando mensagem para ${contact.TelefoneClientes} via Evolution API usando instância ${instance.name}`)
     
     const evolutionResponse = await fetch(
-      `${evolutionApiUrl}/message/sendText/${contact.followUp.instance_id}`,
+      `${evolutionApiUrl}/message/sendText/${instance.name}`,
       {
         method: 'POST',
         headers: {
