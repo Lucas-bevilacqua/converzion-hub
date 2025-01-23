@@ -59,7 +59,8 @@ serve(async (req) => {
         )
       `)
       .eq('is_active', true)
-      .lt('execution_count', 'max_attempts');
+      .filter('execution_count', 'lt', 'max_attempts')
+      .order('last_execution_time', { ascending: true, nullsFirst: true });
 
     if (followUpsError) {
       console.error(`[${requestId}] ❌ Error fetching follow-ups:`, followUpsError);
