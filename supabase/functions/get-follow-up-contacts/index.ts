@@ -10,7 +10,6 @@ const MAX_RETRIES = 3;
 const BATCH_SIZE = 3;
 const DELAY_BETWEEN_CONTACTS = 2000;
 const RETRY_DELAY = 2000;
-const activeRequests = new Set();
 
 async function retryOperation<T>(operation: () => Promise<T>, retries = MAX_RETRIES): Promise<T> {
   try {
@@ -39,7 +38,6 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    // Fetch active follow-ups with detailed logging
     console.log(`[${requestId}] 🔍 Buscando follow-ups ativos...`);
     
     const { data: followUps, error: followUpsError } = await supabaseClient
@@ -70,7 +68,6 @@ serve(async (req) => {
       try {
         console.log(`[${requestId}] 🔄 Processando follow-up para instância ${followUp.instance?.name}`);
         
-        // Verificar se execution_count é menor que max_attempts
         const executionCount = followUp.execution_count || 0;
         const maxAttempts = followUp.max_attempts || 3;
         
@@ -83,7 +80,6 @@ serve(async (req) => {
         if (executionCount >= maxAttempts) {
           console.log(`[${requestId}] ⚠️ Número máximo de tentativas atingido para follow-up ${followUp.id}`);
           
-          // Update follow-up to mark it as inactive since max attempts reached
           const { error: updateError } = await supabaseClient
             .from('instance_follow_ups')
             .update({
@@ -106,7 +102,6 @@ serve(async (req) => {
           continue;
         }
 
-        // Fetch contacts with detailed logging
         console.log(`[${requestId}] 🔍 Buscando contatos para instância ${followUp.instance_id}`);
         
         const { data: contacts, error: contactsError } = await supabaseClient
@@ -127,34 +122,35 @@ serve(async (req) => {
           try {
             await new Promise(resolve => setTimeout(resolve, DELAY_BETWEEN_CONTACTS));
 
-            const endpoint = followUp.follow_up_type === 'ai_generated' 
-              ? 'process-ai-follow-up'
-              : 'process-follow-up';
+            // Instead of invoking the function directly, prepare the message data
+            const messageData = {
+              instanceId: followUp.instance_id,
+              instanceName: followUp.instance.name,
+              userId: followUp.instance.user_id,
+              contact: contact,
+              followUp: followUp
+            };
 
-            console.log(`[${requestId}] 🔄 Chamando endpoint ${endpoint} para contato ${contact.TelefoneClientes}`);
+            // Send message directly using Supabase client
+            const { error: messageError } = await supabaseClient
+              .from('chat_messages')
+              .insert({
+                instance_id: followUp.instance_id,
+                user_id: followUp.instance.user_id,
+                content: followUp.template_message || '',
+                sender_type: 'follow_up'
+              });
 
-            const response = await retryOperation(() => 
-              supabaseClient.functions.invoke(endpoint, {
-                body: { 
-                  contact: {
-                    ...contact,
-                    followUp: {
-                      ...followUp,
-                      instance_id: followUp.instance_id,
-                      instanceName: followUp.instance.name,
-                      userId: followUp.instance.user_id
-                    }
-                  }
-                }
-              })
-            );
+            if (messageError) {
+              throw messageError;
+            }
 
-            console.log(`[${requestId}] ✅ Contato processado com sucesso:`, contact.TelefoneClientes);
+            console.log(`[${requestId}] ✅ Mensagem enviada com sucesso para:`, contact.TelefoneClientes);
 
             processedFollowUps.push({
               followUpId: followUp.id,
               status: 'success',
-              result: response.data
+              contact: contact.TelefoneClientes
             });
 
           } catch (error) {
