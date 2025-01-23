@@ -76,14 +76,14 @@ serve(async (req) => {
     // Process each follow-up
     for (const followUp of (followUps || [])) {
       try {
-        if (!followUp.instance?.connection_status || followUp.instance.connection_status !== 'connected') {
+        if (!followUp.instance?.connection_status || followUp.instance.connection_status.toLowerCase() !== 'connected') {
           console.log(`[${requestId}] ⚠️ Instance ${followUp.instance?.name} not connected, skipping`);
           continue;
         }
 
         console.log(`[${requestId}] 🔄 Processing follow-up for instance ${followUp.instance.name}`);
 
-        // Get contacts for this instance
+        // Get contacts for this instance - Note: Using both Users_clientes and users_clientes tables
         const { data: contacts, error: contactsError } = await supabaseClient
           .from('Users_clientes')
           .select('*')
@@ -96,16 +96,30 @@ serve(async (req) => {
           throw contactsError;
         }
 
-        console.log(`[${requestId}] 📊 Found ${contacts?.length || 0} contacts for processing`);
+        // Also try lowercase table
+        const { data: contacts2, error: contacts2Error } = await supabaseClient
+          .from('users_clientes')
+          .select('*')
+          .eq('nomedaempresa', followUp.instance_id)
+          .not('telefoneclientes', 'is', null)
+          .order('last_message_time', { ascending: true, nullsFirst: true });
+
+        if (contacts2Error) {
+          console.error(`[${requestId}] ❌ Error fetching contacts from lowercase table:`, contacts2Error);
+        }
+
+        // Combine contacts from both tables
+        const allContacts = [...(contacts || []), ...(contacts2 || [])];
+        console.log(`[${requestId}] 📊 Found ${allContacts.length} contacts for processing`);
 
         // Process each contact
-        for (const contact of (contacts || [])) {
+        for (const contact of allContacts) {
           try {
             const endpoint = followUp.follow_up_type === 'ai_generated' 
               ? 'process-ai-follow-up'
               : 'process-follow-up';
 
-            console.log(`[${requestId}] 🔄 Processing contact ${contact.TelefoneClientes} via ${endpoint}`);
+            console.log(`[${requestId}] 🔄 Processing contact ${contact.TelefoneClientes || contact.telefoneclientes} via ${endpoint}`);
             
             const processFollowUpUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/${endpoint}`;
             
@@ -133,7 +147,7 @@ serve(async (req) => {
               console.error(`[${requestId}] ❌ Error processing contact:`, {
                 status: response.status,
                 error: errorText,
-                contact: contact.TelefoneClientes
+                contact: contact.TelefoneClientes || contact.telefoneclientes
               });
               throw new Error(`Error processing follow-up: ${errorText}`);
             }
