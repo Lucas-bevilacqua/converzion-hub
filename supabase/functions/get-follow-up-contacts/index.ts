@@ -28,6 +28,8 @@ async function retryOperation<T>(operation: () => Promise<T>, retries = MAX_RETR
 
 async function verifyInstanceConnection(evolutionApiUrl: string, evolutionApiKey: string, instanceName: string) {
   try {
+    console.log(`🔍 [DEBUG] Verificando conexão da instância ${instanceName}`);
+    
     const response = await fetch(`${evolutionApiUrl}/instance/connectionState/${instanceName}`, {
       headers: {
         'Content-Type': 'application/json',
@@ -36,11 +38,14 @@ async function verifyInstanceConnection(evolutionApiUrl: string, evolutionApiKey
     });
 
     if (!response.ok) {
+      console.error(`❌ [ERROR] Falha ao verificar estado da instância: ${response.statusText}`);
       throw new Error(`Falha ao verificar estado da instância: ${response.statusText}`);
     }
 
     const data = await response.json();
-    return data?.instance?.state === 'open';
+    const isConnected = data?.instance?.state === 'open';
+    console.log(`✅ [DEBUG] Estado da instância ${instanceName}: ${isConnected ? 'conectada' : 'desconectada'}`);
+    return isConnected;
   } catch (error) {
     console.error(`❌ [ERROR] Erro ao verificar conexão da instância ${instanceName}:`, error);
     return false;
@@ -125,6 +130,8 @@ serve(async (req) => {
 
     for (const followUp of (followUps || [])) {
       try {
+        console.log(`[${requestId}] 🔄 Processando follow-up para instância ${followUp.instance?.name}`);
+        
         // Verificar status da conexão em tempo real
         const isConnected = await retryOperation(() => 
           verifyInstanceConnection(evolutionApiUrl, evolutionApiKey, followUp.instance?.name)
@@ -205,6 +212,8 @@ serve(async (req) => {
             })
             .eq('id', followUp.id)
         );
+
+        console.log(`[${requestId}] ✅ Follow-up processado com sucesso para instância ${followUp.instance?.name}`);
 
       } catch (error) {
         console.error(`[${requestId}] ❌ Erro ao processar follow-up:`, error);
