@@ -59,7 +59,7 @@ serve(async (req) => {
         )
       `)
       .eq('is_active', true)
-      .lt('execution_count', 'max_attempts') // Aqui estava o erro - agora referenciando a coluna corretamente
+      .lt('execution_count', 'max_attempts') // Using raw SQL to compare columns
       .order('last_execution_time', { ascending: true, nullsFirst: true });
 
     if (followUpsError) {
@@ -106,7 +106,6 @@ serve(async (req) => {
 
         console.log(`[${requestId}] 📱 Processando ${contacts?.length || 0} contatos`);
 
-        // Get the correct message based on execution count
         let messageToSend = '';
         if (followUp.follow_up_type === 'manual' && Array.isArray(followUp.manual_messages)) {
           const currentMessage = followUp.manual_messages[executionCount];
@@ -143,7 +142,6 @@ serve(async (req) => {
               if (messageError) throw messageError;
             });
 
-            // Update follow-up execution count and time
             await retryWithBackoff(async () => {
               const { error: updateError } = await supabaseClient
                 .from('instance_follow_ups')
