@@ -74,7 +74,6 @@ serve(async (req) => {
       throw new Error('Erro ao verificar status da instância')
     }
 
-    // Modificado: Agora só pula se o status for explicitamente 'disconnected'
     if (instance.connection_status === 'disconnected') {
       console.log(`[${requestId}] ⚠️ Instância ${instance.name} desconectada, pulando`)
       return new Response(
@@ -135,10 +134,10 @@ serve(async (req) => {
 
     // Enviar mensagem via Evolution API usando a chave do banco
     const evolutionApiUrl = (Deno.env.get('EVOLUTION_API_URL') || '').replace(/\/$/, '')
-    console.log(`[${requestId}] 📝 Enviando mensagem para ${contact.TelefoneClientes} via Evolution API`)
+    console.log(`[${requestId}] 📝 Enviando mensagem para ${contact.TelefoneClientes} via Evolution API usando instância ${contact.followUp.instance_id}`)
     
     const evolutionResponse = await fetch(
-      `${evolutionApiUrl}/message/sendText/${contact.followUp.instanceName}`,
+      `${evolutionApiUrl}/message/sendText/${contact.followUp.instance_id}`,
       {
         method: 'POST',
         headers: {
