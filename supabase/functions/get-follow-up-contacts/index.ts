@@ -11,58 +11,47 @@ serve(async (req) => {
   const requestId = crypto.randomUUID();
   console.log(`[${requestId}] 🚀 Iniciando função get-follow-up-contacts`);
   
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
-  }
-
   try {
-    // Validar request
-    if (!req.headers.get('authorization')) {
+    // Handle CORS preflight
+    if (req.method === 'OPTIONS') {
+      return new Response(null, { headers: corsHeaders });
+    }
+
+    // Validate authorization
+    const authHeader = req.headers.get('authorization');
+    if (!authHeader) {
+      console.error(`[${requestId}] ❌ Requisição sem header de autorização`);
       throw new Error('Missing authorization header');
     }
 
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    );
+    // Initialize Supabase client
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 
-    // Get service key from secure_configurations
-    console.log(`[${requestId}] 🔑 Buscando chave de serviço`);
-    const { data: keyData, error: keyError } = await supabaseClient
-      .from('secure_configurations')
-      .select('config_value')
-      .eq('config_key', 'supabase_service_role_key')
-      .single();
-
-    if (keyError) {
-      console.error(`[${requestId}] ❌ Erro ao buscar chave de serviço:`, keyError);
-      throw new Error('Failed to get service key');
+    if (!supabaseUrl || !supabaseKey) {
+      console.error(`[${requestId}] ❌ Variáveis de ambiente não configuradas`);
+      throw new Error('Environment variables not configured');
     }
 
-    if (!keyData) {
-      console.error(`[${requestId}] ❌ Chave de serviço não encontrada`);
-      throw new Error('Service key not found');
-    }
+    console.log(`[${requestId}] ✅ Variáveis de ambiente OK`);
+    
+    const supabaseClient = createClient(supabaseUrl, supabaseKey);
 
-    const serviceKey = keyData.config_value;
-    console.log(`[${requestId}] ✅ Chave de serviço obtida com sucesso`);
-
-    // Registrar execução
-    console.log(`[${requestId}] 📝 Registrando execução`);
+    // Log execution start
     const { error: logError } = await supabaseClient
       .from('cron_logs')
       .insert({
         job_name: 'get-follow-up-contacts',
         status: 'started',
-        details: 'Iniciando busca de contatos para follow-up',
+        details: 'Iniciando execução da função',
         details_json: { request_id: requestId }
       });
 
     if (logError) {
-      console.error(`[${requestId}] ⚠️ Erro ao registrar log:`, logError);
+      console.error(`[${requestId}] ⚠️ Erro ao registrar log inicial:`, logError);
     }
 
-    // Buscar follow-ups ativos
+    // Fetch active follow-ups
     console.log(`[${requestId}] 🔍 Buscando follow-ups ativos`);
     const { data: followUps, error: followUpsError } = await supabaseClient
       .from('instance_follow_ups')
@@ -79,7 +68,7 @@ serve(async (req) => {
 
     if (followUpsError) {
       console.error(`[${requestId}] ❌ Erro ao buscar follow-ups:`, followUpsError);
-      throw new Error(`Erro ao buscar follow-ups: ${followUpsError.message}`);
+      throw new Error(`Error fetching follow-ups: ${followUpsError.message}`);
     }
 
     console.log(`[${requestId}] ✅ Encontrados ${followUps?.length || 0} follow-ups ativos`);
@@ -87,6 +76,7 @@ serve(async (req) => {
     const processedFollowUps = [];
     const errors = [];
 
+    // Process each follow-up
     for (const followUp of (followUps || [])) {
       try {
         if (!followUp.instance?.connection_status || followUp.instance.connection_status === 'disconnected') {
@@ -94,15 +84,13 @@ serve(async (req) => {
           continue;
         }
 
-        // Determinar qual endpoint chamar baseado no tipo de follow-up
         const endpoint = followUp.follow_up_type === 'ai_generated' 
           ? 'process-ai-follow-up'
           : 'process-follow-up';
 
-        console.log(`[${requestId}] 🔄 Usando endpoint: ${endpoint}`);
+        console.log(`[${requestId}] 🔄 Processando follow-up tipo: ${endpoint}`);
 
-        // Buscar contatos
-        console.log(`[${requestId}] 🔍 Buscando contatos para instância: ${followUp.instance.name}`);
+        // Get contacts for this instance
         const { data: contacts, error: contactsError } = await supabaseClient
           .from('Users_clientes')
           .select('*')
@@ -112,45 +100,44 @@ serve(async (req) => {
 
         if (contactsError) {
           console.error(`[${requestId}] ❌ Erro ao buscar contatos:`, contactsError);
-          throw new Error(`Erro ao buscar contatos: ${contactsError.message}`);
+          throw new Error(`Error fetching contacts: ${contactsError.message}`);
         }
 
-        console.log(`[${requestId}] 📊 Encontrados ${contacts?.length || 0} contatos`);
+        console.log(`[${requestId}] 📊 Encontrados ${contacts?.length || 0} contatos para processamento`);
 
+        // Process each contact
         for (const contact of (contacts || [])) {
           try {
             const processFollowUpUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/${endpoint}`;
             
             console.log(`[${requestId}] 🔄 Processando contato: ${contact.TelefoneClientes}`);
-            const processingResponse = await fetch(
-              processFollowUpUrl,
-              {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                  'Authorization': `Bearer ${serviceKey}`
-                },
-                body: JSON.stringify({
-                  contact: {
-                    ...contact,
-                    followUp: {
-                      ...followUp,
-                      instance_id: followUp.instance_id,
-                      instanceName: followUp.instance.name,
-                      userId: followUp.instance.user_id
-                    }
+            
+            const response = await fetch(processFollowUpUrl, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${supabaseKey}`
+              },
+              body: JSON.stringify({
+                contact: {
+                  ...contact,
+                  followUp: {
+                    ...followUp,
+                    instance_id: followUp.instance_id,
+                    instanceName: followUp.instance.name,
+                    userId: followUp.instance.user_id
                   }
-                })
-              }
-            );
+                }
+              })
+            });
 
-            if (!processingResponse.ok) {
-              const errorText = await processingResponse.text();
-              throw new Error(`Erro ao processar follow-up: ${errorText}`);
+            if (!response.ok) {
+              const errorText = await response.text();
+              throw new Error(`Error processing follow-up: ${errorText}`);
             }
 
-            const responseData = await processingResponse.json();
-            console.log(`[${requestId}] ✅ Follow-up processado:`, responseData);
+            const responseData = await response.json();
+            console.log(`[${requestId}] ✅ Follow-up processado com sucesso:`, responseData);
 
             processedFollowUps.push({
               followUpId: followUp.id,
@@ -171,18 +158,18 @@ serve(async (req) => {
             });
           }
         }
-      } catch (error) {
-        console.error(`[${requestId}] ❌ Erro ao processar follow-up:`, error);
+      } catch (followUpError) {
+        console.error(`[${requestId}] ❌ Erro ao processar follow-up:`, followUpError);
         errors.push({
           followUpId: followUp.id,
           type: followUp.follow_up_type,
-          error: error.message,
+          error: followUpError.message,
           timestamp: new Date().toISOString()
         });
       }
     }
 
-    // Log conclusão
+    // Log completion
     const endTime = new Date().toISOString();
     const finalLog = {
       request_id: requestId,
@@ -199,7 +186,7 @@ serve(async (req) => {
       .insert({
         job_name: 'get-follow-up-contacts',
         status: 'completed',
-        details: 'Processamento de follow-up concluído',
+        details: 'Processamento concluído com sucesso',
         details_json: finalLog
       });
 
@@ -212,46 +199,48 @@ serve(async (req) => {
       }),
       { 
         headers: { 
-          ...corsHeaders, 
-          'Content-Type': 'application/json' 
-        } 
+          ...corsHeaders,
+          'Content-Type': 'application/json'
+        }
       }
     );
 
   } catch (error) {
-    console.error(`[${requestId}] ❌ Erro crítico:`, error);
+    console.error(`[${requestId}] ❌ Erro crítico na execução:`, error);
     
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    );
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
     
-    await supabase
-      .from('cron_logs')
-      .insert({
-        job_name: 'get-follow-up-contacts',
-        status: 'error',
-        details: 'Falha na execução da função',
-        details_json: {
-          request_id: requestId,
-          error: error.message,
-          stack: error.stack
-        }
-      });
+    if (supabaseUrl && supabaseKey) {
+      const supabase = createClient(supabaseUrl, supabaseKey);
+      
+      await supabase
+        .from('cron_logs')
+        .insert({
+          job_name: 'get-follow-up-contacts',
+          status: 'error',
+          details: 'Erro crítico na execução',
+          details_json: {
+            request_id: requestId,
+            error: error.message,
+            stack: error.stack
+          }
+        });
+    }
 
     return new Response(
-      JSON.stringify({ 
-        success: false, 
+      JSON.stringify({
+        success: false,
         error: error.message,
         request_id: requestId,
         timestamp: new Date().toISOString()
       }),
-      { 
+      {
         status: 500,
-        headers: { 
-          ...corsHeaders, 
-          'Content-Type': 'application/json' 
-        } 
+        headers: {
+          ...corsHeaders,
+          'Content-Type': 'application/json'
+        }
       }
     );
   }
