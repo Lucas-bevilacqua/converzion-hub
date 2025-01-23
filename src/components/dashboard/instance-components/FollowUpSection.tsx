@@ -85,6 +85,7 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
   const { toast } = useToast()
   const queryClient = useQueryClient()
 
+  // Query to fetch follow-up configuration
   const { data: followUp, isLoading } = useQuery({
     queryKey: ['follow-up', instanceId],
     queryFn: async () => {
@@ -121,44 +122,53 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
     }
   })
 
-  // Polling query that runs every 30 seconds
-  useQuery({
-    queryKey: ['poll-follow-up', instanceId],
-    queryFn: async () => {
-      if (!followUp?.is_active) {
-        console.log('⏸️ [DEBUG] Follow-up não está ativo, pulando polling')
+  // Mutation to process follow-ups
+  const processFollowUpMutation = useMutation({
+    mutationFn: async () => {
+      if (!followUp?.is_active || !user?.id) {
+        console.log('⏸️ [DEBUG] Follow-up não está ativo ou usuário não está logado, pulando processamento')
         return null
       }
 
-      console.log('🔄 [DEBUG] Iniciando polling de follow-up', {
+      console.log('🔄 [DEBUG] Processando follow-up', {
         instanceId,
-        userId: user?.id,
-        followUpId: followUp?.id,
-        isActive: followUp?.is_active
+        userId: user.id,
+        followUpId: followUp.id
       })
 
       const { data, error } = await supabase.functions.invoke('get-follow-up-contacts', {
         body: { 
           instanceId,
-          userId: user?.id,
-          followUpId: followUp?.id
+          userId: user.id,
+          followUpId: followUp.id
         }
       })
 
       if (error) {
-        console.error('❌ [ERROR] Erro no polling de follow-up:', error)
+        console.error('❌ [ERROR] Erro ao processar follow-up:', error)
         throw error
       }
 
-      console.log('✅ [DEBUG] Polling executado com sucesso:', data)
+      console.log('✅ [DEBUG] Follow-up processado com sucesso:', data)
       return data
-    },
-    refetchInterval: 30000,
-    enabled: !!followUp?.is_active && !!user?.id, // Only run when follow-up is active and user is logged in
-    retry: true,
-    retryDelay: 5000,
-    staleTime: 25000 // Consider data stale after 25s to ensure regular polling
+    }
   })
+
+  // Effect to handle periodic processing
+  useEffect(() => {
+    if (!followUp?.is_active || !user?.id) return
+
+    console.log('🔄 [DEBUG] Iniciando intervalo de processamento de follow-up')
+    
+    const intervalId = setInterval(() => {
+      processFollowUpMutation.mutate()
+    }, 30000) // Process every 30 seconds
+
+    return () => {
+      console.log('⏹️ [DEBUG] Limpando intervalo de processamento')
+      clearInterval(intervalId)
+    }
+  }, [followUp?.is_active, user?.id, followUp?.id])
 
   const [formData, setFormData] = useState<FormData>({
     is_active: followUp?.is_active || false,
@@ -292,62 +302,6 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
     }
   })
 
-  const testMutation = useMutation({
-    mutationFn: async () => {
-      console.log('🔍 [DEBUG] Testing follow-up for instance:', instanceId)
-      
-      const { data: contacts, error: contactsError } = await supabase
-        .from('Users_clientes')
-        .select('*')
-        .eq('NomeDaEmpresa', instanceId)
-        .limit(1)
-        .maybeSingle()
-
-      if (contactsError) {
-        console.error('❌ [ERROR] Error fetching test contact:', contactsError)
-        throw contactsError
-      }
-
-      if (!contacts) {
-        throw new Error('Nenhum contato encontrado para teste')
-      }
-
-      const { data, error } = await supabase.functions.invoke('process-follow-up', {
-        body: { 
-          contact: {
-            ...contacts,
-            followUp: {
-              ...formData,
-              instance_id: instanceId,
-              userId: user?.id
-            }
-          }
-        }
-      })
-
-      if (error) {
-        console.error('❌ [ERROR] Error testing follow-up:', error)
-        throw error
-      }
-
-      return data
-    },
-    onSuccess: () => {
-      toast({
-        title: "Teste iniciado",
-        description: "O teste de follow-up foi iniciado. Verifique a aba de contatos para ver os resultados.",
-      })
-    },
-    onError: (error) => {
-      console.error('❌ [ERROR] Error in test mutation:', error)
-      toast({
-        title: "Erro",
-        description: error instanceof Error ? error.message : "Não foi possível executar o teste. Por favor, tente novamente.",
-        variant: "destructive",
-      })
-    }
-  })
-
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -361,7 +315,7 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => testMutation.mutate()}
+            onClick={() => processFollowUpMutation.mutate()}
             disabled={!followUp?.is_active}
           >
             <Play className="h-4 w-4 mr-2" />
