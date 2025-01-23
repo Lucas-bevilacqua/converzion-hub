@@ -131,6 +131,8 @@ serve(async (req) => {
     for (const followUp of (followUps || [])) {
       try {
         console.log(`[${requestId}] 🔄 Processando follow-up para instância ${followUp.instance?.name}`);
+        console.log(`[${requestId}] ⏰ Próxima execução agendada para: ${followUp.next_execution_time}`);
+        console.log(`[${requestId}] 📝 Tentativas: ${followUp.execution_count}/${followUp.max_attempts}`);
         
         // Verificar status da conexão em tempo real
         const isConnected = await retryOperation(() => 
@@ -163,6 +165,9 @@ serve(async (req) => {
         // Processar cada contato com retry
         for (const contact of (contacts || [])) {
           try {
+            console.log(`[${requestId}] 📨 Processando contato: ${contact.TelefoneClientes}`);
+            console.log(`[${requestId}] ⏱️ Última mensagem: ${contact.last_message_time}`);
+
             await new Promise(resolve => setTimeout(resolve, DELAY_BETWEEN_CONTACTS));
 
             const endpoint = followUp.follow_up_type === 'ai_generated' 
@@ -184,6 +189,8 @@ serve(async (req) => {
                 }
               })
             );
+
+            console.log(`[${requestId}] ✅ Contato processado com sucesso: ${contact.TelefoneClientes}`);
 
             processedFollowUps.push({
               followUpId: followUp.id,
@@ -214,6 +221,7 @@ serve(async (req) => {
         );
 
         console.log(`[${requestId}] ✅ Follow-up processado com sucesso para instância ${followUp.instance?.name}`);
+        console.log(`[${requestId}] ⏰ Próxima execução agendada para: ${new Date(Date.now() + (followUp.delay_minutes * 60 * 1000)).toISOString()}`);
 
       } catch (error) {
         console.error(`[${requestId}] ❌ Erro ao processar follow-up:`, error);
