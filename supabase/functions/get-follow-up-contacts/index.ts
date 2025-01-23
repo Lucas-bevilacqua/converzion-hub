@@ -6,7 +6,6 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// Rate limiting implementation with reduced limits
 const RATE_LIMIT = 5;
 const BATCH_SIZE = 3;
 const DELAY_BETWEEN_CONTACTS = 2000;
@@ -14,20 +13,18 @@ const activeRequests = new Set();
 
 serve(async (req) => {
   const requestId = crypto.randomUUID();
-  console.log(`[${requestId}] 🚀 Starting get-follow-up-contacts function`);
+  console.log(`[${requestId}] 🚀 Iniciando função get-follow-up-contacts`);
 
   try {
-    // Handle CORS preflight requests
     if (req.method === 'OPTIONS') {
       return new Response(null, { headers: corsHeaders });
     }
 
-    // Validate authentication
     const authHeader = req.headers.get('authorization');
     const apiKey = req.headers.get('apikey');
 
     if (!authHeader && !apiKey) {
-      console.error(`[${requestId}] ❌ No authorization header or apikey provided`);
+      console.error(`[${requestId}] ❌ Sem header de autorização ou apikey`);
       return new Response(
         JSON.stringify({
           error: 'No authorization provided',
@@ -40,9 +37,8 @@ serve(async (req) => {
       );
     }
 
-    // Check rate limit
     if (activeRequests.size >= RATE_LIMIT) {
-      console.log(`[${requestId}] ⚠️ Rate limit exceeded`);
+      console.log(`[${requestId}] ⚠️ Rate limit excedido`);
       return new Response(
         JSON.stringify({
           success: false,
@@ -57,25 +53,22 @@ serve(async (req) => {
 
     activeRequests.add(requestId);
 
-    // Initialize Supabase client
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    // Log execution start
-    console.log(`[${requestId}] 📝 Logging execution start`);
+    console.log(`[${requestId}] 📝 Registrando início da execução`);
     await supabaseClient
       .from('cron_logs')
       .insert({
         job_name: 'get-follow-up-contacts',
         status: 'started',
-        details: 'Starting function execution',
+        details: 'Iniciando execução da função',
         details_json: { request_id: requestId }
       });
 
-    // Fetch active follow-ups
-    console.log(`[${requestId}] 🔍 Fetching active follow-ups`);
+    console.log(`[${requestId}] 🔍 Buscando follow-ups ativos`);
     const { data: followUps, error: followUpsError } = await supabaseClient
       .from('instance_follow_ups')
       .select(`
@@ -88,45 +81,55 @@ serve(async (req) => {
         )
       `)
       .eq('is_active', true)
+      .lt('next_execution_time', new Date().toISOString())
+      .lt('execution_count', 'max_attempts')
       .limit(BATCH_SIZE);
 
     if (followUpsError) {
+      console.error(`[${requestId}] ❌ Erro ao buscar follow-ups:`, followUpsError);
       throw followUpsError;
     }
 
-    console.log(`[${requestId}] ✅ Found ${followUps?.length || 0} active follow-ups`);
+    console.log(`[${requestId}] ✅ Encontrados ${followUps?.length || 0} follow-ups ativos`);
+    console.log(`[${requestId}] 📊 Follow-ups encontrados:`, followUps);
 
     const processedFollowUps = [];
     const errors = [];
 
-    // Process each follow-up
     for (const followUp of (followUps || [])) {
       try {
         if (!followUp.instance?.connection_status || 
             followUp.instance.connection_status.toLowerCase() !== 'connected') {
+          console.log(`[${requestId}] ⚠️ Instância ${followUp.instance?.name} não está conectada, pulando`);
           continue;
         }
 
-        console.log(`[${requestId}] 🔄 Processing follow-up for instance ${followUp.instance.name}`);
+        console.log(`[${requestId}] 🔄 Processando follow-up para instância ${followUp.instance.name}`);
+        console.log(`[${requestId}] 📊 Detalhes do follow-up:`, {
+          id: followUp.id,
+          instance_id: followUp.instance_id,
+          is_active: followUp.is_active,
+          execution_count: followUp.execution_count,
+          max_attempts: followUp.max_attempts,
+          next_execution_time: followUp.next_execution_time
+        });
 
         const endpoint = followUp.follow_up_type === 'ai_generated' 
           ? 'process-ai-follow-up'
           : 'process-follow-up';
 
-        // Fetch contacts in smaller batches
         const { data: contacts } = await supabaseClient
           .from('Users_clientes')
           .select('*')
           .eq('NomeDaEmpresa', followUp.instance_id)
           .limit(BATCH_SIZE);
 
-        console.log(`[${requestId}] 📊 Found ${contacts?.length || 0} contacts for processing`);
+        console.log(`[${requestId}] 📊 Encontrados ${contacts?.length || 0} contatos para processamento`);
 
         for (const contact of (contacts || [])) {
           try {
-            console.log(`[${requestId}] 🔄 Processing contact ${contact.TelefoneClientes} via ${endpoint}`);
+            console.log(`[${requestId}] 🔄 Processando contato ${contact.TelefoneClientes} via ${endpoint}`);
             
-            // Add delay between processing contacts
             await new Promise(resolve => setTimeout(resolve, DELAY_BETWEEN_CONTACTS));
 
             const response = await supabaseClient.functions.invoke(endpoint, {
@@ -143,6 +146,8 @@ serve(async (req) => {
               }
             });
 
+            console.log(`[${requestId}] ✅ Contato processado com sucesso:`, response.data);
+
             processedFollowUps.push({
               followUpId: followUp.id,
               status: 'success',
@@ -150,7 +155,7 @@ serve(async (req) => {
             });
 
           } catch (error) {
-            console.error(`[${requestId}] ❌ Error processing contact:`, error);
+            console.error(`[${requestId}] ❌ Erro ao processar contato:`, error);
             errors.push({
               followUpId: followUp.id,
               status: 'error',
@@ -158,8 +163,23 @@ serve(async (req) => {
             });
           }
         }
+
+        // Atualizar contador de execuções e próximo horário
+        const { error: updateError } = await supabaseClient
+          .from('instance_follow_ups')
+          .update({
+            execution_count: (followUp.execution_count || 0) + 1,
+            last_execution_time: new Date().toISOString(),
+            next_execution_time: new Date(Date.now() + (followUp.delay_minutes * 60 * 1000)).toISOString()
+          })
+          .eq('id', followUp.id);
+
+        if (updateError) {
+          console.error(`[${requestId}] ❌ Erro ao atualizar follow-up:`, updateError);
+        }
+
       } catch (error) {
-        console.error(`[${requestId}] ❌ Error processing follow-up:`, error);
+        console.error(`[${requestId}] ❌ Erro ao processar follow-up:`, error);
         errors.push({
           followUpId: followUp.id,
           status: 'error',
@@ -168,13 +188,12 @@ serve(async (req) => {
       }
     }
 
-    // Log completion
     await supabaseClient
       .from('cron_logs')
       .insert({
         job_name: 'get-follow-up-contacts',
         status: 'completed',
-        details: 'Function execution completed',
+        details: 'Execução da função completada',
         details_json: { 
           request_id: requestId,
           processed: processedFollowUps.length,
@@ -194,15 +213,14 @@ serve(async (req) => {
     );
 
   } catch (error) {
-    console.error(`[${requestId}] ❌ Critical error:`, error);
+    console.error(`[${requestId}] ❌ Erro crítico:`, error);
     
-    // Log error
     await supabaseClient
       .from('cron_logs')
       .insert({
         job_name: 'get-follow-up-contacts',
         status: 'error',
-        details: 'Function execution failed',
+        details: 'Execução da função falhou',
         details_json: { 
           request_id: requestId,
           error: error.message
