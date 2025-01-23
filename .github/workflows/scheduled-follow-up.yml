@@ -1,0 +1,19 @@
+name: Scheduled Follow-up Processing
+
+on:
+  schedule:
+    # Runs every 5 minutes
+    - cron: '*/5 * * * *'
+  workflow_dispatch: # Allows manual triggering
+
+jobs:
+  process-follow-ups:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Process Follow-ups
+        run: |
+          curl -X POST 'https://vodexhppkasbulogmcqb.supabase.co/functions/v1/process-follow-up' \
+          -H 'Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}' \
+          -H 'Content-Type: application/json' \
+          --data-raw '{"scheduled":true, "source": "github-action"}'

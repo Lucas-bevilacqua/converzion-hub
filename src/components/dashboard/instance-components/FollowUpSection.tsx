@@ -85,7 +85,6 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
   const { user } = useAuth()
   const { toast } = useToast()
   const queryClient = useQueryClient()
-  const [lastProcessedAt, setLastProcessedAt] = useState<Date | null>(null)
 
   // Query to fetch follow-up configuration
   const { data: followUp, isLoading } = useQuery({
@@ -124,35 +123,26 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
     }
   })
 
-  // Mutation to process follow-ups
+  // Mutation to process follow-ups manually
   const processFollowUpMutation = useMutation({
     mutationFn: async () => {
-      // Verificar se já processou nos últimos 10 segundos
-      if (lastProcessedAt && new Date().getTime() - lastProcessedAt.getTime() < 10000) {
-        console.log('⏳ [DEBUG] Aguardando tempo mínimo entre processamentos')
-        return null
-      }
-
       if (!followUp?.is_active || !user?.id) {
         console.log('⏸️ [DEBUG] Follow-up não está ativo ou usuário não está logado')
         return null
       }
 
-      console.log('🔄 [DEBUG] Processando follow-up', {
+      console.log('🔄 [DEBUG] Processando follow-up manualmente', {
         instanceId,
         userId: user.id,
-        followUpId: followUp.id,
-        lastProcessedAt
+        followUpId: followUp.id
       })
-
-      setLastProcessedAt(new Date())
 
       const { data, error } = await supabase.functions.invoke('get-follow-up-contacts', {
         body: { 
           instanceId,
           userId: user.id,
           followUpId: followUp.id,
-          timestamp: new Date().toISOString()
+          source: 'manual-trigger'
         }
       })
 
@@ -165,33 +155,6 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
       return data
     }
   })
-
-  // Effect to handle periodic processing
-  useEffect(() => {
-    if (!followUp?.is_active || !user?.id) {
-      console.log('⏸️ [DEBUG] Follow-up inativo ou usuário não logado, parando processamento')
-      return
-    }
-
-    console.log('🔄 [DEBUG] Iniciando processamento periódico', {
-      isActive: followUp.is_active,
-      userId: user.id,
-      followUpId: followUp.id
-    })
-    
-    // Processar imediatamente ao ativar
-    processFollowUpMutation.mutate()
-    
-    // Configurar intervalo para processamento periódico
-    const intervalId = setInterval(() => {
-      processFollowUpMutation.mutate()
-    }, 15000) // Tentar a cada 15 segundos
-
-    return () => {
-      console.log('⏹️ [DEBUG] Limpando intervalo de processamento')
-      clearInterval(intervalId)
-    }
-  }, [followUp?.is_active, user?.id, followUp?.id])
 
   const [formData, setFormData] = useState<FormData>({
     is_active: followUp?.is_active || false,
