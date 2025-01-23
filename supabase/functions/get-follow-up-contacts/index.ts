@@ -115,8 +115,7 @@ serve(async (req) => {
         )
       `)
       .eq('is_active', true)
-      .lt('next_execution_time', new Date().toISOString())
-      .lt('execution_count', 'max_attempts');
+      .lt('next_execution_time', new Date().toISOString());
 
     if (followUpsError) {
       throw followUpsError;
@@ -135,7 +134,13 @@ serve(async (req) => {
         const executionCount = followUp.execution_count || 0;
         const maxAttempts = followUp.max_attempts || 3;
         
-        console.log(`[${requestId}] 📝 Verificando tentativas: ${executionCount}/${maxAttempts}`);
+        console.log(`[${requestId}] 📝 Verificando tentativas:`, {
+          executionCount: typeof executionCount,
+          executionCountValue: executionCount,
+          maxAttempts: typeof maxAttempts,
+          maxAttemptsValue: maxAttempts,
+          comparison: executionCount >= maxAttempts
+        });
         
         if (executionCount >= maxAttempts) {
           console.log(`[${requestId}] ⚠️ Número máximo de tentativas atingido para follow-up ${followUp.id}`);
@@ -220,7 +225,7 @@ serve(async (req) => {
         }
 
         // Atualizar contadores com retry
-        await retryOperation(() =>
+        const updateResult = await retryOperation(() =>
           supabaseClient
             .from('instance_follow_ups')
             .update({
@@ -230,6 +235,12 @@ serve(async (req) => {
             })
             .eq('id', followUp.id)
         );
+
+        console.log(`[${requestId}] 🔄 Resultado da atualização:`, {
+          success: !updateResult.error,
+          error: updateResult.error,
+          newExecutionCount: executionCount + 1
+        });
 
         console.log(`[${requestId}] ✅ Follow-up processado com sucesso para instância ${followUp.instance?.name}`);
         console.log(`[${requestId}] ⏰ Próxima execução agendada para: ${new Date(Date.now() + (followUp.delay_minutes * 60 * 1000)).toISOString()}`);
