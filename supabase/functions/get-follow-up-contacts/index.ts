@@ -90,14 +90,32 @@ serve(async (req) => {
       throw followUpsError;
     }
 
-    console.log(`[${requestId}] ✅ Encontrados ${followUps?.length || 0} follow-ups ativos`);
-    console.log(`[${requestId}] 📊 Follow-ups encontrados:`, followUps);
+    console.log(`[${requestId}] 📊 Follow-ups encontrados:`, {
+      quantidade: followUps?.length || 0,
+      detalhes: followUps?.map(f => ({
+        id: f.id,
+        instance_name: f.instance?.name,
+        is_active: f.is_active,
+        next_execution_time: f.next_execution_time,
+        execution_count: f.execution_count,
+        max_attempts: f.max_attempts,
+        connection_status: f.instance?.connection_status
+      }))
+    });
 
     const processedFollowUps = [];
     const errors = [];
 
     for (const followUp of (followUps || [])) {
       try {
+        console.log(`[${requestId}] 🔄 Verificando follow-up:`, {
+          id: followUp.id,
+          instance_name: followUp.instance?.name,
+          connection_status: followUp.instance?.connection_status,
+          execution_count: followUp.execution_count,
+          max_attempts: followUp.max_attempts
+        });
+
         if (!followUp.instance?.connection_status || 
             followUp.instance.connection_status.toLowerCase() !== 'connected') {
           console.log(`[${requestId}] ⚠️ Instância ${followUp.instance?.name} não está conectada, pulando`);
@@ -105,14 +123,6 @@ serve(async (req) => {
         }
 
         console.log(`[${requestId}] 🔄 Processando follow-up para instância ${followUp.instance.name}`);
-        console.log(`[${requestId}] 📊 Detalhes do follow-up:`, {
-          id: followUp.id,
-          instance_id: followUp.instance_id,
-          is_active: followUp.is_active,
-          execution_count: followUp.execution_count,
-          max_attempts: followUp.max_attempts,
-          next_execution_time: followUp.next_execution_time
-        });
 
         const endpoint = followUp.follow_up_type === 'ai_generated' 
           ? 'process-ai-follow-up'
@@ -128,7 +138,11 @@ serve(async (req) => {
 
         for (const contact of (contacts || [])) {
           try {
-            console.log(`[${requestId}] 🔄 Processando contato ${contact.TelefoneClientes} via ${endpoint}`);
+            console.log(`[${requestId}] 🔄 Processando contato:`, {
+              telefone: contact.TelefoneClientes,
+              endpoint: endpoint,
+              instance: followUp.instance.name
+            });
             
             await new Promise(resolve => setTimeout(resolve, DELAY_BETWEEN_CONTACTS));
 
