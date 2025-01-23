@@ -13,18 +13,18 @@ export default function Login() {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    // Check for existing session on mount
+    // Verificar sessão existente ao montar
     const checkSession = async () => {
       const { data: { session }, error: sessionError } = await supabase.auth.getSession()
       
       if (sessionError) {
-        console.error('Error checking session:', sessionError)
+        console.error('Erro ao verificar sessão:', sessionError)
         setError(sessionError.message)
         return
       }
 
       if (session) {
-        console.log('Active session found, redirecting to dashboard')
+        console.log('Sessão ativa encontrada, redirecionando para dashboard')
         navigate('/dashboard')
       }
     }
@@ -32,23 +32,23 @@ export default function Login() {
     checkSession()
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log('Auth state changed:', event, session)
+      console.log('Estado de autenticação alterado:', event, session)
       
       if (event === 'SIGNED_IN') {
-        console.log('User signed in successfully')
+        console.log('Usuário logado com sucesso')
         setError(null)
         navigate('/dashboard')
       }
       
       if (event === 'TOKEN_REFRESHED') {
-        console.log('Token refreshed successfully')
+        console.log('Token atualizado com sucesso')
         setError(null)
       }
 
       if (event === 'SIGNED_OUT') {
-        console.log('User signed out')
+        console.log('Usuário desconectado')
         setError(null)
-        // Clear any stored auth data
+        // Limpar dados de autenticação armazenados
         localStorage.removeItem('supabase.auth.token')
       }
     })
