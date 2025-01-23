@@ -65,7 +65,7 @@ serve(async (req) => {
     // Verificar status da conexão da instância
     const { data: instance, error: instanceError } = await supabaseClient
       .from('evolution_instances')
-      .select('connection_status, name, id')
+      .select('connection_status, name')
       .eq('id', contact.followUp.instance_id)
       .single()
 
@@ -86,19 +86,19 @@ serve(async (req) => {
       )
     }
 
-    // Get service key from secure_configurations
+    // Get Evolution API key from secure_configurations
     const { data: keyData, error: keyError } = await supabaseClient
       .from('secure_configurations')
       .select('config_value')
-      .eq('config_key', 'supabase_service_role_key')
+      .eq('config_key', 'evolution_api_key')
       .single()
 
     if (keyError || !keyData) {
-      console.error(`[${requestId}] ❌ Failed to get service key:`, keyError)
-      throw new Error('Failed to get service key')
+      console.error(`[${requestId}] ❌ Failed to get Evolution API key:`, keyError)
+      throw new Error('Failed to get Evolution API key')
     }
 
-    const serviceKey = keyData.config_value
+    const evolutionApiKey = keyData.config_value
 
     // Determinar qual mensagem enviar
     let currentMessageIndex = -1
@@ -134,15 +134,15 @@ serve(async (req) => {
 
     // Enviar mensagem via Evolution API usando a chave do banco
     const evolutionApiUrl = (Deno.env.get('EVOLUTION_API_URL') || '').replace(/\/$/, '')
-    console.log(`[${requestId}] 📝 Enviando mensagem para ${contact.TelefoneClientes} via Evolution API usando instância ${instance.id}`)
+    console.log(`[${requestId}] 📝 Enviando mensagem para ${contact.TelefoneClientes} via Evolution API usando instância ${instance.name}`)
     
     const evolutionResponse = await fetch(
-      `${evolutionApiUrl}/message/sendText/${instance.id}`,
+      `${evolutionApiUrl}/message/sendText/${instance.name}`,
       {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'apikey': serviceKey,
+          'apikey': evolutionApiKey,
         },
         body: JSON.stringify({
           number: contact.TelefoneClientes,
