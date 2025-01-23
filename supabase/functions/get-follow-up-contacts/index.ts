@@ -52,7 +52,8 @@ serve(async (req) => {
         )
       `)
       .eq('is_active', true)
-      .order('created_at', { ascending: false });
+      .filter('execution_count', 'lt', 'max_attempts')
+      .order('last_execution_time', { ascending: true, nullsFirst: true });
 
     if (followUpsError) {
       console.error(`[${requestId}] ❌ Error fetching follow-ups:`, followUpsError);
@@ -98,8 +99,8 @@ serve(async (req) => {
         }
 
         if (!followUp.instance?.connection_status || 
-            followUp.instance.connection_status !== 'connected') {
-          console.log(`[${requestId}] ⚠️ Instância ${followUp.instance?.name} não conectada`);
+            followUp.instance.connection_status.toLowerCase() !== 'connected') {
+          console.log(`[${requestId}] ⚠️ Instância ${followUp.instance?.name} não conectada. Status: ${followUp.instance?.connection_status}`);
           continue;
         }
 
@@ -123,15 +124,18 @@ serve(async (req) => {
           try {
             await new Promise(resolve => setTimeout(resolve, DELAY_BETWEEN_CONTACTS));
 
-            // Send message directly using Supabase client
+            const message = followUp.follow_up_type === 'manual' 
+              ? (followUp.manual_messages?.[0]?.message || followUp.template_message || '')
+              : followUp.template_message || '';
+
+            console.log(`[${requestId}] 📝 Enviando mensagem:`, message);
+
             const { error: messageError } = await supabaseClient
               .from('chat_messages')
               .insert({
                 instance_id: followUp.instance_id,
                 user_id: followUp.instance.user_id,
-                content: followUp.follow_up_type === 'manual' 
-                  ? (followUp.manual_messages?.[0]?.message || followUp.template_message || '')
-                  : followUp.template_message || '',
+                content: message,
                 sender_type: 'follow_up'
               });
 
@@ -146,7 +150,8 @@ serve(async (req) => {
               .from('instance_follow_ups')
               .update({
                 execution_count: executionCount + 1,
-                last_execution_time: new Date().toISOString()
+                last_execution_time: new Date().toISOString(),
+                next_execution_time: new Date(Date.now() + (followUp.delay_minutes * 60 * 1000)).toISOString()
               })
               .eq('id', followUp.id);
 
