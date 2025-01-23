@@ -7,12 +7,16 @@ const corsHeaders = {
 }
 
 serve(async (req) => {
+  // Handle CORS preflight
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders })
+    return new Response(null, { 
+      headers: corsHeaders,
+      status: 204
+    })
   }
 
   try {
-    console.log('🔄 [DEBUG] Starting follow-up processing from GitHub Action')
+    console.log('🔄 [DEBUG] Starting follow-up processing')
     
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
@@ -33,6 +37,7 @@ serve(async (req) => {
       .eq('is_active', true)
 
     if (followUpsError) {
+      console.error('❌ [ERROR] Failed to fetch active follow-ups:', followUpsError)
       throw new Error(`Failed to fetch active follow-ups: ${followUpsError.message}`)
     }
 
@@ -50,6 +55,7 @@ serve(async (req) => {
         })
 
         if (processError) {
+          console.error('❌ [ERROR] Failed to process follow-up:', processError)
           throw processError
         }
 
@@ -77,7 +83,8 @@ serve(async (req) => {
         headers: { 
           ...corsHeaders,
           'Content-Type': 'application/json'
-        }
+        },
+        status: 200
       }
     )
 
@@ -86,6 +93,7 @@ serve(async (req) => {
     
     return new Response(
       JSON.stringify({
+        success: false,
         error: error.message,
         timestamp: new Date().toISOString()
       }),
