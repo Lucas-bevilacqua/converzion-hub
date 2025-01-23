@@ -16,27 +16,39 @@ serve(async (req) => {
   }
 
   try {
+    // Validar request
+    if (!req.headers.get('authorization')) {
+      throw new Error('Missing authorization header');
+    }
+
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
     // Get service key from secure_configurations
+    console.log(`[${requestId}] 🔑 Buscando chave de serviço`);
     const { data: keyData, error: keyError } = await supabaseClient
       .from('secure_configurations')
       .select('config_value')
       .eq('config_key', 'supabase_service_role_key')
       .single();
 
-    if (keyError || !keyData) {
+    if (keyError) {
+      console.error(`[${requestId}] ❌ Erro ao buscar chave de serviço:`, keyError);
       throw new Error('Failed to get service key');
     }
 
-    const serviceKey = keyData.config_value;
+    if (!keyData) {
+      console.error(`[${requestId}] ❌ Chave de serviço não encontrada`);
+      throw new Error('Service key not found');
+    }
 
-    console.log(`[${requestId}] 📝 Verificando credenciais e configurações`);
-    
+    const serviceKey = keyData.config_value;
+    console.log(`[${requestId}] ✅ Chave de serviço obtida com sucesso`);
+
     // Registrar execução
+    console.log(`[${requestId}] 📝 Registrando execução`);
     const { error: logError } = await supabaseClient
       .from('cron_logs')
       .insert({
@@ -47,7 +59,7 @@ serve(async (req) => {
       });
 
     if (logError) {
-      console.error(`[${requestId}] ❌ Erro ao registrar log:`, logError);
+      console.error(`[${requestId}] ⚠️ Erro ao registrar log:`, logError);
     }
 
     // Buscar follow-ups ativos
@@ -66,6 +78,7 @@ serve(async (req) => {
       .eq('is_active', true);
 
     if (followUpsError) {
+      console.error(`[${requestId}] ❌ Erro ao buscar follow-ups:`, followUpsError);
       throw new Error(`Erro ao buscar follow-ups: ${followUpsError.message}`);
     }
 
@@ -76,8 +89,6 @@ serve(async (req) => {
 
     for (const followUp of (followUps || [])) {
       try {
-        console.log(`[${requestId}] 📱 Processando follow-up tipo ${followUp.follow_up_type} para instância: ${followUp.instance?.name}`);
-        
         if (!followUp.instance?.connection_status || followUp.instance.connection_status === 'disconnected') {
           console.log(`[${requestId}] ⚠️ Instância ${followUp.instance?.name} não conectada, pulando`);
           continue;
@@ -88,7 +99,7 @@ serve(async (req) => {
           ? 'process-ai-follow-up'
           : 'process-follow-up';
 
-        console.log(`[${requestId}] 🔄 Usando endpoint: ${endpoint} para follow-up tipo ${followUp.follow_up_type}`);
+        console.log(`[${requestId}] 🔄 Usando endpoint: ${endpoint}`);
 
         // Buscar contatos
         console.log(`[${requestId}] 🔍 Buscando contatos para instância: ${followUp.instance.name}`);
@@ -100,18 +111,17 @@ serve(async (req) => {
           .order('last_message_time', { ascending: true, nullsFirst: true });
 
         if (contactsError) {
+          console.error(`[${requestId}] ❌ Erro ao buscar contatos:`, contactsError);
           throw new Error(`Erro ao buscar contatos: ${contactsError.message}`);
         }
 
-        console.log(`[${requestId}] 📊 Encontrados ${contacts?.length || 0} contatos para instância ${followUp.instance.name}`);
+        console.log(`[${requestId}] 📊 Encontrados ${contacts?.length || 0} contatos`);
 
         for (const contact of (contacts || [])) {
           try {
-            console.log(`[${requestId}] 👤 Processando contato: ${contact.TelefoneClientes} com follow-up tipo ${followUp.follow_up_type}`);
-            
             const processFollowUpUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/${endpoint}`;
             
-            console.log(`[${requestId}] 🔄 Enviando requisição para ${processFollowUpUrl}`);
+            console.log(`[${requestId}] 🔄 Processando contato: ${contact.TelefoneClientes}`);
             const processingResponse = await fetch(
               processFollowUpUrl,
               {
@@ -140,7 +150,7 @@ serve(async (req) => {
             }
 
             const responseData = await processingResponse.json();
-            console.log(`[${requestId}] ✅ Follow-up tipo ${followUp.follow_up_type} processado:`, responseData);
+            console.log(`[${requestId}] ✅ Follow-up processado:`, responseData);
 
             processedFollowUps.push({
               followUpId: followUp.id,
@@ -151,7 +161,7 @@ serve(async (req) => {
             });
 
           } catch (contactError) {
-            console.error(`[${requestId}] ❌ Falha ao processar contato ${contact.id}:`, contactError);
+            console.error(`[${requestId}] ❌ Erro ao processar contato:`, contactError);
             errors.push({
               followUpId: followUp.id,
               contactId: contact.id,
@@ -162,7 +172,7 @@ serve(async (req) => {
           }
         }
       } catch (error) {
-        console.error(`[${requestId}] ❌ Falha ao processar follow-up ${followUp.id}:`, error);
+        console.error(`[${requestId}] ❌ Erro ao processar follow-up:`, error);
         errors.push({
           followUpId: followUp.id,
           type: followUp.follow_up_type,
