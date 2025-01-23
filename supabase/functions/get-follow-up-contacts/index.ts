@@ -77,8 +77,24 @@ serve(async (req) => {
           comparison: executionCount >= maxAttempts
         });
         
+        // Changed comparison to use < instead of >= to continue while we haven't hit max attempts
         if (executionCount >= maxAttempts) {
           console.log(`[${requestId}] ⚠️ Número máximo de tentativas atingido para follow-up ${followUp.id}`);
+          
+          // Update follow-up to mark it as inactive since max attempts reached
+          const { error: updateError } = await supabaseClient
+            .from('instance_follow_ups')
+            .update({
+              is_active: false,
+              last_execution_time: new Date().toISOString(),
+              execution_count: executionCount
+            })
+            .eq('id', followUp.id);
+
+          if (updateError) {
+            console.error(`[${requestId}] ❌ Error updating follow-up status:`, updateError);
+          }
+          
           continue;
         }
 
