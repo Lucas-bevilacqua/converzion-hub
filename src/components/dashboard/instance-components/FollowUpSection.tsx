@@ -52,9 +52,6 @@ interface FormData {
   follow_up_type: FollowUpType
   delay_minutes: number
   template_message: string
-  schedule_start_time: string
-  schedule_end_time: string
-  schedule_days: number[]
   max_attempts: number
   stop_on_reply: boolean
   stop_on_keyword: string[]
@@ -69,9 +66,6 @@ interface FollowUpData {
   follow_up_type: FollowUpType;
   delay_minutes: number;
   template_message: string;
-  schedule_start_time: string;
-  schedule_end_time: string;
-  schedule_days: number[];
   max_attempts: number;
   stop_on_reply: boolean;
   stop_on_keyword: string[];
@@ -199,9 +193,6 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
     follow_up_type: followUp?.follow_up_type || "manual",
     delay_minutes: followUp?.delay_minutes || 1,
     template_message: followUp?.template_message || '',
-    schedule_start_time: followUp?.schedule_start_time || '09:00',
-    schedule_end_time: followUp?.schedule_end_time || '18:00',
-    schedule_days: followUp?.schedule_days || [1,2,3,4,5],
     max_attempts: followUp?.max_attempts || 3,
     stop_on_reply: followUp?.stop_on_reply ?? true,
     stop_on_keyword: followUp?.stop_on_keyword || ['comprou', 'agendou', 'agendado', 'comprado'],
@@ -217,9 +208,6 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
         follow_up_type: followUp.follow_up_type || "manual",
         delay_minutes: followUp.delay_minutes || 1,
         template_message: followUp.template_message || '',
-        schedule_start_time: followUp.schedule_start_time || '09:00',
-        schedule_end_time: followUp.schedule_end_time || '18:00',
-        schedule_days: followUp.schedule_days || [1,2,3,4,5],
         max_attempts: followUp.max_attempts || 3,
         stop_on_reply: followUp.stop_on_reply ?? true,
         stop_on_keyword: followUp.stop_on_keyword || ['comprou', 'agendou', 'agendado', 'comprado'],
@@ -239,9 +227,6 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
         follow_up_type: values.follow_up_type,
         delay_minutes: Math.max(1, values.delay_minutes),
         template_message: values.template_message,
-        schedule_start_time: values.schedule_start_time,
-        schedule_end_time: values.schedule_end_time,
-        schedule_days: values.schedule_days,
         max_attempts: values.max_attempts,
         stop_on_reply: values.stop_on_reply,
         stop_on_keyword: values.stop_on_keyword,
@@ -307,9 +292,6 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
         follow_up_type: "manual",
         delay_minutes: 1,
         template_message: '',
-        schedule_start_time: '09:00',
-        schedule_end_time: '18:00',
-        schedule_days: [1,2,3,4,5],
         max_attempts: 3,
         stop_on_reply: true,
         stop_on_keyword: ['comprou', 'agendou', 'agendado', 'comprado'],
@@ -547,9 +529,6 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
                       follow_up_type: followUp.follow_up_type || "manual",
                       delay_minutes: followUp.delay_minutes || 1,
                       template_message: followUp.template_message || '',
-                      schedule_start_time: followUp.schedule_start_time || '09:00',
-                      schedule_end_time: followUp.schedule_end_time || '18:00',
-                      schedule_days: followUp.schedule_days || [1,2,3,4,5],
                       max_attempts: followUp.max_attempts || 3,
                       stop_on_reply: followUp.stop_on_reply ?? true,
                       stop_on_keyword: followUp.stop_on_keyword || ['comprou', 'agendou', 'agendado', 'comprado'],

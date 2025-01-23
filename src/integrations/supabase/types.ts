@@ -337,9 +337,6 @@ export type Database = {
           manual_messages: Json | null
           max_attempts: number | null
           next_execution_time: string | null
-          schedule_days: number[] | null
-          schedule_end_time: string | null
-          schedule_start_time: string | null
           settings: Json | null
           stop_on_keyword: string[] | null
           stop_on_reply: boolean | null
@@ -359,9 +356,6 @@ export type Database = {
           manual_messages?: Json | null
           max_attempts?: number | null
           next_execution_time?: string | null
-          schedule_days?: number[] | null
-          schedule_end_time?: string | null
-          schedule_start_time?: string | null
           settings?: Json | null
           stop_on_keyword?: string[] | null
           stop_on_reply?: boolean | null
@@ -381,9 +375,6 @@ export type Database = {
           manual_messages?: Json | null
           max_attempts?: number | null
           next_execution_time?: string | null
-          schedule_days?: number[] | null
-          schedule_end_time?: string | null
-          schedule_start_time?: string | null
           settings?: Json | null
           stop_on_keyword?: string[] | null
           stop_on_reply?: boolean | null
