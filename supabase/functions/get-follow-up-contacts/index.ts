@@ -9,7 +9,43 @@ const corsHeaders = {
 const RATE_LIMIT = 5;
 const BATCH_SIZE = 3;
 const DELAY_BETWEEN_CONTACTS = 2000;
+const MAX_RETRIES = 3;
+const RETRY_DELAY = 2000;
 const activeRequests = new Set();
+
+async function retryOperation<T>(operation: () => Promise<T>, retries = MAX_RETRIES): Promise<T> {
+  try {
+    return await operation();
+  } catch (error) {
+    if (retries > 0) {
+      console.log(`🔄 [DEBUG] Tentando novamente, ${retries} tentativas restantes`);
+      await new Promise(resolve => setTimeout(resolve, RETRY_DELAY));
+      return retryOperation(operation, retries - 1);
+    }
+    throw error;
+  }
+}
+
+async function verifyInstanceConnection(evolutionApiUrl: string, evolutionApiKey: string, instanceName: string) {
+  try {
+    const response = await fetch(`${evolutionApiUrl}/instance/connectionState/${instanceName}`, {
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': evolutionApiKey,
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error(`Falha ao verificar estado da instância: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    return data?.instance?.state === 'open';
+  } catch (error) {
+    console.error(`❌ [ERROR] Erro ao verificar conexão da instância ${instanceName}:`, error);
+    return false;
+  }
+}
 
 serve(async (req) => {
   const requestId = crypto.randomUUID();
@@ -53,6 +89,14 @@ serve(async (req) => {
         details_json: { request_id: requestId }
       });
 
+    // Configurações da Evolution API
+    const evolutionApiUrl = Deno.env.get('EVOLUTION_API_URL')?.replace(/\/$/, '');
+    const evolutionApiKey = Deno.env.get('EVOLUTION_API_KEY');
+
+    if (!evolutionApiUrl || !evolutionApiKey) {
+      throw new Error('Evolution API configuration missing');
+    }
+
     // Buscar follow-ups ativos
     const { data: followUps, error: followUpsError } = await supabaseClient
       .from('instance_follow_ups')
@@ -76,24 +120,28 @@ serve(async (req) => {
 
     console.log(`[${requestId}] 📊 Follow-ups encontrados:`, followUps?.length || 0);
 
-    // Processar follow-ups
     const processedFollowUps = [];
     const errors = [];
 
     for (const followUp of (followUps || [])) {
       try {
-        if (!followUp.instance?.connection_status || 
-            followUp.instance.connection_status !== 'connected') {
+        // Verificar status da conexão em tempo real
+        const isConnected = await retryOperation(() => 
+          verifyInstanceConnection(evolutionApiUrl, evolutionApiKey, followUp.instance?.name)
+        );
+
+        if (!isConnected) {
           console.log(`[${requestId}] ⚠️ Instância ${followUp.instance?.name} não conectada`);
+          
+          // Atualizar status da instância se necessário
+          if (followUp.instance?.connection_status === 'connected') {
+            await supabaseClient
+              .from('evolution_instances')
+              .update({ connection_status: 'disconnected' })
+              .eq('id', followUp.instance?.id);
+          }
+          
           continue;
-        }
-
-        // Verificar Evolution API
-        const evolutionApiUrl = Deno.env.get('EVOLUTION_API_URL');
-        const evolutionApiKey = Deno.env.get('EVOLUTION_API_KEY');
-
-        if (!evolutionApiUrl || !evolutionApiKey) {
-          throw new Error('Evolution API configuration missing');
         }
 
         // Buscar contatos
@@ -105,7 +153,7 @@ serve(async (req) => {
 
         console.log(`[${requestId}] 📱 Processando ${contacts?.length || 0} contatos`);
 
-        // Processar cada contato
+        // Processar cada contato com retry
         for (const contact of (contacts || [])) {
           try {
             await new Promise(resolve => setTimeout(resolve, DELAY_BETWEEN_CONTACTS));
@@ -114,19 +162,21 @@ serve(async (req) => {
               ? 'process-ai-follow-up'
               : 'process-follow-up';
 
-            const response = await supabaseClient.functions.invoke(endpoint, {
-              body: { 
-                contact: {
-                  ...contact,
-                  followUp: {
-                    ...followUp,
-                    instance_id: followUp.instance_id,
-                    instanceName: followUp.instance.name,
-                    userId: followUp.instance.user_id
+            const response = await retryOperation(() => 
+              supabaseClient.functions.invoke(endpoint, {
+                body: { 
+                  contact: {
+                    ...contact,
+                    followUp: {
+                      ...followUp,
+                      instance_id: followUp.instance_id,
+                      instanceName: followUp.instance.name,
+                      userId: followUp.instance.user_id
+                    }
                   }
                 }
-              }
-            });
+              })
+            );
 
             processedFollowUps.push({
               followUpId: followUp.id,
@@ -144,15 +194,17 @@ serve(async (req) => {
           }
         }
 
-        // Atualizar contadores
-        await supabaseClient
-          .from('instance_follow_ups')
-          .update({
-            execution_count: (followUp.execution_count || 0) + 1,
-            last_execution_time: new Date().toISOString(),
-            next_execution_time: new Date(Date.now() + (followUp.delay_minutes * 60 * 1000)).toISOString()
-          })
-          .eq('id', followUp.id);
+        // Atualizar contadores com retry
+        await retryOperation(() =>
+          supabaseClient
+            .from('instance_follow_ups')
+            .update({
+              execution_count: (followUp.execution_count || 0) + 1,
+              last_execution_time: new Date().toISOString(),
+              next_execution_time: new Date(Date.now() + (followUp.delay_minutes * 60 * 1000)).toISOString()
+            })
+            .eq('id', followUp.id)
+        );
 
       } catch (error) {
         console.error(`[${requestId}] ❌ Erro ao processar follow-up:`, error);
