@@ -135,6 +135,8 @@ serve(async (req) => {
         const executionCount = followUp.execution_count || 0;
         const maxAttempts = followUp.max_attempts || 3;
         
+        console.log(`[${requestId}] 📝 Verificando tentativas: ${executionCount}/${maxAttempts}`);
+        
         if (executionCount >= maxAttempts) {
           console.log(`[${requestId}] ⚠️ Número máximo de tentativas atingido para follow-up ${followUp.id}`);
           continue;
