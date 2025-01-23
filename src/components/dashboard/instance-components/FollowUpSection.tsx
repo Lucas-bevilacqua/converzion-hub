@@ -97,7 +97,6 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
 
       console.log('✅ [DEBUG] Follow-up data:', data)
 
-      // Parse manual_messages from Json to ManualMessage[]
       const parsedData = {
         ...data,
         manual_messages: Array.isArray(data?.manual_messages) 
@@ -115,7 +114,37 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
       } as FollowUpData
 
       return parsedData
-    }
+    },
+    refetchInterval: (data) => data?.is_active ? 30000 : false
+  })
+
+  const processFollowUpQuery = useQuery({
+    queryKey: ['process-follow-up', instanceId],
+    queryFn: async () => {
+      if (!followUp?.is_active) {
+        console.log('🔄 [DEBUG] Follow-up não está ativo, pulando processamento')
+        return null
+      }
+
+      console.log('🔄 [DEBUG] Processando follow-ups pendentes')
+      
+      const { data, error } = await supabase.functions.invoke('process-follow-up', {
+        body: { 
+          instanceId,
+          userId: user?.id,
+          followUp 
+        }
+      })
+
+      if (error) {
+        console.error('❌ [ERROR] Erro ao processar follow-ups:', error)
+        throw error
+      }
+
+      return data
+    },
+    refetchInterval: followUp?.is_active ? 30000 : false,
+    enabled: !!followUp?.is_active
   })
 
   const [formData, setFormData] = useState<FormData>({
@@ -250,12 +279,10 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
     }
   })
 
-  // Add test mutation
   const testMutation = useMutation({
     mutationFn: async () => {
       console.log('🔍 [DEBUG] Testing follow-up for instance:', instanceId)
       
-      // First get a test contact
       const { data: contacts, error: contactsError } = await supabase
         .from('Users_clientes')
         .select('*')
