@@ -1,14 +1,14 @@
-import "https://deno.land/x/xhr@0.1.0/mod.ts";
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+}
 
 // Rate limiting implementation
 const RATE_LIMIT = 10; // Max concurrent requests
+const BATCH_SIZE = 5; // Process contacts in smaller batches
 const activeRequests = new Set();
 
 serve(async (req) => {
@@ -38,17 +38,11 @@ serve(async (req) => {
 
     activeRequests.add(requestId);
 
-    // Validate environment variables
-    const supabaseUrl = Deno.env.get('SUPABASE_URL');
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-
-    if (!supabaseUrl || !supabaseKey) {
-      throw new Error('Environment variables not configured');
-    }
-
-    console.log(`[${requestId}] ✅ Environment variables OK`);
-    
-    const supabaseClient = createClient(supabaseUrl, supabaseKey);
+    // Initialize Supabase client
+    const supabaseClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    );
 
     // Log execution start
     console.log(`[${requestId}] 📝 Logging execution start`);
@@ -75,7 +69,7 @@ serve(async (req) => {
         )
       `)
       .eq('is_active', true)
-      .limit(5); // Process in smaller batches
+      .limit(BATCH_SIZE);
 
     if (followUpsError) {
       throw followUpsError;
@@ -100,11 +94,12 @@ serve(async (req) => {
           ? 'process-ai-follow-up'
           : 'process-follow-up';
 
+        // Fetch contacts in smaller batches
         const { data: contacts } = await supabaseClient
           .from('Users_clientes')
           .select('*')
           .eq('NomeDaEmpresa', followUp.instance_id)
-          .limit(2); // Process fewer contacts per batch
+          .limit(BATCH_SIZE);
 
         console.log(`[${requestId}] 📊 Found ${contacts?.length || 0} contacts for processing`);
 
@@ -112,6 +107,9 @@ serve(async (req) => {
           try {
             console.log(`[${requestId}] 🔄 Processing contact ${contact.TelefoneClientes} via ${endpoint}`);
             
+            // Add delay between processing contacts
+            await new Promise(resolve => setTimeout(resolve, 1000));
+
             const response = await supabaseClient.functions.invoke(endpoint, {
               body: { 
                 contact: {
@@ -131,9 +129,6 @@ serve(async (req) => {
               status: 'success',
               result: response.data
             });
-
-            // Add delay between processing contacts
-            await new Promise(resolve => setTimeout(resolve, 1000));
 
           } catch (error) {
             console.error(`[${requestId}] ❌ Error processing contact:`, error);
