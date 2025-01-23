@@ -115,7 +115,7 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
 
       return parsedData
     },
-    refetchInterval: (data) => data?.is_active ? 30000 : false
+    refetchInterval: (data) => data && data.is_active ? 30000 : false
   })
 
   const processFollowUpQuery = useQuery({
@@ -602,3 +602,4 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
     </div>
   )
 }
+
