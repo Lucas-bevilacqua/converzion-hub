@@ -120,22 +120,33 @@ serve(async (req) => {
         console.log(`[${requestId}] 📱 Processando ${contacts?.length || 0} contatos`);
         console.log(`[${requestId}] 🔍 Detalhes dos contatos:`, contacts);
 
+        let messageToSend = '';
+        if (followUp.follow_up_type === 'manual' && Array.isArray(followUp.manual_messages)) {
+          const currentMessage = followUp.manual_messages[executionCount];
+          if (currentMessage && currentMessage.message) {
+            messageToSend = currentMessage.message;
+          }
+        } else {
+          messageToSend = followUp.template_message || '';
+        }
+
+        if (!messageToSend) {
+          console.log(`[${requestId}] ⚠️ Nenhuma mensagem para enviar no follow-up ${followUp.id}`);
+          continue;
+        }
+
         for (const contact of (contacts || [])) {
           try {
             await new Promise(resolve => setTimeout(resolve, DELAY_BETWEEN_CONTACTS));
 
-            const message = followUp.follow_up_type === 'manual' 
-              ? (followUp.manual_messages?.[0]?.message || followUp.template_message || '')
-              : followUp.template_message || '';
-
-            console.log(`[${requestId}] 📝 Enviando mensagem:`, message);
+            console.log(`[${requestId}] 📝 Enviando mensagem:`, messageToSend);
 
             const { error: messageError } = await supabaseClient
               .from('chat_messages')
               .insert({
                 instance_id: followUp.instance_id,
                 user_id: followUp.instance.user_id,
-                content: message,
+                content: messageToSend,
                 sender_type: 'follow_up'
               });
 
