@@ -10,6 +10,10 @@ const MAX_RETRIES = 3;
 const BATCH_SIZE = 3;
 const DELAY_BETWEEN_CONTACTS = 2000;
 const RETRY_DELAY = 2000;
+const INITIAL_DELAY = 1000; // Added missing constant
+
+// Added missing sleep utility
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 async function retryWithBackoff<T>(
   operation: () => Promise<T>, 
@@ -145,7 +149,7 @@ serve(async (req) => {
 
         for (const contact of (contacts || [])) {
           try {
-            await new Promise(resolve => setTimeout(resolve, DELAY_BETWEEN_CONTACTS));
+            await sleep(DELAY_BETWEEN_CONTACTS);
 
             console.log(`[${requestId}] 📝 Enviando mensagem para ${contact.TelefoneClientes}:`, messageToSend);
 
