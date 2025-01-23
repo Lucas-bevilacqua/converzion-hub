@@ -11,14 +11,18 @@ const BATCH_SIZE = 3;
 const DELAY_BETWEEN_CONTACTS = 2000;
 const RETRY_DELAY = 2000;
 
-async function retryOperation<T>(operation: () => Promise<T>, retries = MAX_RETRIES): Promise<T> {
+async function retryWithBackoff<T>(
+  operation: () => Promise<T>, 
+  retries: number = MAX_RETRIES,
+  delay: number = INITIAL_DELAY
+): Promise<T> {
   try {
     return await operation();
   } catch (error) {
     if (retries > 0) {
-      console.log(`🔄 [DEBUG] Tentando novamente, ${retries} tentativas restantes`);
-      await new Promise(resolve => setTimeout(resolve, RETRY_DELAY));
-      return retryOperation(operation, retries - 1);
+      console.log(`🔄 [DEBUG] Retrying operation, ${retries} attempts remaining, waiting ${delay}ms`);
+      await sleep(delay);
+      return retryWithBackoff(operation, retries - 1, delay * 2);
     }
     throw error;
   }
@@ -120,18 +124,22 @@ serve(async (req) => {
         console.log(`[${requestId}] 📱 Processando ${contacts?.length || 0} contatos`);
         console.log(`[${requestId}] 🔍 Detalhes dos contatos:`, contacts);
 
+        // Get the correct message based on execution count
         let messageToSend = '';
         if (followUp.follow_up_type === 'manual' && Array.isArray(followUp.manual_messages)) {
+          // Get message corresponding to current execution count
           const currentMessage = followUp.manual_messages[executionCount];
-          if (currentMessage && currentMessage.message) {
+          if (currentMessage?.message) {
             messageToSend = currentMessage.message;
+            console.log(`[${requestId}] 📝 Usando mensagem manual ${executionCount + 1}:`, messageToSend);
           }
         } else {
           messageToSend = followUp.template_message || '';
+          console.log(`[${requestId}] 📝 Usando mensagem template:`, messageToSend);
         }
 
         if (!messageToSend) {
-          console.log(`[${requestId}] ⚠️ Nenhuma mensagem para enviar no follow-up ${followUp.id}`);
+          console.log(`[${requestId}] ⚠️ Nenhuma mensagem disponível para follow-up ${followUp.id}`);
           continue;
         }
 
@@ -139,7 +147,7 @@ serve(async (req) => {
           try {
             await new Promise(resolve => setTimeout(resolve, DELAY_BETWEEN_CONTACTS));
 
-            console.log(`[${requestId}] 📝 Enviando mensagem:`, messageToSend);
+            console.log(`[${requestId}] 📝 Enviando mensagem para ${contact.TelefoneClientes}:`, messageToSend);
 
             const { error: messageError } = await supabaseClient
               .from('chat_messages')
@@ -153,8 +161,6 @@ serve(async (req) => {
             if (messageError) {
               throw messageError;
             }
-
-            console.log(`[${requestId}] ✅ Mensagem enviada com sucesso para:`, contact.TelefoneClientes);
 
             // Update follow-up execution count and time
             const { error: updateError } = await supabaseClient
