@@ -13,16 +13,14 @@ export default function Index() {
     try {
       console.log('🚀 Iniciando teste de follow-up');
       
-      const { data, error } = await supabase.functions.invoke('get-follow-up-contacts', {
-        body: { scheduled: true }
-      });
+      const { data, error } = await supabase.rpc('execute_follow_up_contacts_real');
 
       if (error) {
         console.error('❌ Erro ao executar follow-up:', error);
         throw error;
       }
 
-      console.log('✅ Resposta do follow-up:', data);
+      console.log('✅ Follow-up executado com sucesso:', data);
       
       toast({
         title: "Sucesso!",
