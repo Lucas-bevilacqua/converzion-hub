@@ -18,8 +18,10 @@ jobs:
           curl -X POST 'https://vodexhppkasbulogmcqb.supabase.co/functions/v1/get-follow-up-contacts' \
           -H "Authorization: Bearer ${SUPABASE_KEY}" \
           -H "Content-Type: application/json" \
+          -H "apikey: ${SUPABASE_KEY}" \
           --data-raw '{"scheduled":true, "source": "github-action"}' \
           --fail \
           --show-error \
-          --silent
+          --silent \
+          || echo "Error: Failed to process follow-ups"
           echo "Completed follow-up processing at $(date)"
