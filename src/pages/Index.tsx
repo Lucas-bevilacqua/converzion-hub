@@ -1,10 +1,11 @@
 import { Button } from "@/components/ui/button";
-import { useToast } from "@/components/ui/use-toast";
+import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { HeroSection } from "@/components/home/HeroSection";
 import { FeaturesSection } from "@/components/home/FeaturesSection";
 import { TestimonialSection } from "@/components/home/TestimonialSection";
 import { CTASection } from "@/components/home/CTASection";
+import { Play, Check } from "lucide-react";
 
 export default function Index() {
   const { toast } = useToast();
@@ -71,15 +72,17 @@ export default function Index() {
           <Button 
             onClick={testFollowUp}
             variant="outline"
-            className="bg-white/90 hover:bg-white"
+            className="bg-white/90 hover:bg-white flex items-center gap-2"
           >
+            <Play className="h-4 w-4" />
             Testar Follow-up
           </Button>
           <Button 
             onClick={testCronJob}
             variant="outline"
-            className="bg-white/90 hover:bg-white"
+            className="bg-white/90 hover:bg-white flex items-center gap-2"
           >
+            <Check className="h-4 w-4" />
             Testar Cron Job
           </Button>
         </div>
