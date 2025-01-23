@@ -84,6 +84,7 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
   const { data: followUp, isLoading } = useQuery({
     queryKey: ['follow-up', instanceId],
     queryFn: async () => {
+      console.log('🔄 [DEBUG] Fetching follow-up configuration')
       const { data, error } = await supabase
         .from('instance_follow_ups')
         .select('*')
@@ -115,7 +116,10 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
 
       return parsedData
     },
-    refetchInterval: (data) => data && data.is_active ? 30000 : false
+    refetchInterval: (query) => {
+      const data = query.state.data
+      return data?.is_active ? 30000 : false
+    }
   })
 
   const processFollowUpQuery = useQuery({
@@ -159,7 +163,10 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
 
       return data
     },
-    refetchInterval: followUp?.is_active ? 30000 : false,
+    refetchInterval: (query) => {
+      const data = followUp
+      return data?.is_active ? 30000 : false
+    },
     enabled: !!followUp?.is_active
   })
 
@@ -602,4 +609,3 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
     </div>
   )
 }
-
