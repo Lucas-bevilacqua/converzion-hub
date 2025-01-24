@@ -111,7 +111,6 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
 
   console.log('🔄 [DEBUG] FollowUpSection - Iniciando com instanceId:', instanceId)
 
-  // Query to fetch follow-up configuration
   const { data: followUp, isLoading } = useQuery({
     queryKey: ['follow-up', instanceId],
     queryFn: async () => {
@@ -334,7 +333,6 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
     }
   })
 
-  // Add mutation to reset execution count
   const resetExecutionMutation = useMutation({
     mutationFn: async () => {
       console.log('🔄 Resetting execution count for follow-up')
@@ -365,7 +363,6 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
     }
   })
 
-  // Improved connection status check with detailed logging
   const isInstanceConnected = (instance?: { connection_status?: string | null }) => {
     console.log('🔍 Checking instance connection status:', {
       rawStatus: instance?.connection_status,
@@ -389,7 +386,6 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
     return isConnected;
   };
 
-  // Modified FollowUpStatus component with timezone handling
   const FollowUpStatus = () => {
     if (!followUp) {
       console.log('❌ No follow-up data available');
