@@ -19,7 +19,7 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    // Buscar follow-ups ativos que precisam ser processados
+    // Buscar follow-ups ativos
     const { data: followUps, error: followUpsError } = await supabaseClient
       .from('follow_ups')
       .select(`
@@ -32,33 +32,38 @@ serve(async (req) => {
         )
       `)
       .eq('status', 'pending')
-      .lt('scheduled_for', new Date().toISOString())
+      .is('completed_at', null)
+      .lte('scheduled_for', new Date().toISOString())
 
     if (followUpsError) {
       console.error('❌ [ERROR] Erro ao buscar follow-ups:', followUpsError)
       throw followUpsError
     }
 
-    console.log(`✅ [DEBUG] Follow-ups encontrados: ${followUps?.length || 0}`)
-    console.log('📊 [DEBUG] Detalhes dos follow-ups:', followUps)
+    console.log('✅ [DEBUG] Follow-ups encontrados:', followUps?.length || 0)
 
-    // Filtrar follow-ups com instâncias conectadas
-    const validFollowUps = followUps?.filter(followUp => 
-      followUp.instance?.connection_status === 'connected'
+    // Filtrar follow-ups válidos (com instâncias conectadas)
+    const validFollowUps = followUps?.filter(f => 
+      f.instance?.connection_status?.toLowerCase() === 'connected'
     ) || []
 
-    console.log(`🔍 [DEBUG] Follow-ups válidos (com instâncias conectadas): ${validFollowUps.length}`)
+    console.log('🔍 [INFO] Razões possíveis para não encontrar follow-ups:')
+    console.log('- Instâncias estão desconectadas')
+    console.log('- Data agendada ainda não chegou')
+    console.log('- Follow-ups não estão com status "pending"')
     
+    console.log('🔎 [DEBUG] Follow-ups válidos (com instâncias conectadas):', validFollowUps.length)
+    console.log('📋 [DEBUG] Detalhes dos follow-ups:', followUps)
+
     if (validFollowUps.length === 0) {
-      console.log('ℹ️ [INFO] Razões possíveis para não encontrar follow-ups:')
-      console.log('- Follow-ups não estão com status "pending"')
-      console.log('- Data agendada ainda não chegou')
-      console.log('- Instâncias estão desconectadas')
-      
       return new Response(
         JSON.stringify({ 
           message: 'Nenhum follow-up para processar',
-          timestamp: new Date().toISOString()
+          details: {
+            total: followUps?.length || 0,
+            valid: 0,
+            timestamp: new Date().toISOString()
+          }
         }),
         { 
           headers: { 
@@ -73,8 +78,6 @@ serve(async (req) => {
     const results = await Promise.all(
       validFollowUps.map(async (followUp) => {
         try {
-          console.log(`🔄 [DEBUG] Processando follow-up ${followUp.id} para instância ${followUp.instance?.name}`)
-          
           // Buscar mensagens do follow-up
           const { data: messages, error: messagesError } = await supabaseClient
             .from('follow_up_messages')
@@ -83,8 +86,6 @@ serve(async (req) => {
             .order('delay_minutes', { ascending: true })
 
           if (messagesError) throw messagesError
-
-          console.log(`📨 [DEBUG] Mensagens encontradas para follow-up ${followUp.id}:`, messages?.length || 0)
 
           // Atualizar status do follow-up
           const { error: updateError } = await supabaseClient
@@ -99,21 +100,21 @@ serve(async (req) => {
 
           return {
             followUpId: followUp.id,
-            status: 'success',
+            instanceId: followUp.instance_id,
+            status: 'processed',
             messages: messages?.length || 0
           }
         } catch (error) {
           console.error(`❌ [ERROR] Erro ao processar follow-up ${followUp.id}:`, error)
           return {
             followUpId: followUp.id,
+            instanceId: followUp.instance_id,
             status: 'error',
             error: error.message
           }
         }
       })
     )
-
-    console.log('✅ [DEBUG] Resultados do processamento:', results)
 
     return new Response(
       JSON.stringify({
@@ -132,7 +133,6 @@ serve(async (req) => {
 
   } catch (error) {
     console.error('❌ [ERROR] Erro crítico:', error)
-    
     return new Response(
       JSON.stringify({
         success: false,
