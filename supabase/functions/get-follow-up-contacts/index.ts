@@ -6,15 +6,6 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-interface FollowUpContact {
-  id: string;
-  instance_id: string;
-  execution_count: number;
-  max_attempts: number;
-  next_execution_time: string | null;
-  delay_minutes: number;
-}
-
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
@@ -27,44 +18,25 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
 
     if (!supabaseUrl || !supabaseKey) {
-      throw new Error('Missing required environment variables SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY')
+      throw new Error('Missing environment variables')
     }
 
-    const supabaseClient = createClient(supabaseUrl, supabaseKey)
+    const supabase = createClient(supabaseUrl, supabaseKey)
 
-    // Get current time in America/Sao_Paulo timezone
+    // Get current time in UTC
     const now = new Date()
-    const saoPauloOffset = -3 * 60 // UTC-3 in minutes
-    const userOffset = now.getTimezoneOffset() // Get local offset in minutes
-    const offsetDiff = saoPauloOffset - userOffset // Calculate difference
-    const saoPauloTime = new Date(now.getTime() + offsetDiff * 60 * 1000)
-    const saoPauloISO = saoPauloTime.toISOString()
-    
-    console.log('⏰ [DEBUG] Time information:', {
-      currentUTC: now.toISOString(),
-      saoPauloTime: saoPauloISO,
-      readableTime: new Date(saoPauloISO).toLocaleString('pt-BR', { 
-        timeZone: 'America/Sao_Paulo',
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit'
-      })
-    })
+    console.log('⏰ [DEBUG] Current UTC time:', now.toISOString())
 
-    // Get all active follow-ups that are due for execution
-    const { data: followUps, error: followUpsError } = await supabaseClient
+    // Fetch active follow-ups that need processing
+    const { data: followUps, error: followUpsError } = await supabase
       .from('instance_follow_ups')
       .select(`
         id,
         instance_id,
         execution_count,
         max_attempts,
-        next_execution_time,
         delay_minutes,
-        evolution_instances!inner(
+        evolution_instances!inner (
           id,
           connection_status
         )
@@ -72,7 +44,7 @@ serve(async (req) => {
       .eq('is_active', true)
       .eq('evolution_instances.connection_status', 'connected')
       .lt('execution_count', 'max_attempts')
-      .or(`next_execution_time.is.null,next_execution_time.lte.${saoPauloISO}`)
+      .or(`next_execution_time.is.null,next_execution_time.lte.${now.toISOString()}`)
 
     if (followUpsError) {
       console.error('❌ [ERROR] Error fetching follow-ups:', followUpsError)
@@ -80,121 +52,78 @@ serve(async (req) => {
     }
 
     console.log('✅ [DEBUG] Found follow-ups:', followUps?.length)
-    console.log('📊 [DEBUG] Follow-ups details:', followUps)
 
-    const results = await Promise.all(
-      (followUps ?? []).map(async (followUp: any) => {
-        try {
-          console.log('🔢 [DEBUG] Raw follow-up data:', followUp)
+    const results = []
+    
+    for (const followUp of (followUps || [])) {
+      try {
+        console.log('🔄 [DEBUG] Processing follow-up:', followUp.id)
 
-          // Convert numeric values safely
-          const executionCount = typeof followUp.execution_count === 'number' ? followUp.execution_count : 0
-          const maxAttempts = typeof followUp.max_attempts === 'number' ? followUp.max_attempts : 3
-          const delayMinutes = typeof followUp.delay_minutes === 'number' ? followUp.delay_minutes : 60
-
-          console.log('✅ [DEBUG] Numeric values before update:', {
-            executionCount,
-            maxAttempts,
-            delayMinutes
+        // Update follow-up execution count and times
+        const { error: updateError } = await supabase
+          .from('instance_follow_ups')
+          .update({
+            execution_count: (followUp.execution_count || 0) + 1,
+            last_execution_time: now.toISOString(),
+            next_execution_time: new Date(now.getTime() + ((followUp.delay_minutes || 60) * 60 * 1000)).toISOString()
           })
+          .eq('id', followUp.id)
 
-          // Calculate next execution time in São Paulo timezone
-          const nextExecutionTime = new Date(saoPauloTime.getTime() + (delayMinutes * 60 * 1000))
-          const nextExecutionISO = nextExecutionTime.toISOString()
-
-          console.log('⏰ [DEBUG] Time calculations:', {
-            followUpId: followUp.id,
-            currentSaoPauloTime: saoPauloISO,
-            delayMinutes,
-            nextExecutionTime: nextExecutionISO
-          })
-
-          const { error: updateError } = await supabaseClient
-            .from('instance_follow_ups')
-            .update({
-              execution_count: executionCount + 1,
-              last_execution_time: saoPauloISO,
-              next_execution_time: nextExecutionISO
-            })
-            .eq('id', followUp.id)
-
-          if (updateError) {
-            console.error('❌ [ERROR] Error updating follow-up:', updateError)
-            throw updateError
-          }
-
-          const { data: contacts, error: contactsError } = await supabaseClient
-            .from('instance_contacts')
-            .select('*')
-            .eq('instance_id', followUp.instance_id)
-            .eq('follow_up_status', 'pending')
-            .limit(50)
-
-          if (contactsError) {
-            console.error('❌ [ERROR] Error fetching contacts:', contactsError)
-            throw contactsError
-          }
-
-          return { 
-            success: true, 
-            followUpId: followUp.id,
-            contactsCount: contacts?.length || 0,
-            details: { 
-              executionCount: executionCount + 1, 
-              maxAttempts,
-              nextExecutionTime: nextExecutionISO,
-              currentTime: saoPauloISO
-            }
-          }
-        } catch (error) {
-          console.error('❌ [ERROR] Error processing follow-up:', error)
-          return { 
-            success: false, 
-            followUpId: followUp.id, 
-            error: error.message,
-            details: { error: error.stack }
-          }
+        if (updateError) {
+          throw updateError
         }
-      })
-    )
+
+        // Fetch pending contacts for this instance
+        const { data: contacts, error: contactsError } = await supabase
+          .from('instance_contacts')
+          .select('*')
+          .eq('instance_id', followUp.instance_id)
+          .eq('follow_up_status', 'pending')
+          .limit(50)
+
+        if (contactsError) {
+          throw contactsError
+        }
+
+        results.push({
+          success: true,
+          followUpId: followUp.id,
+          contactsCount: contacts?.length || 0,
+          executionDetails: {
+            executionTime: now.toISOString(),
+            nextExecutionTime: new Date(now.getTime() + ((followUp.delay_minutes || 60) * 60 * 1000)).toISOString()
+          }
+        })
+
+      } catch (error) {
+        console.error(`❌ [ERROR] Error processing follow-up ${followUp.id}:`, error)
+        results.push({
+          success: false,
+          followUpId: followUp.id,
+          error: error.message
+        })
+      }
+    }
 
     return new Response(
-      JSON.stringify({ 
-        success: true, 
+      JSON.stringify({
+        success: true,
         results,
-        timestamp: saoPauloISO,
-        readableTimestamp: new Date(saoPauloISO).toLocaleString('pt-BR', { 
-          timeZone: 'America/Sao_Paulo',
-          day: '2-digit',
-          month: '2-digit',
-          year: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit',
-          second: '2-digit'
-        })
+        timestamp: now.toISOString()
       }),
-      { 
-        headers: { 
-          ...corsHeaders, 
-          'Content-Type': 'application/json' 
-        } 
-      }
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
 
   } catch (error) {
     console.error('❌ [ERROR] Unhandled error:', error)
     return new Response(
-      JSON.stringify({ 
-        success: false, 
-        error: error.message,
-        details: error.stack
+      JSON.stringify({
+        success: false,
+        error: error.message
       }),
       { 
-        headers: { 
-          ...corsHeaders, 
-          'Content-Type': 'application/json' 
-        }, 
-        status: 500 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 500
       }
     )
   }
