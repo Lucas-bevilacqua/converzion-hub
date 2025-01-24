@@ -1,19 +1,9 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
-
-interface FollowUp {
-  id: string
-  instance_id: string
-  status: string
-  type: string
-  settings: {
-    is_active: boolean
-  }
 }
 
 serve(async (req) => {
@@ -22,134 +12,139 @@ serve(async (req) => {
   }
 
   try {
-    console.log('🔄 [DEBUG] Starting follow-up contacts processing')
+    console.log('🔄 [DEBUG] Iniciando busca de follow-ups')
+    
+    const supabaseClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    )
 
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
-
-    if (!supabaseUrl || !supabaseKey) {
-      throw new Error('Missing environment variables')
-    }
-
-    const supabase = createClient(supabaseUrl, supabaseKey)
-
-    // Get current time in UTC
-    const now = new Date()
-    console.log('⏰ [DEBUG] Current UTC time:', now.toISOString())
-
-    // Fetch active follow-ups that need processing
-    const { data: followUps, error: followUpsError } = await supabase
+    // Buscar follow-ups ativos que precisam ser processados
+    const { data: followUps, error: followUpsError } = await supabaseClient
       .from('follow_ups')
       .select(`
-        id,
-        instance_id,
-        status,
-        type,
-        settings,
-        evolution_instances!inner (
+        *,
+        instance:evolution_instances (
           id,
-          connection_status
+          name,
+          connection_status,
+          user_id
         )
       `)
       .eq('status', 'pending')
-      .eq('evolution_instances.connection_status', 'connected')
+      .lt('scheduled_for', new Date().toISOString())
 
     if (followUpsError) {
-      console.error('❌ [ERROR] Error fetching follow-ups:', followUpsError)
+      console.error('❌ [ERROR] Erro ao buscar follow-ups:', followUpsError)
       throw followUpsError
     }
 
-    // Log the number of follow-ups found
-    const followUpsCount = followUps?.length || 0
-    console.log(`✅ [DEBUG] Found ${followUpsCount} follow-ups to process`)
+    console.log(`✅ [DEBUG] Follow-ups encontrados: ${followUps?.length || 0}`)
+    console.log('📊 [DEBUG] Detalhes dos follow-ups:', followUps)
 
-    // If no follow-ups found, return early with a success response
-    if (followUpsCount === 0) {
+    // Filtrar follow-ups com instâncias conectadas
+    const validFollowUps = followUps?.filter(followUp => 
+      followUp.instance?.connection_status === 'connected'
+    ) || []
+
+    console.log(`🔍 [DEBUG] Follow-ups válidos (com instâncias conectadas): ${validFollowUps.length}`)
+    
+    if (validFollowUps.length === 0) {
+      console.log('ℹ️ [INFO] Razões possíveis para não encontrar follow-ups:')
+      console.log('- Follow-ups não estão com status "pending"')
+      console.log('- Data agendada ainda não chegou')
+      console.log('- Instâncias estão desconectadas')
+      
       return new Response(
-        JSON.stringify({
-          success: true,
-          results: [],
-          message: 'No pending follow-ups found to process',
-          timestamp: now.toISOString()
+        JSON.stringify({ 
+          message: 'Nenhum follow-up para processar',
+          timestamp: new Date().toISOString()
         }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        { 
+          headers: { 
+            ...corsHeaders,
+            'Content-Type': 'application/json'
+          }
+        }
       )
     }
 
-    const results = []
-    
-    for (const followUp of (followUps || [])) {
-      try {
-        console.log('🔄 [DEBUG] Processing follow-up:', followUp)
+    // Processar cada follow-up válido
+    const results = await Promise.all(
+      validFollowUps.map(async (followUp) => {
+        try {
+          console.log(`🔄 [DEBUG] Processando follow-up ${followUp.id} para instância ${followUp.instance?.name}`)
+          
+          // Buscar mensagens do follow-up
+          const { data: messages, error: messagesError } = await supabaseClient
+            .from('follow_up_messages')
+            .select('*')
+            .eq('follow_up_id', followUp.id)
+            .order('delay_minutes', { ascending: true })
 
-        // Update follow-up status to in_progress
-        const { error: updateError } = await supabase
-          .from('follow_ups')
-          .update({
-            status: 'in_progress',
-            updated_at: now.toISOString()
-          })
-          .eq('id', followUp.id)
+          if (messagesError) throw messagesError
 
-        if (updateError) {
-          console.error('❌ [ERROR] Error updating follow-up:', updateError)
-          throw updateError
-        }
+          console.log(`📨 [DEBUG] Mensagens encontradas para follow-up ${followUp.id}:`, messages?.length || 0)
 
-        // Fetch pending contacts for this follow-up
-        const { data: contacts, error: contactsError } = await supabase
-          .from('follow_up_contacts')
-          .select('*')
-          .eq('follow_up_id', followUp.id)
-          .eq('status', 'pending')
-          .limit(50)
+          // Atualizar status do follow-up
+          const { error: updateError } = await supabaseClient
+            .from('follow_ups')
+            .update({ 
+              status: 'in_progress',
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', followUp.id)
 
-        if (contactsError) {
-          console.error('❌ [ERROR] Error fetching contacts:', contactsError)
-          throw contactsError
-        }
+          if (updateError) throw updateError
 
-        console.log(`✅ [DEBUG] Found ${contacts?.length || 0} contacts to process for follow-up ${followUp.id}`)
-
-        results.push({
-          success: true,
-          followUpId: followUp.id,
-          contactsCount: contacts?.length || 0,
-          executionDetails: {
-            executionTime: now.toISOString(),
-            status: 'in_progress'
+          return {
+            followUpId: followUp.id,
+            status: 'success',
+            messages: messages?.length || 0
           }
-        })
+        } catch (error) {
+          console.error(`❌ [ERROR] Erro ao processar follow-up ${followUp.id}:`, error)
+          return {
+            followUpId: followUp.id,
+            status: 'error',
+            error: error.message
+          }
+        }
+      })
+    )
 
-      } catch (error) {
-        console.error(`❌ [ERROR] Error processing follow-up ${followUp.id}:`, error)
-        results.push({
-          success: false,
-          followUpId: followUp.id,
-          error: error.message
-        })
-      }
-    }
+    console.log('✅ [DEBUG] Resultados do processamento:', results)
 
     return new Response(
       JSON.stringify({
         success: true,
+        processed: results.length,
         results,
-        timestamp: now.toISOString()
+        timestamp: new Date().toISOString()
       }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { 
+        headers: { 
+          ...corsHeaders,
+          'Content-Type': 'application/json'
+        }
+      }
     )
 
   } catch (error) {
-    console.error('❌ [ERROR] Unhandled error:', error)
+    console.error('❌ [ERROR] Erro crítico:', error)
+    
     return new Response(
       JSON.stringify({
         success: false,
-        error: error.message
+        error: error.message,
+        timestamp: new Date().toISOString()
       }),
       { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 500
+        status: 500,
+        headers: { 
+          ...corsHeaders,
+          'Content-Type': 'application/json'
+        }
       }
     )
   }
