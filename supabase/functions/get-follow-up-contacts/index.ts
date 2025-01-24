@@ -12,10 +12,10 @@ interface FollowUpContact {
   execution_count: number;
   max_attempts: number;
   next_execution_time: string;
+  delay_minutes: number;
 }
 
 serve(async (req) => {
-  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
   }
@@ -23,22 +23,26 @@ serve(async (req) => {
   try {
     console.log('🔄 [DEBUG] Starting follow-up contacts processing')
 
-    // Get Supabase URL and key from environment variables
     const supabaseUrl = Deno.env.get('SUPABASE_URL')
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
 
-    // Validate environment variables
     if (!supabaseUrl || !supabaseKey) {
       throw new Error('Missing required environment variables SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY')
     }
 
-    // Initialize Supabase client
     const supabaseClient = createClient(supabaseUrl, supabaseKey)
 
-    // Get current time in UTC/GMT
+    // Get current time in America/Sao_Paulo timezone
     const now = new Date()
-    const nowISO = now.toISOString()
-    console.log('⏰ [DEBUG] Current UTC time:', nowISO)
+    // Convert to UTC-3 (São Paulo timezone)
+    const saoPauloTime = new Date(now.getTime() - (3 * 60 * 60 * 1000))
+    const saoPauloISO = saoPauloTime.toISOString()
+    
+    console.log('⏰ [DEBUG] Time information:', {
+      currentUTC: now.toISOString(),
+      saoPauloTime: saoPauloISO,
+      readableTime: saoPauloTime.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })
+    })
 
     // Get all active follow-ups that are due for execution
     const { data: followUps, error: followUpsError } = await supabaseClient
@@ -53,7 +57,7 @@ serve(async (req) => {
       .eq('is_active', true)
       .eq('evolution_instances.connection_status', 'connected')
       .lt('execution_count', 'max_attempts')
-      .or(`next_execution_time.is.null,next_execution_time.lte.${nowISO}`)
+      .or(`next_execution_time.is.null,next_execution_time.lte.${saoPauloISO}`)
 
     if (followUpsError) {
       console.error('❌ [ERROR] Error fetching follow-ups:', followUpsError)
@@ -63,11 +67,9 @@ serve(async (req) => {
     console.log('✅ [DEBUG] Found follow-ups:', followUps?.length)
     console.log('📊 [DEBUG] Follow-ups details:', followUps)
 
-    // Process each follow-up
     const results = await Promise.all(
       (followUps ?? []).map(async (followUp: FollowUpContact) => {
         try {
-          // Only process if execution_count is less than max_attempts
           const executionCount = Number(followUp.execution_count) || 0
           const maxAttempts = Number(followUp.max_attempts) || 3
 
@@ -81,23 +83,24 @@ serve(async (req) => {
             }
           }
 
-          // Calculate next execution time in UTC
-          const delayMinutes = followUp.delay_minutes || 60 // Default to 60 minutes if not set
-          const nextExecutionTime = new Date(now.getTime() + (delayMinutes * 60 * 1000))
+          // Calculate next execution time in São Paulo timezone
+          const delayMinutes = followUp.delay_minutes || 60
+          const nextExecutionTime = new Date(saoPauloTime.getTime() + (delayMinutes * 60 * 1000))
           const nextExecutionISO = nextExecutionTime.toISOString()
 
           console.log('⏰ [DEBUG] Time calculations:', {
             followUpId: followUp.id,
-            currentUTCTime: nowISO,
+            currentSaoPauloTime: saoPauloTime.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }),
             delayMinutes: delayMinutes,
-            nextExecutionUTC: nextExecutionISO
+            nextExecutionSaoPaulo: nextExecutionTime.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }),
+            nextExecutionISO: nextExecutionISO
           })
 
           const { error: updateError } = await supabaseClient
             .from('instance_follow_ups')
             .update({
               execution_count: executionCount + 1,
-              last_execution_time: nowISO,
+              last_execution_time: saoPauloISO,
               next_execution_time: nextExecutionISO
             })
             .eq('id', followUp.id)
@@ -107,7 +110,6 @@ serve(async (req) => {
             throw updateError
           }
 
-          // Get contacts that haven't been processed yet
           const { data: contacts, error: contactsError } = await supabaseClient
             .from('instance_contacts')
             .select('*')
@@ -128,7 +130,8 @@ serve(async (req) => {
               executionCount: executionCount + 1, 
               maxAttempts,
               nextExecutionTime: nextExecutionISO,
-              currentTime: nowISO
+              currentTime: saoPauloISO,
+              readableTime: saoPauloTime.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })
             }
           }
         } catch (error) {
@@ -147,7 +150,8 @@ serve(async (req) => {
       JSON.stringify({ 
         success: true, 
         results,
-        timestamp: nowISO
+        timestamp: saoPauloISO,
+        readableTimestamp: saoPauloTime.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })
       }),
       { 
         headers: { 
