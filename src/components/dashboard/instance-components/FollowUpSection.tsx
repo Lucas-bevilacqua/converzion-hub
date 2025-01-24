@@ -118,7 +118,13 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
       console.log('🔄 [DEBUG] Buscando configuração de follow-up para instância:', instanceId)
       const { data, error } = await supabase
         .from('instance_follow_ups')
-        .select('*')
+        .select(`
+          *,
+          instance:evolution_instances (
+            id,
+            connection_status
+          )
+        `)
         .eq('instance_id', instanceId)
         .maybeSingle()
 
@@ -131,23 +137,9 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
       console.log('⏰ [DEBUG] Última execução:', data?.last_execution_time)
       console.log('⏰ [DEBUG] Próxima execução:', data?.next_execution_time)
       console.log('📊 [DEBUG] Contagem de execuções:', data?.execution_count)
+      console.log('🔌 [DEBUG] Status da instância:', data?.instance?.connection_status)
 
-      const parsedData = {
-        ...data,
-        manual_messages: Array.isArray(data?.manual_messages) 
-          ? (data.manual_messages as Record<string, any>[]).map(msg => {
-              if (typeof msg === 'object' && msg !== null) {
-                return {
-                  message: String(msg.message || ''),
-                  delay_minutes: Number(msg.delay_minutes || 1)
-                }
-              }
-              return { message: '', delay_minutes: 1 }
-            })
-          : []
-      } as FollowUpData
-
-      return parsedData
+      return data
     }
   })
 
@@ -366,12 +358,12 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
     }
 
     const status = instance.connection_status.toLowerCase();
-    const isConnected = status.includes('connect');
+    const isConnected = status === 'connected';
     
     console.log('📊 Connection status analysis:', {
       normalizedStatus: status,
       isConnected,
-      matchType: isConnected ? 'connected found in status' : 'no match found'
+      matchType: isConnected ? 'exact match: connected' : 'no match found'
     });
 
     return isConnected;
