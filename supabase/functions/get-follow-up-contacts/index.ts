@@ -34,14 +34,24 @@ serve(async (req) => {
 
     // Get current time in America/Sao_Paulo timezone
     const now = new Date()
-    // Convert to UTC-3 (São Paulo timezone)
-    const saoPauloTime = new Date(now.getTime() - (3 * 60 * 60 * 1000))
+    const saoPauloOffset = -3 * 60 // UTC-3 in minutes
+    const userOffset = now.getTimezoneOffset() // Get local offset in minutes
+    const offsetDiff = saoPauloOffset - userOffset // Calculate difference
+    const saoPauloTime = new Date(now.getTime() + offsetDiff * 60 * 1000)
     const saoPauloISO = saoPauloTime.toISOString()
     
     console.log('⏰ [DEBUG] Time information:', {
       currentUTC: now.toISOString(),
       saoPauloTime: saoPauloISO,
-      readableTime: saoPauloTime.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })
+      readableTime: new Date(saoPauloISO).toLocaleString('pt-BR', { 
+        timeZone: 'America/Sao_Paulo',
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+      })
     })
 
     // Get all active follow-ups that are due for execution
@@ -96,9 +106,25 @@ serve(async (req) => {
 
           console.log('⏰ [DEBUG] Time calculations:', {
             followUpId: followUp.id,
-            currentSaoPauloTime: saoPauloTime.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }),
+            currentSaoPauloTime: new Date(saoPauloISO).toLocaleString('pt-BR', { 
+              timeZone: 'America/Sao_Paulo',
+              day: '2-digit',
+              month: '2-digit',
+              year: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit',
+              second: '2-digit'
+            }),
             delayMinutes: delayMinutes,
-            nextExecutionSaoPaulo: nextExecutionTime.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }),
+            nextExecutionSaoPaulo: new Date(nextExecutionISO).toLocaleString('pt-BR', { 
+              timeZone: 'America/Sao_Paulo',
+              day: '2-digit',
+              month: '2-digit',
+              year: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit',
+              second: '2-digit'
+            }),
             nextExecutionISO: nextExecutionISO
           })
 
@@ -137,7 +163,15 @@ serve(async (req) => {
               maxAttempts,
               nextExecutionTime: nextExecutionISO,
               currentTime: saoPauloISO,
-              readableTime: saoPauloTime.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })
+              readableTime: new Date(saoPauloISO).toLocaleString('pt-BR', { 
+                timeZone: 'America/Sao_Paulo',
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit'
+              })
             }
           }
         } catch (error) {
@@ -157,7 +191,15 @@ serve(async (req) => {
         success: true, 
         results,
         timestamp: saoPauloISO,
-        readableTimestamp: saoPauloTime.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })
+        readableTimestamp: new Date(saoPauloISO).toLocaleString('pt-BR', { 
+          timeZone: 'America/Sao_Paulo',
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit'
+        })
       }),
       { 
         headers: { 
