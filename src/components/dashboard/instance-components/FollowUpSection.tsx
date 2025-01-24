@@ -78,6 +78,28 @@ interface FormData {
   system_prompt?: string;
 }
 
+const MAX_RETRIES = 3;
+const INITIAL_DELAY = 1000;
+
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+async function retryWithBackoff<T>(
+  operation: () => Promise<T>,
+  retries: number = MAX_RETRIES,
+  delay: number = INITIAL_DELAY
+): Promise<T> {
+  try {
+    return await operation();
+  } catch (error) {
+    if (retries > 0) {
+      console.log(`🔄 [DEBUG] Retrying operation, ${retries} attempts remaining, waiting ${delay}ms`);
+      await sleep(delay);
+      return retryWithBackoff(operation, retries - 1, delay * 2);
+    }
+    throw error;
+  }
+}
+
 export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
   const { user } = useAuth()
   const { toast } = useToast()
@@ -157,7 +179,7 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
       let followUpId: string;
 
       if (followUp) {
-        const { error: updateError } = await supabase
+        const { data: updatedFollowUp, error: updateError } = await supabase
           .from('follow_ups')
           .update(followUpData)
           .eq('id', followUp.id)
@@ -182,14 +204,18 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
         const messagesData = values.manual_messages.map(msg => ({
           follow_up_id: followUpId,
           message: msg.message,
-          delay_minutes: msg.delay_minutes
+          delay_minutes: msg.delay_minutes,
+          metadata: {} // Required by the schema
         }))
 
         const { error: messagesError } = await supabase
           .from('follow_up_messages')
           .insert(messagesData)
 
-        if (messagesError) throw messagesError
+        if (messagesError) {
+          console.error('❌ [ERROR] Error inserting messages:', messagesError)
+          throw messagesError
+        }
       }
     },
     onSuccess: () => {
