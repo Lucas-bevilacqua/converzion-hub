@@ -27,8 +27,8 @@ serve(async (req) => {
         instance:evolution_instances (
           id,
           name,
-          connection_status,
-          user_id
+          user_id,
+          connection_status
         )
       `)
       .eq('status', 'pending')
