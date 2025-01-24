@@ -19,7 +19,7 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    // Get active follow-ups with pending status
+    // Get active follow-ups with pending status and is_active true
     const { data: followUps, error: followUpsError } = await supabase
       .from('follow_ups')
       .select(`
@@ -39,22 +39,74 @@ serve(async (req) => {
 
     console.log('✅ Found follow-ups:', followUps)
 
+    // Filter out follow-ups where instance is not connected
+    const activeFollowUps = followUps.filter(followUp => 
+      followUp.instance?.connection_status?.toLowerCase() === 'connected'
+    )
+
+    console.log('✅ Active follow-ups after filtering:', activeFollowUps)
+
     // Process each follow-up
-    const results = await Promise.all(followUps.map(async (followUp) => {
+    const results = await Promise.all(activeFollowUps.map(async (followUp) => {
       try {
-        // Check if instance is connected (case-insensitive)
-        const isConnected = followUp.instance?.connection_status?.toLowerCase() === 'connected'
-        
-        if (!isConnected) {
-          console.log(`⚠️ Instance ${followUp.instance_id} not connected, skipping`)
-          return {
-            followUpId: followUp.id,
-            status: 'skipped',
-            reason: 'Instance not connected'
+        // Get follow-up messages
+        const { data: messages, error: messagesError } = await supabase
+          .from('follow_up_messages')
+          .select('*')
+          .eq('follow_up_id', followUp.id)
+          .order('delay_minutes', { ascending: true })
+
+        if (messagesError) {
+          console.error(`❌ Error fetching messages for follow-up ${followUp.id}:`, messagesError)
+          throw messagesError
+        }
+
+        // Get existing contacts to avoid duplicates
+        const { data: existingContacts, error: contactsError } = await supabase
+          .from('follow_up_contacts')
+          .select('phone')
+          .eq('follow_up_id', followUp.id)
+
+        if (contactsError) {
+          console.error(`❌ Error fetching existing contacts for follow-up ${followUp.id}:`, contactsError)
+          throw contactsError
+        }
+
+        // Get potential contacts from users_clientes
+        const { data: contacts, error: usersError } = await supabase
+          .from('users_clientes')
+          .select('*')
+          .eq('nomedaempresa', followUp.instance_id)
+          .not('telefoneclientes', 'in', existingContacts.map(c => c.phone))
+
+        if (usersError) {
+          console.error(`❌ Error fetching users for follow-up ${followUp.id}:`, usersError)
+          throw usersError
+        }
+
+        console.log(`✅ Processing follow-up ${followUp.id} with ${messages.length} messages and ${contacts.length} new contacts`)
+
+        // Create follow-up contacts
+        if (contacts.length > 0) {
+          const { error: insertError } = await supabase
+            .from('follow_up_contacts')
+            .insert(contacts.map(contact => ({
+              follow_up_id: followUp.id,
+              phone: contact.telefoneclientes,
+              status: 'pending',
+              metadata: {
+                contact_name: contact.nomeclientes,
+                last_message_time: contact.last_message_time
+              }
+            })))
+
+          if (insertError) {
+            console.error(`❌ Error inserting contacts for follow-up ${followUp.id}:`, insertError)
+            throw insertError
           }
         }
 
-        // Update follow-up status to in_progress
+        // Update follow-up status
         const { error: updateError } = await supabase
           .from('follow_ups')
           .update({ 
@@ -68,24 +120,11 @@ serve(async (req) => {
           throw updateError
         }
 
-        // Get follow-up messages
-        const { data: messages, error: messagesError } = await supabase
-          .from('follow_up_messages')
-          .select('*')
-          .eq('follow_up_id', followUp.id)
-          .order('delay_minutes', { ascending: true })
-
-        if (messagesError) {
-          console.error(`❌ Error fetching messages for follow-up ${followUp.id}:`, messagesError)
-          throw messagesError
-        }
-
-        console.log(`✅ Processing follow-up ${followUp.id} with ${messages.length} messages`)
-
         return {
           followUpId: followUp.id,
           status: 'success',
-          messages: messages
+          messages: messages,
+          newContacts: contacts.length
         }
       } catch (error) {
         console.error(`❌ Error processing follow-up ${followUp.id}:`, error)
