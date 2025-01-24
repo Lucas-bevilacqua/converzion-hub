@@ -77,6 +77,9 @@ interface FollowUpData {
   last_execution_time?: string;
   next_execution_time?: string;
   execution_count?: number;
+  instance?: {
+    connection_status?: string;
+  }
 }
 
 const MAX_RETRIES = 3;
@@ -354,9 +357,8 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
   const FollowUpStatus = () => {
     if (!followUp) return null
 
-    const instance = followUp.evolution_instances
     const hasReachedMaxAttempts = followUp.execution_count >= followUp.max_attempts
-    const isDisconnected = instance?.connection_status?.toLowerCase() !== 'connected'
+    const isDisconnected = followUp.instance?.connection_status?.toLowerCase() !== 'connected'
 
     if (!followUp.is_active) {
       return (
@@ -384,7 +386,7 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
 
     if (hasReachedMaxAttempts) {
       return (
-        <Alert variant="warning" className="mb-4">
+        <Alert variant="destructive" className="mb-4">
           <AlertCircle className="h-4 w-4" />
           <AlertTitle>Máximo de Tentativas Atingido</AlertTitle>
           <AlertDescription className="flex items-center gap-2">
