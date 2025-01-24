@@ -132,30 +132,29 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
         throw error
       }
 
-      console.log('✅ [DEBUG] Dados do follow-up:', data)
-      console.log('⏰ [DEBUG] Última execução:', data?.last_execution_time)
-      console.log('⏰ [DEBUG] Próxima execução:', data?.next_execution_time)
-      console.log('📊 [DEBUG] Contagem de execuções:', data?.execution_count)
-      console.log('🔌 [DEBUG] Status da instância:', data?.instance?.connection_status)
+      console.log('✅ [DEBUG] Dados do follow-up brutos:', data)
+
+      if (!data) {
+        console.log('⚠️ [DEBUG] Nenhum follow-up encontrado para a instância')
+        return null
+      }
 
       // Parse manual_messages from Json to ManualMessage[]
-      const parsedManualMessages = Array.isArray(data?.manual_messages) 
+      const parsedManualMessages = Array.isArray(data.manual_messages) 
         ? (data.manual_messages as any[]).map(msg => ({
             message: String(msg.message || ''),
             delay_minutes: Number(msg.delay_minutes || 1)
           }))
         : [];
 
-      const parsedData: FollowUpData = {
-        ...data,
-        manual_messages: data?.manual_messages || []
-      };
+      console.log('✅ [DEBUG] Manual messages parseadas:', parsedManualMessages)
 
       return {
-        ...parsedData,
+        ...data,
         manual_messages: parsedManualMessages
-      } as unknown as FollowUpData;
-    }
+      } as FollowUpData;
+    },
+    enabled: !!instanceId
   })
 
   const processFollowUpMutation = useMutation({
