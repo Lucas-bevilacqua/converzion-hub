@@ -182,27 +182,46 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
     enabled: !!followUp?.id
   });
 
-  const deleteMessageMutation = useMutation({
-    mutationFn: async (messageId: string) => {
-      const { error } = await supabase
+  const deleteMutation = useMutation({
+    mutationFn: async () => {
+      if (!followUp?.id) throw new Error("No follow-up to delete")
+      
+      console.log('🔄 [DEBUG] Deleting follow-up:', followUp.id)
+      
+      const { error: messagesError } = await supabase
         .from('follow_up_messages')
         .delete()
-        .eq('id', messageId)
+        .eq('follow_up_id', followUp.id)
 
-      if (error) throw error
+      if (messagesError) {
+        console.error('❌ [ERROR] Error deleting follow-up messages:', messagesError)
+        throw messagesError
+      }
+
+      const { error: followUpError } = await supabase
+        .from('follow_ups')
+        .delete()
+        .eq('id', followUp.id)
+
+      if (followUpError) {
+        console.error('❌ [ERROR] Error deleting follow-up:', followUpError)
+        throw followUpError
+      }
+      
+      console.log('✅ [DEBUG] Follow-up deleted successfully')
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['follow-up-messages'] })
+      queryClient.invalidateQueries({ queryKey: ['follow-up'] })
       toast({
         title: "Sucesso",
-        description: "Mensagem removida com sucesso.",
+        description: "Follow-up excluído com sucesso.",
       })
     },
     onError: (error) => {
-      console.error('❌ [ERROR] Error deleting message:', error)
+      console.error('❌ [ERROR] Error deleting follow-up:', error)
       toast({
         title: "Erro",
-        description: "Não foi possível remover a mensagem.",
+        description: "Não foi possível excluir o follow-up.",
         variant: "destructive",
       })
     }
