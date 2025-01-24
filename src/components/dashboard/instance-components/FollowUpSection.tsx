@@ -353,13 +353,25 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
     }
   })
 
-  // Add status alert component
-  const FollowUpStatus = () => {
-    if (!followUp) return null
+  // Add status check function
+  const isInstanceConnected = (instance?: { connection_status?: string | null }) => {
+    if (!instance?.connection_status) return false;
+    return instance.connection_status.toLowerCase().includes('connect');
+  };
 
-    const hasReachedMaxAttempts = followUp.execution_count >= followUp.max_attempts
-    // Modificando a verificação para ser case-insensitive
-    const isDisconnected = !followUp.instance?.connection_status?.toLowerCase().includes('connect')
+  // Modify the FollowUpStatus component
+  const FollowUpStatus = () => {
+    if (!followUp) return null;
+
+    const hasReachedMaxAttempts = followUp.execution_count >= followUp.max_attempts;
+    const isDisconnected = !isInstanceConnected(followUp.instance);
+
+    console.log('Status check:', {
+      followUp,
+      isDisconnected,
+      connectionStatus: followUp.instance?.connection_status,
+      hasReachedMaxAttempts
+    });
 
     if (!followUp.is_active) {
       return (
@@ -370,7 +382,7 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
             Ative o follow-up para começar a enviar mensagens.
           </AlertDescription>
         </Alert>
-      )
+      );
     }
 
     if (isDisconnected) {
@@ -382,7 +394,7 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
             Conecte a instância para que os follow-ups possam ser enviados.
           </AlertDescription>
         </Alert>
-      )
+      );
     }
 
     if (hasReachedMaxAttempts) {
@@ -402,7 +414,7 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
             </Button>
           </AlertDescription>
         </Alert>
-      )
+      );
     }
 
     return (
@@ -416,7 +428,7 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
         </AlertDescription>
       </Alert>
     )
-  }
+  };
 
   return (
     <div className="space-y-6">
