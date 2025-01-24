@@ -78,28 +78,6 @@ interface FormData {
   system_prompt?: string;
 }
 
-const MAX_RETRIES = 3;
-const INITIAL_DELAY = 1000;
-
-const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
-
-async function retryWithBackoff<T>(
-  operation: () => Promise<T>,
-  retries: number = MAX_RETRIES,
-  delay: number = INITIAL_DELAY
-): Promise<T> {
-  try {
-    return await operation();
-  } catch (error) {
-    if (retries > 0) {
-      console.log(`🔄 [DEBUG] Retrying operation, ${retries} attempts remaining, waiting ${delay}ms`);
-      await sleep(delay);
-      return retryWithBackoff(operation, retries - 1, delay * 2);
-    }
-    throw error;
-  }
-}
-
 export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
   const { user } = useAuth()
   const { toast } = useToast()
@@ -162,7 +140,8 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
     mutationFn: async (values: FormData) => {
       console.log('💾 [DEBUG] Saving follow-up with values:', values)
       
-      const dataToSave = {
+      // First, create or update the follow_up record
+      const followUpData = {
         instance_id: instanceId,
         type: values.type,
         settings: {
@@ -175,29 +154,41 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
         scheduled_for: new Date().toISOString()
       }
 
-      const operation = followUp
-        ? supabase
-            .from('follow_ups')
-            .update(dataToSave)
-            .eq('id', followUp.id)
-        : supabase
-            .from('follow_ups')
-            .insert(dataToSave)
+      let followUpId: string;
 
-      const { error } = await operation
-      if (error) throw error
+      if (followUp) {
+        const { error: updateError } = await supabase
+          .from('follow_ups')
+          .update(followUpData)
+          .eq('id', followUp.id)
+          .select()
+          .single()
 
-      // Save messages if it's a manual follow-up
+        if (updateError) throw updateError
+        followUpId = followUp.id
+      } else {
+        const { data: newFollowUp, error: insertError } = await supabase
+          .from('follow_ups')
+          .insert(followUpData)
+          .select()
+          .single()
+
+        if (insertError) throw insertError
+        followUpId = newFollowUp.id
+      }
+
+      // Then, if it's a manual follow-up, save the messages
       if (values.type === 'manual' && values.manual_messages.length > 0) {
+        const messagesData = values.manual_messages.map(msg => ({
+          follow_up_id: followUpId,
+          message: msg.message,
+          delay_minutes: msg.delay_minutes
+        }))
+
         const { error: messagesError } = await supabase
           .from('follow_up_messages')
-          .insert(
-            values.manual_messages.map(msg => ({
-              follow_up_id: followUp?.id,
-              message: msg.message,
-              delay_minutes: msg.delay_minutes
-            }))
-          )
+          .insert(messagesData)
+
         if (messagesError) throw messagesError
       }
     },
