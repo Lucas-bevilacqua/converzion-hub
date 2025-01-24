@@ -389,7 +389,7 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
     return isConnected;
   };
 
-  // Modified FollowUpStatus component with enhanced logging
+  // Modified FollowUpStatus component with timezone handling
   const FollowUpStatus = () => {
     if (!followUp) {
       console.log('❌ No follow-up data available');
@@ -458,7 +458,15 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
         <AlertCircle className="h-4 w-4" />
         <AlertTitle>Follow-up Ativo</AlertTitle>
         <AlertDescription>
-          Próxima execução: {new Date(followUp.next_execution_time).toLocaleString()}
+          Próxima execução: {followUp.next_execution_time ? new Date(followUp.next_execution_time).toLocaleString('pt-BR', { 
+            timeZone: 'America/Sao_Paulo',
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit'
+          }) : '-'}
           <br />
           Execuções: {followUp.execution_count}/{followUp.max_attempts}
         </AlertDescription>
