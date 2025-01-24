@@ -158,7 +158,6 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
     }
   }, [followUp])
 
-  // Query para buscar as mensagens do follow-up
   const { data: followUpMessages = [], isLoading: isLoadingMessages } = useQuery({
     queryKey: ['follow-up-messages', followUp?.id],
     queryFn: async () => {
@@ -181,7 +180,6 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
     enabled: !!followUp?.id
   })
 
-  // Mutation para deletar uma mensagem
   const deleteMessageMutation = useMutation({
     mutationFn: async (messageId: string) => {
       const { error } = await supabase
@@ -208,7 +206,6 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
     }
   })
 
-  // Atualiza o formData quando as mensagens são carregadas
   useEffect(() => {
     if (followUpMessages.length > 0) {
       setFormData(prev => ({
@@ -225,7 +222,6 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
     mutationFn: async (values: FormData) => {
       console.log('💾 [DEBUG] Saving follow-up with values:', values)
       
-      // First, create or update the follow_up record
       const followUpData = {
         instance_id: instanceId,
         type: values.type,
@@ -262,13 +258,12 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
         followUpId = newFollowUp.id
       }
 
-      // Then, if it's a manual follow-up, save the messages
       if (values.type === 'manual' && values.manual_messages.length > 0) {
         const messagesData = values.manual_messages.map(msg => ({
           follow_up_id: followUpId,
           message: msg.message,
           delay_minutes: msg.delay_minutes,
-          metadata: {} // Required by the schema
+          metadata: {}
         }))
 
         const { error: messagesError } = await supabase
@@ -385,6 +380,44 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
     )
   }
 
+  // Adicionar mutation para deletar follow-up
+  const deleteMutation = useMutation({
+    mutationFn: async () => {
+      if (!followUp?.id) throw new Error("No follow-up to delete")
+      
+      // Primeiro deletar as mensagens associadas
+      const { error: messagesError } = await supabase
+        .from('follow_up_messages')
+        .delete()
+        .eq('follow_up_id', followUp.id)
+
+      if (messagesError) throw messagesError
+
+      // Depois deletar o follow-up
+      const { error: followUpError } = await supabase
+        .from('follow_ups')
+        .delete()
+        .eq('id', followUp.id)
+
+      if (followUpError) throw followUpError
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['follow-up'] })
+      toast({
+        title: "Sucesso",
+        description: "Follow-up excluído com sucesso.",
+      })
+    },
+    onError: (error) => {
+      console.error('❌ [ERROR] Error deleting follow-up:', error)
+      toast({
+        title: "Erro",
+        description: "Não foi possível excluir o follow-up.",
+        variant: "destructive",
+      })
+    }
+  })
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -410,6 +443,7 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
                 variant="destructive"
                 size="sm"
                 disabled={!followUp}
+                onClick={() => deleteMutation.mutate()}
               >
                 <Trash2 className="h-4 w-4 mr-2" />
                 Excluir
