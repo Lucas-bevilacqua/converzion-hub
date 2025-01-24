@@ -9,10 +9,11 @@ const corsHeaders = {
 interface FollowUp {
   id: string
   instance_id: string
-  execution_count: number
-  max_attempts: number
-  delay_minutes: number
-  is_active: boolean
+  status: string
+  type: string
+  settings: {
+    is_active: boolean
+  }
 }
 
 serve(async (req) => {
@@ -38,22 +39,20 @@ serve(async (req) => {
 
     // Fetch active follow-ups that need processing
     const { data: followUps, error: followUpsError } = await supabase
-      .from('instance_follow_ups')
+      .from('follow_ups')
       .select(`
         id,
         instance_id,
-        execution_count,
-        max_attempts,
-        delay_minutes,
-        is_active,
+        status,
+        type,
+        settings,
         evolution_instances!inner (
           id,
           connection_status
         )
       `)
-      .eq('is_active', true)
+      .eq('status', 'pending')
       .eq('evolution_instances.connection_status', 'connected')
-      .or(`next_execution_time.is.null,next_execution_time.lte.${now.toISOString()}`)
 
     if (followUpsError) {
       console.error('❌ [ERROR] Error fetching follow-ups:', followUpsError)
@@ -68,24 +67,12 @@ serve(async (req) => {
       try {
         console.log('🔄 [DEBUG] Processing follow-up:', followUp)
 
-        // Ensure numeric values are properly typed
-        const executionCount = Number(followUp.execution_count) || 0
-        const maxAttempts = Number(followUp.max_attempts) || 3
-        const delayMinutes = Number(followUp.delay_minutes) || 60
-
-        // Skip if max attempts reached
-        if (executionCount >= maxAttempts) {
-          console.log('⚠️ [DEBUG] Max attempts reached for follow-up:', followUp.id)
-          continue
-        }
-
-        // Update follow-up execution count and times
+        // Update follow-up status to in_progress
         const { error: updateError } = await supabase
-          .from('instance_follow_ups')
+          .from('follow_ups')
           .update({
-            execution_count: executionCount + 1,
-            last_execution_time: now.toISOString(),
-            next_execution_time: new Date(now.getTime() + (delayMinutes * 60 * 1000)).toISOString()
+            status: 'in_progress',
+            updated_at: now.toISOString()
           })
           .eq('id', followUp.id)
 
@@ -96,10 +83,10 @@ serve(async (req) => {
 
         // Fetch pending contacts for this instance
         const { data: contacts, error: contactsError } = await supabase
-          .from('instance_contacts')
+          .from('follow_up_contacts')
           .select('*')
-          .eq('instance_id', followUp.instance_id)
-          .eq('follow_up_status', 'pending')
+          .eq('follow_up_id', followUp.id)
+          .eq('status', 'pending')
           .limit(50)
 
         if (contactsError) {
@@ -113,9 +100,7 @@ serve(async (req) => {
           contactsCount: contacts?.length || 0,
           executionDetails: {
             executionTime: now.toISOString(),
-            nextExecutionTime: new Date(now.getTime() + (delayMinutes * 60 * 1000)).toISOString(),
-            currentExecutionCount: executionCount + 1,
-            maxAttempts: maxAttempts
+            status: 'in_progress'
           }
         })
 
