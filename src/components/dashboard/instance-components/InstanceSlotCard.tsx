@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react"
+import React, { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { MessageSquare, QrCode, Settings, LogOut, Trash2 } from "lucide-react"
@@ -7,7 +7,7 @@ import { supabase } from "@/integrations/supabase/client"
 import { useToast } from "@/components/ui/use-toast"
 import { QRCodeDialog } from "./QRCodeDialog"
 import { InstancePromptDialog } from "./InstancePromptDialog"
-import { Dialog, DialogContent } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { FollowUpSection } from "./FollowUpSection"
 
 interface InstanceSlotCardProps {
@@ -129,7 +129,7 @@ export function InstanceSlotCard({
     }
   }
 
-  const isConnected = stateData?.state === 'connected' || instance?.connection_status === 'connected'
+  const isConnected = stateData?.state === 'connected' || instance?.connection_status?.toLowerCase() === 'connected'
 
   const handleConnect = async () => {
     if (!instance?.id) return
@@ -258,6 +258,10 @@ export function InstanceSlotCard({
 
       <Dialog open={showFollowUpDialog} onOpenChange={setShowFollowUpDialog}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogTitle>Configurações de Follow-up</DialogTitle>
+          <DialogDescription>
+            Configure as mensagens e regras de follow-up para este número.
+          </DialogDescription>
           <FollowUpSection instanceId={instance?.id} />
         </DialogContent>
       </Dialog>
