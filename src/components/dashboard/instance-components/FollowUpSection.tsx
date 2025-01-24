@@ -102,11 +102,13 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
   const { toast } = useToast()
   const queryClient = useQueryClient()
 
+  console.log('🔄 [DEBUG] FollowUpSection - Iniciando com instanceId:', instanceId)
+
   // Query to fetch follow-up configuration
   const { data: followUp, isLoading } = useQuery({
     queryKey: ['follow-up', instanceId],
     queryFn: async () => {
-      console.log('🔄 [DEBUG] Fetching follow-up configuration')
+      console.log('🔄 [DEBUG] Buscando configuração de follow-up para instância:', instanceId)
       const { data, error } = await supabase
         .from('instance_follow_ups')
         .select('*')
@@ -114,11 +116,11 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
         .maybeSingle()
 
       if (error) {
-        console.error('❌ [ERROR] Error fetching follow-up:', error)
+        console.error('❌ [ERROR] Erro ao buscar follow-up:', error)
         throw error
       }
 
-      console.log('✅ [DEBUG] Follow-up data:', data)
+      console.log('✅ [DEBUG] Dados do follow-up:', data)
 
       const parsedData = {
         ...data,
