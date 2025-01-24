@@ -40,29 +40,56 @@ serve(async (req) => {
       throw followUpsError
     }
 
-    console.log(`✅ [DEBUG] Follow-ups encontrados: ${followUps?.length || 0}`)
-    console.log('📊 [DEBUG] Detalhes dos follow-ups:', followUps)
+    const totalFollowUps = followUps?.length || 0
+    console.log(`✅ [DEBUG] Follow-ups encontrados: ${totalFollowUps}`)
+    
+    if (totalFollowUps > 0) {
+      console.log('📊 [DEBUG] Detalhes dos follow-ups:', followUps)
+    }
 
     // Filtrar follow-ups com instâncias conectadas
     const validFollowUps = followUps?.filter(followUp => {
       const isConnected = followUp.instance?.connection_status?.toLowerCase() === 'connected'
-      console.log(`🔍 [DEBUG] Follow-up ${followUp.id} - Instância ${followUp.instance?.name} - Status: ${followUp.instance?.connection_status} - Válido: ${isConnected}`)
-      return isConnected
+      const isActive = followUp.settings?.is_active === true
+      const scheduledTime = new Date(followUp.scheduled_for).getTime()
+      const currentTime = new Date().getTime()
+      const isTimeToProcess = scheduledTime <= currentTime
+
+      console.log(`🔍 [DEBUG] Validando follow-up ${followUp.id}:`, {
+        isConnected,
+        isActive,
+        scheduledTime: new Date(followUp.scheduled_for).toISOString(),
+        currentTime: new Date().toISOString(),
+        isTimeToProcess,
+        connection_status: followUp.instance?.connection_status
+      })
+
+      return isConnected && isActive && isTimeToProcess
     }) || []
 
     console.log(`🔍 [DEBUG] Follow-ups válidos (com instâncias conectadas): ${validFollowUps.length}`)
-    
+
     if (validFollowUps.length === 0) {
       console.log('ℹ️ [INFO] Razões possíveis para não encontrar follow-ups:')
-      console.log('- Follow-ups não estão com status "pending"')
-      console.log('- Data agendada ainda não chegou')
-      console.log('- Instâncias estão desconectadas')
+      if (totalFollowUps === 0) {
+        console.log('- Nenhum follow-up encontrado')
+      } else {
+        if (!followUps?.some(f => f.settings?.is_active)) {
+          console.log('- Follow-ups não estão ativos')
+        }
+        if (!followUps?.some(f => new Date(f.scheduled_for).getTime() <= new Date().getTime())) {
+          console.log('- Data agendada ainda não chegou')
+        }
+        if (!followUps?.some(f => f.instance?.connection_status?.toLowerCase() === 'connected')) {
+          console.log('- Instâncias estão desconectadas')
+        }
+      }
       
       return new Response(
         JSON.stringify({ 
           message: 'Nenhum follow-up para processar',
           details: {
-            total: followUps?.length || 0,
+            total: totalFollowUps,
             valid: 0,
             timestamp: new Date().toISOString()
           }
