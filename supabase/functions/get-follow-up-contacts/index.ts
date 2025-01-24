@@ -19,7 +19,7 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    // Buscar follow-ups ativos
+    // Buscar follow-ups ativos que precisam ser processados
     const { data: followUps, error: followUpsError } = await supabaseClient
       .from('follow_ups')
       .select(`
@@ -32,30 +32,29 @@ serve(async (req) => {
         )
       `)
       .eq('status', 'pending')
-      .is('completed_at', null)
-      .lte('scheduled_for', new Date().toISOString())
+      .lt('scheduled_for', new Date().toISOString())
 
     if (followUpsError) {
       console.error('❌ [ERROR] Erro ao buscar follow-ups:', followUpsError)
       throw followUpsError
     }
 
-    console.log('✅ [DEBUG] Follow-ups encontrados:', followUps?.length || 0)
+    console.log(`✅ [DEBUG] Follow-ups encontrados: ${followUps?.length || 0}`)
+    console.log('📊 [DEBUG] Detalhes dos follow-ups:', followUps)
 
-    // Filtrar follow-ups válidos (com instâncias conectadas)
-    const validFollowUps = followUps?.filter(f => 
-      f.instance?.connection_status?.toLowerCase() === 'connected'
+    // Filtrar follow-ups com instâncias conectadas
+    const validFollowUps = followUps?.filter(followUp => 
+      followUp.instance?.connection_status?.toLowerCase() === 'connected'
     ) || []
 
-    console.log('🔍 [INFO] Razões possíveis para não encontrar follow-ups:')
-    console.log('- Instâncias estão desconectadas')
-    console.log('- Data agendada ainda não chegou')
-    console.log('- Follow-ups não estão com status "pending"')
+    console.log(`🔍 [DEBUG] Follow-ups válidos (com instâncias conectadas): ${validFollowUps.length}`)
     
-    console.log('🔎 [DEBUG] Follow-ups válidos (com instâncias conectadas):', validFollowUps.length)
-    console.log('📋 [DEBUG] Detalhes dos follow-ups:', followUps)
-
     if (validFollowUps.length === 0) {
+      console.log('ℹ️ [INFO] Razões possíveis para não encontrar follow-ups:')
+      console.log('- Follow-ups não estão com status "pending"')
+      console.log('- Data agendada ainda não chegou')
+      console.log('- Instâncias estão desconectadas')
+      
       return new Response(
         JSON.stringify({ 
           message: 'Nenhum follow-up para processar',
@@ -78,6 +77,8 @@ serve(async (req) => {
     const results = await Promise.all(
       validFollowUps.map(async (followUp) => {
         try {
+          console.log(`🔄 [DEBUG] Processando follow-up ${followUp.id} para instância ${followUp.instance?.name}`)
+          
           // Buscar mensagens do follow-up
           const { data: messages, error: messagesError } = await supabaseClient
             .from('follow_up_messages')
@@ -87,7 +88,9 @@ serve(async (req) => {
 
           if (messagesError) throw messagesError
 
-          // Atualizar status do follow-up
+          console.log(`📨 [DEBUG] Mensagens encontradas para follow-up ${followUp.id}:`, messages?.length || 0)
+
+          // Atualizar status do follow-up para in_progress
           const { error: updateError } = await supabaseClient
             .from('follow_ups')
             .update({ 
@@ -116,6 +119,8 @@ serve(async (req) => {
       })
     )
 
+    console.log('✅ [DEBUG] Resultados do processamento:', results)
+
     return new Response(
       JSON.stringify({
         success: true,
@@ -133,6 +138,7 @@ serve(async (req) => {
 
   } catch (error) {
     console.error('❌ [ERROR] Erro crítico:', error)
+    
     return new Response(
       JSON.stringify({
         success: false,
