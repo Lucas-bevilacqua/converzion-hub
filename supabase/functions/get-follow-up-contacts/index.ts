@@ -1,221 +1,210 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
+import { createClient } from '@supabase/supabase-js'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-const MAX_RETRIES = 3;
-const BATCH_SIZE = 3;
-const DELAY_BETWEEN_CONTACTS = 2000;
-const RETRY_DELAY = 2000;
-const INITIAL_DELAY = 1000;
-
-const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
-
-async function retryWithBackoff<T>(
-  operation: () => Promise<T>, 
-  retries: number = MAX_RETRIES,
-  delay: number = INITIAL_DELAY
-): Promise<T> {
-  try {
-    return await operation();
-  } catch (error) {
-    if (retries > 0) {
-      console.log(`🔄 [DEBUG] Retrying operation, ${retries} attempts remaining, waiting ${delay}ms`);
-      await sleep(delay);
-      return retryWithBackoff(operation, retries - 1, delay * 2);
-    }
-    throw error;
-  }
-}
-
 serve(async (req) => {
-  const requestId = crypto.randomUUID();
-  console.log(`[${requestId}] 🚀 Iniciando função get-follow-up-contacts`);
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders })
+  }
 
   try {
-    if (req.method === 'OPTIONS') {
-      return new Response(null, { headers: corsHeaders });
-    }
-
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    );
+    )
 
-    console.log(`[${requestId}] 🔍 Buscando follow-ups ativos...`);
-    
+    console.log('🔄 [DEBUG] Fetching follow-ups to process')
+
+    // Get all active follow-ups
     const { data: followUps, error: followUpsError } = await supabaseClient
       .from('instance_follow_ups')
-      .select(`
-        *,
-        instance:evolution_instances(
-          id,
-          name,
-          user_id,
-          connection_status
-        )
-      `)
+      .select('*, evolution_instances!inner(*)')
       .eq('is_active', true)
       .filter('execution_count', 'lt', 'max_attempts')
-      .order('last_execution_time', { ascending: true, nullsFirst: true });
+      .filter('evolution_instances.connection_status', 'eq', 'connected')
 
     if (followUpsError) {
-      console.error(`[${requestId}] ❌ Error fetching follow-ups:`, followUpsError);
-      throw followUpsError;
+      console.error('❌ [ERROR] Error fetching follow-ups:', followUpsError)
+      throw followUpsError
     }
 
-    console.log(`[${requestId}] 📊 Follow-ups encontrados:`, followUps?.length || 0);
+    console.log('✅ [DEBUG] Found follow-ups:', followUps?.length)
 
-    const processedFollowUps = [];
-    const errors = [];
+    // Process each follow-up
+    const results = await Promise.all(
+      (followUps ?? []).map(async (followUp) => {
+        try {
+          // Update execution count and time
+          const { error: updateError } = await supabaseClient
+            .from('instance_follow_ups')
+            .update({
+              execution_count: (followUp.execution_count || 0) + 1,
+              last_execution_time: new Date().toISOString()
+            })
+            .eq('id', followUp.id)
 
-    for (const followUp of (followUps || [])) {
-      try {
-        console.log(`[${requestId}] 🔄 Processando follow-up para instância ${followUp.instance?.name}`);
-        
-        const executionCount = followUp.execution_count || 0;
-        const maxAttempts = followUp.max_attempts || 3;
-        
-        console.log(`[${requestId}] 📝 Verificando tentativas:`, {
-          executionCount,
-          maxAttempts,
-          comparison: executionCount >= maxAttempts
-        });
-
-        // Skip if max attempts reached
-        if (executionCount >= maxAttempts) {
-          console.log(`[${requestId}] ⚠️ Max attempts reached for follow-up ${followUp.id}`);
-          continue;
-        }
-
-        if (!followUp.instance?.connection_status || 
-            followUp.instance.connection_status.toLowerCase() !== 'connected') {
-          console.log(`[${requestId}] ⚠️ Instância ${followUp.instance?.name} não conectada. Status: ${followUp.instance?.connection_status}`);
-          continue;
-        }
-
-        console.log(`[${requestId}] 🔍 Buscando contatos para instância ${followUp.instance_id}`);
-        
-        const { data: contacts, error: contactsError } = await supabaseClient
-          .from('Users_clientes')
-          .select('*')
-          .eq('NomeDaEmpresa', followUp.instance_id)
-          .limit(BATCH_SIZE);
-
-        if (contactsError) {
-          console.error(`[${requestId}] ❌ Erro ao buscar contatos:`, contactsError);
-          continue;
-        }
-
-        console.log(`[${requestId}] 📱 Processando ${contacts?.length || 0} contatos`);
-
-        let messageToSend = '';
-        if (followUp.follow_up_type === 'manual' && Array.isArray(followUp.manual_messages)) {
-          const currentMessage = followUp.manual_messages[executionCount];
-          if (currentMessage?.message) {
-            messageToSend = currentMessage.message;
-            console.log(`[${requestId}] 📝 Usando mensagem manual ${executionCount + 1}:`, messageToSend);
+          if (updateError) {
+            console.error('❌ [ERROR] Error updating follow-up:', updateError)
+            throw updateError
           }
-        } else {
-          messageToSend = followUp.template_message || '';
-          console.log(`[${requestId}] 📝 Usando mensagem template:`, messageToSend);
-        }
 
-        if (!messageToSend) {
-          console.log(`[${requestId}] ⚠️ Nenhuma mensagem disponível para follow-up ${followUp.id}`);
-          continue;
-        }
+          // Get contacts that haven't been processed yet
+          const { data: contacts, error: contactsError } = await supabaseClient
+            .from('instance_contacts')
+            .select('*')
+            .eq('instance_id', followUp.instance_id)
+            .eq('follow_up_status', 'pending')
+            .limit(50)
 
-        for (const contact of (contacts || [])) {
-          try {
-            await sleep(DELAY_BETWEEN_CONTACTS);
+          if (contactsError) {
+            console.error('❌ [ERROR] Error fetching contacts:', contactsError)
+            throw contactsError
+          }
 
-            console.log(`[${requestId}] 📝 Enviando mensagem para ${contact.TelefoneClientes}:`, messageToSend);
-
-            await retryWithBackoff(async () => {
-              const { error: messageError } = await supabaseClient
-                .from('chat_messages')
-                .insert({
-                  instance_id: followUp.instance_id,
-                  user_id: followUp.instance.user_id,
-                  content: messageToSend,
-                  sender_type: 'follow_up'
-                });
-
-              if (messageError) throw messageError;
-            });
-
-            await retryWithBackoff(async () => {
-              const { error: updateError } = await supabaseClient
-                .from('instance_follow_ups')
-                .update({
-                  execution_count: executionCount + 1,
-                  last_execution_time: new Date().toISOString(),
-                  next_execution_time: new Date(Date.now() + (followUp.delay_minutes * 60 * 1000)).toISOString()
+          // Process contacts based on follow-up type
+          if (followUp.follow_up_type === 'ai_generated') {
+            await Promise.all(contacts.map(async (contact) => {
+              try {
+                // Generate AI message
+                const response = await fetch('https://api.openai.com/v1/chat/completions', {
+                  method: 'POST',
+                  headers: {
+                    'Authorization': `Bearer ${Deno.env.get('OPENAI_API_KEY')}`,
+                    'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify({
+                    model: 'gpt-3.5-turbo',
+                    messages: [
+                      {
+                        role: 'system',
+                        content: followUp.system_prompt || 'You are a helpful assistant generating follow-up messages.'
+                      },
+                      {
+                        role: 'user',
+                        content: `Generate a follow-up message for a contact named ${contact.name}. The message should be friendly and professional.`
+                      }
+                    ],
+                    temperature: 0.7,
+                  }),
                 })
-                .eq('id', followUp.id);
 
-              if (updateError) throw updateError;
-            });
+                const aiResponse = await response.json()
+                const message = aiResponse.choices[0]?.message?.content
 
-            processedFollowUps.push({
-              followUpId: followUp.id,
-              status: 'success',
-              contact: contact.TelefoneClientes
-            });
+                if (!message) {
+                  throw new Error('No message generated by AI')
+                }
 
-          } catch (error) {
-            console.error(`[${requestId}] ❌ Erro ao processar contato:`, error);
-            errors.push({
-              followUpId: followUp.id,
-              contactId: contact.id,
-              error: error.message
-            });
+                // Send message via WhatsApp API
+                const whatsappResponse = await fetch(`${Deno.env.get('WHATSAPP_API_URL')}/send-message`, {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${followUp.evolution_instances.auth_token}`
+                  },
+                  body: JSON.stringify({
+                    phone: contact.phone_number,
+                    message: message
+                  })
+                })
+
+                if (!whatsappResponse.ok) {
+                  throw new Error('Failed to send WhatsApp message')
+                }
+
+                // Update contact status
+                await supabaseClient
+                  .from('instance_contacts')
+                  .update({
+                    follow_up_status: 'completed',
+                    last_message_sent: message,
+                    last_message_time: new Date().toISOString()
+                  })
+                  .eq('id', contact.id)
+
+              } catch (error) {
+                console.error('❌ [ERROR] Error processing AI contact:', error)
+                await supabaseClient
+                  .from('instance_contacts')
+                  .update({
+                    follow_up_status: 'failed',
+                    error_message: error.message
+                  })
+                  .eq('id', contact.id)
+              }
+            }))
+          } else {
+            // Process manual follow-ups
+            const messages = followUp.manual_messages || []
+            await Promise.all(contacts.map(async (contact) => {
+              try {
+                for (const msgConfig of messages) {
+                  // Send message via WhatsApp API
+                  const whatsappResponse = await fetch(`${Deno.env.get('WHATSAPP_API_URL')}/send-message`, {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json',
+                      'Authorization': `Bearer ${followUp.evolution_instances.auth_token}`
+                    },
+                    body: JSON.stringify({
+                      phone: contact.phone_number,
+                      message: msgConfig.message
+                    })
+                  })
+
+                  if (!whatsappResponse.ok) {
+                    throw new Error('Failed to send WhatsApp message')
+                  }
+
+                  // Wait for specified delay before sending next message
+                  await new Promise(resolve => setTimeout(resolve, msgConfig.delay_minutes * 60 * 1000))
+                }
+
+                // Update contact status after all messages sent
+                await supabaseClient
+                  .from('instance_contacts')
+                  .update({
+                    follow_up_status: 'completed',
+                    last_message_sent: messages[messages.length - 1]?.message,
+                    last_message_time: new Date().toISOString()
+                  })
+                  .eq('id', contact.id)
+
+              } catch (error) {
+                console.error('❌ [ERROR] Error processing manual contact:', error)
+                await supabaseClient
+                  .from('instance_contacts')
+                  .update({
+                    follow_up_status: 'failed',
+                    error_message: error.message
+                  })
+                  .eq('id', contact.id)
+              }
+            }))
           }
-        }
 
-      } catch (error) {
-        console.error(`[${requestId}] ❌ Error processing follow-up:`, error);
-        errors.push({
-          followUpId: followUp.id,
-          error: error.message
-        });
-      }
-    }
+          return { success: true, followUpId: followUp.id }
+        } catch (error) {
+          console.error('❌ [ERROR] Error processing follow-up:', error)
+          return { success: false, followUpId: followUp.id, error }
+        }
+      })
+    )
 
     return new Response(
-      JSON.stringify({
-        success: true,
-        processed: processedFollowUps.length,
-        errors: errors.length,
-        results: [...processedFollowUps, ...errors]
-      }),
-      { 
-        headers: { 
-          ...corsHeaders,
-          'Content-Type': 'application/json'
-        }
-      }
-    );
+      JSON.stringify({ success: true, results }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    )
+
   } catch (error) {
-    console.error(`[${requestId}] ❌ Fatal error:`, error);
-    
+    console.error('❌ [ERROR] Unhandled error:', error)
     return new Response(
-      JSON.stringify({
-        success: false,
-        error: error.message,
-        request_id: requestId
-      }),
-      { 
-        status: 500,
-        headers: { 
-          ...corsHeaders,
-          'Content-Type': 'application/json'
-        }
-      }
-    );
+      JSON.stringify({ success: false, error: error.message }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
+    )
   }
-});
+})
