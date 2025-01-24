@@ -1,9 +1,15 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+}
+
+interface FollowUpContact {
+  id: string;
+  instance_id: string;
+  execution_count: number;
+  max_attempts: number;
 }
 
 serve(async (req) => {
@@ -25,7 +31,6 @@ serve(async (req) => {
       .from('instance_follow_ups')
       .select('*, evolution_instances!inner(*)')
       .eq('is_active', true)
-      .lt('execution_count', 'max_attempts')
       .filter('evolution_instances.connection_status', 'eq', 'connected')
 
     if (followUpsError) {
@@ -37,8 +42,18 @@ serve(async (req) => {
 
     // Process each follow-up
     const results = await Promise.all(
-      (followUps ?? []).map(async (followUp) => {
+      (followUps ?? []).map(async (followUp: FollowUpContact) => {
         try {
+          // Only process if execution_count is less than max_attempts
+          if (followUp.execution_count >= followUp.max_attempts) {
+            console.log(`⏭️ [DEBUG] Skipping follow-up ${followUp.id} - max attempts reached`)
+            return {
+              success: false,
+              followUpId: followUp.id,
+              reason: 'max_attempts_reached'
+            }
+          }
+
           // Update execution count and time
           const { error: updateError } = await supabaseClient
             .from('instance_follow_ups')
@@ -66,24 +81,50 @@ serve(async (req) => {
             throw contactsError
           }
 
-          return { success: true, followUpId: followUp.id }
+          return { 
+            success: true, 
+            followUpId: followUp.id,
+            contactsCount: contacts?.length || 0
+          }
         } catch (error) {
           console.error('❌ [ERROR] Error processing follow-up:', error)
-          return { success: false, followUpId: followUp.id, error }
+          return { 
+            success: false, 
+            followUpId: followUp.id, 
+            error: error.message 
+          }
         }
       })
     )
 
     return new Response(
-      JSON.stringify({ success: true, results }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      JSON.stringify({ 
+        success: true, 
+        results,
+        timestamp: new Date().toISOString()
+      }),
+      { 
+        headers: { 
+          ...corsHeaders, 
+          'Content-Type': 'application/json' 
+        } 
+      }
     )
 
   } catch (error) {
     console.error('❌ [ERROR] Unhandled error:', error)
     return new Response(
-      JSON.stringify({ success: false, error: error.message }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
+      JSON.stringify({ 
+        success: false, 
+        error: error.message 
+      }),
+      { 
+        headers: { 
+          ...corsHeaders, 
+          'Content-Type': 'application/json' 
+        }, 
+        status: 500 
+      }
     )
   }
 })
