@@ -22,10 +22,17 @@ serve(async (req) => {
   try {
     console.log('🔄 [DEBUG] Starting follow-up contacts processing')
 
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    )
+    // Get Supabase URL and key from environment variables
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+
+    // Validate environment variables
+    if (!supabaseUrl || !supabaseKey) {
+      throw new Error('Missing required environment variables SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY')
+    }
+
+    // Initialize Supabase client
+    const supabaseClient = createClient(supabaseUrl, supabaseKey)
 
     // Get all active follow-ups
     const { data: followUps, error: followUpsError } = await supabaseClient
@@ -46,12 +53,16 @@ serve(async (req) => {
       (followUps ?? []).map(async (followUp: FollowUpContact) => {
         try {
           // Only process if execution_count is less than max_attempts
-          if (followUp.execution_count >= followUp.max_attempts) {
-            console.log(`⏭️ [DEBUG] Skipping follow-up ${followUp.id} - max attempts reached`)
+          const executionCount = Number(followUp.execution_count) || 0
+          const maxAttempts = Number(followUp.max_attempts) || 3
+
+          if (executionCount >= maxAttempts) {
+            console.log(`⏭️ [DEBUG] Skipping follow-up ${followUp.id} - max attempts reached (${executionCount}/${maxAttempts})`)
             return {
               success: false,
               followUpId: followUp.id,
-              reason: 'max_attempts_reached'
+              reason: 'max_attempts_reached',
+              details: { executionCount, maxAttempts }
             }
           }
 
@@ -59,7 +70,7 @@ serve(async (req) => {
           const { error: updateError } = await supabaseClient
             .from('instance_follow_ups')
             .update({
-              execution_count: (followUp.execution_count || 0) + 1,
+              execution_count: executionCount + 1,
               last_execution_time: new Date().toISOString()
             })
             .eq('id', followUp.id)
@@ -85,14 +96,16 @@ serve(async (req) => {
           return { 
             success: true, 
             followUpId: followUp.id,
-            contactsCount: contacts?.length || 0
+            contactsCount: contacts?.length || 0,
+            details: { executionCount: executionCount + 1, maxAttempts }
           }
         } catch (error) {
           console.error('❌ [ERROR] Error processing follow-up:', error)
           return { 
             success: false, 
             followUpId: followUp.id, 
-            error: error.message 
+            error: error.message,
+            details: { error: error.stack }
           }
         }
       })
@@ -117,7 +130,8 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({ 
         success: false, 
-        error: error.message 
+        error: error.message,
+        details: error.stack
       }),
       { 
         headers: { 
