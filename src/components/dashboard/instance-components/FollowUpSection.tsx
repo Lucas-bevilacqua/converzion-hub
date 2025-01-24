@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { useToast } from "@/components/ui/use-toast"
-import { Plus, Trash2, Users, Play } from "lucide-react"
+import { Plus, Trash2, Users, Play, AlertCircle } from "lucide-react"
 import { Json } from "@/integrations/supabase/types"
 import {
   AlertDialog,
@@ -35,6 +35,7 @@ import {
   TabsTrigger,
 } from "@/components/ui/tabs"
 import { ContactsTable } from "./ContactsTable"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 
 interface FollowUpSectionProps {
   instanceId: string
@@ -318,6 +319,102 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
     }
   })
 
+  // Add mutation to reset execution count
+  const resetExecutionMutation = useMutation({
+    mutationFn: async () => {
+      console.log('🔄 Resetting execution count for follow-up')
+      const { error } = await supabase
+        .from('instance_follow_ups')
+        .update({ 
+          execution_count: 0,
+          next_execution_time: new Date().toISOString()
+        })
+        .eq('id', followUp?.id)
+
+      if (error) throw error
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['follow-up'] })
+      toast({
+        title: "Sucesso",
+        description: "Contador de execuções reiniciado.",
+      })
+    },
+    onError: (error) => {
+      console.error('Error resetting execution count:', error)
+      toast({
+        title: "Erro",
+        description: "Não foi possível reiniciar o contador.",
+        variant: "destructive",
+      })
+    }
+  })
+
+  // Add status alert component
+  const FollowUpStatus = () => {
+    if (!followUp) return null
+
+    const instance = followUp.evolution_instances
+    const hasReachedMaxAttempts = followUp.execution_count >= followUp.max_attempts
+    const isDisconnected = instance?.connection_status?.toLowerCase() !== 'connected'
+
+    if (!followUp.is_active) {
+      return (
+        <Alert className="mb-4">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Follow-up Inativo</AlertTitle>
+          <AlertDescription>
+            Ative o follow-up para começar a enviar mensagens.
+          </AlertDescription>
+        </Alert>
+      )
+    }
+
+    if (isDisconnected) {
+      return (
+        <Alert variant="destructive" className="mb-4">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Instância Desconectada</AlertTitle>
+          <AlertDescription>
+            Conecte a instância para que os follow-ups possam ser enviados.
+          </AlertDescription>
+        </Alert>
+      )
+    }
+
+    if (hasReachedMaxAttempts) {
+      return (
+        <Alert variant="warning" className="mb-4">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Máximo de Tentativas Atingido</AlertTitle>
+          <AlertDescription className="flex items-center gap-2">
+            O follow-up atingiu o número máximo de tentativas.
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={() => resetExecutionMutation.mutate()}
+              disabled={resetExecutionMutation.isPending}
+            >
+              Reiniciar Contador
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )
+    }
+
+    return (
+      <Alert variant="default" className="mb-4">
+        <AlertCircle className="h-4 w-4" />
+        <AlertTitle>Follow-up Ativo</AlertTitle>
+        <AlertDescription>
+          Próxima execução: {new Date(followUp.next_execution_time).toLocaleString()}
+          <br />
+          Execuções: {followUp.execution_count}/{followUp.max_attempts}
+        </AlertDescription>
+      </Alert>
+    )
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -373,6 +470,8 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
           />
         </div>
       </div>
+
+      <FollowUpStatus />
 
       <Tabs defaultValue="settings">
         <TabsList>
@@ -566,4 +665,3 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
     </div>
   )
 }
-
