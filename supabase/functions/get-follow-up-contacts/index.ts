@@ -85,10 +85,10 @@ serve(async (req) => {
     const results = await Promise.all(
       (followUps ?? []).map(async (followUp: FollowUpContact) => {
         try {
-          // Ensure numeric values are properly converted
-          const executionCount = parseInt(String(followUp.execution_count || '0'), 10)
-          const maxAttempts = parseInt(String(followUp.max_attempts || '3'), 10)
-          const delayMinutes = parseInt(String(followUp.delay_minutes || '60'), 10)
+          // Ensure numeric values are properly handled
+          const executionCount = Number(followUp.execution_count) || 0
+          const maxAttempts = Number(followUp.max_attempts) || 3
+          const delayMinutes = Number(followUp.delay_minutes) || 60
 
           console.log('🔢 [DEBUG] Numeric values:', {
             executionCount,
@@ -124,7 +124,7 @@ serve(async (req) => {
               minute: '2-digit',
               second: '2-digit'
             }),
-            delayMinutes: delayMinutes,
+            delayMinutes,
             nextExecutionSaoPaulo: new Date(nextExecutionISO).toLocaleString('pt-BR', { 
               timeZone: 'America/Sao_Paulo',
               day: '2-digit',
@@ -134,7 +134,7 @@ serve(async (req) => {
               minute: '2-digit',
               second: '2-digit'
             }),
-            nextExecutionISO: nextExecutionISO
+            nextExecutionISO
           })
 
           const { error: updateError } = await supabaseClient
