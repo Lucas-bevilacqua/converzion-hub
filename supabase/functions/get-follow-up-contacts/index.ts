@@ -59,7 +59,22 @@ serve(async (req) => {
       throw followUpsError
     }
 
-    console.log('✅ [DEBUG] Found follow-ups:', followUps?.length)
+    // Log the number of follow-ups found
+    const followUpsCount = followUps?.length || 0
+    console.log(`✅ [DEBUG] Found ${followUpsCount} follow-ups to process`)
+
+    // If no follow-ups found, return early with a success response
+    if (followUpsCount === 0) {
+      return new Response(
+        JSON.stringify({
+          success: true,
+          results: [],
+          message: 'No pending follow-ups found to process',
+          timestamp: now.toISOString()
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
 
     const results = []
     
@@ -81,7 +96,7 @@ serve(async (req) => {
           throw updateError
         }
 
-        // Fetch pending contacts for this instance
+        // Fetch pending contacts for this follow-up
         const { data: contacts, error: contactsError } = await supabase
           .from('follow_up_contacts')
           .select('*')
@@ -93,6 +108,8 @@ serve(async (req) => {
           console.error('❌ [ERROR] Error fetching contacts:', contactsError)
           throw contactsError
         }
+
+        console.log(`✅ [DEBUG] Found ${contacts?.length || 0} contacts to process for follow-up ${followUp.id}`)
 
         results.push({
           success: true,
