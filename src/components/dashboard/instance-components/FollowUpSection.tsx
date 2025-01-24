@@ -83,7 +83,7 @@ interface FollowUpData {
 }
 
 const MAX_RETRIES = 3;
-const INITIAL_DELAY = 1000; // 1 second
+const INITIAL_DELAY = 1000;
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
