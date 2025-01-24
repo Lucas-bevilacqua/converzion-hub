@@ -11,6 +11,7 @@ interface FollowUpContact {
   instance_id: string;
   execution_count: number;
   max_attempts: number;
+  next_execution_time: string;
 }
 
 serve(async (req) => {
@@ -34,12 +35,14 @@ serve(async (req) => {
     // Initialize Supabase client
     const supabaseClient = createClient(supabaseUrl, supabaseKey)
 
-    // Get all active follow-ups
+    // Get all active follow-ups that are due for execution
     const { data: followUps, error: followUpsError } = await supabaseClient
       .from('instance_follow_ups')
       .select('*, evolution_instances!inner(*)')
       .eq('is_active', true)
       .filter('evolution_instances.connection_status', 'eq', 'connected')
+      .filter('execution_count', 'lt', 'max_attempts')
+      .or(`next_execution_time.is.null,next_execution_time.lte.${new Date().toISOString()}`)
 
     if (followUpsError) {
       console.error('❌ [ERROR] Error fetching follow-ups:', followUpsError)
@@ -47,6 +50,7 @@ serve(async (req) => {
     }
 
     console.log('✅ [DEBUG] Found follow-ups:', followUps?.length)
+    console.log('📊 [DEBUG] Follow-ups details:', followUps)
 
     // Process each follow-up
     const results = await Promise.all(
@@ -67,11 +71,13 @@ serve(async (req) => {
           }
 
           // Update execution count and time
+          const now = new Date()
           const { error: updateError } = await supabaseClient
             .from('instance_follow_ups')
             .update({
               execution_count: executionCount + 1,
-              last_execution_time: new Date().toISOString()
+              last_execution_time: now.toISOString(),
+              next_execution_time: new Date(now.getTime() + (followUp.delay_minutes * 60000)).toISOString()
             })
             .eq('id', followUp.id)
 
@@ -97,7 +103,11 @@ serve(async (req) => {
             success: true, 
             followUpId: followUp.id,
             contactsCount: contacts?.length || 0,
-            details: { executionCount: executionCount + 1, maxAttempts }
+            details: { 
+              executionCount: executionCount + 1, 
+              maxAttempts,
+              nextExecutionTime: new Date(now.getTime() + (followUp.delay_minutes * 60000)).toISOString()
+            }
           }
         } catch (error) {
           console.error('❌ [ERROR] Error processing follow-up:', error)
