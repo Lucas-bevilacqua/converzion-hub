@@ -35,14 +35,23 @@ serve(async (req) => {
     // Initialize Supabase client
     const supabaseClient = createClient(supabaseUrl, supabaseKey)
 
+    const now = new Date().toISOString()
+    console.log('⏰ [DEBUG] Current time:', now)
+
     // Get all active follow-ups that are due for execution
     const { data: followUps, error: followUpsError } = await supabaseClient
       .from('instance_follow_ups')
-      .select('*, evolution_instances!inner(*)')
+      .select(`
+        *,
+        evolution_instances!inner(
+          id,
+          connection_status
+        )
+      `)
       .eq('is_active', true)
-      .filter('evolution_instances.connection_status', 'eq', 'connected')
-      .filter('execution_count', 'lt', 'max_attempts')
-      .or(`next_execution_time.is.null,next_execution_time.lte.${new Date().toISOString()}`)
+      .eq('evolution_instances.connection_status', 'connected')
+      .lt('execution_count', 'max_attempts')
+      .or(`next_execution_time.is.null,next_execution_time.lte.${now}`)
 
     if (followUpsError) {
       console.error('❌ [ERROR] Error fetching follow-ups:', followUpsError)
@@ -72,12 +81,22 @@ serve(async (req) => {
 
           // Update execution count and time
           const now = new Date()
+          const nextExecutionTime = new Date(now.getTime() + (followUp.delay_minutes * 60000))
+          
+          console.log('⏰ [DEBUG] Updating follow-up timing:', {
+            followUpId: followUp.id,
+            currentCount: executionCount,
+            newCount: executionCount + 1,
+            lastExecutionTime: now.toISOString(),
+            nextExecutionTime: nextExecutionTime.toISOString()
+          })
+
           const { error: updateError } = await supabaseClient
             .from('instance_follow_ups')
             .update({
               execution_count: executionCount + 1,
               last_execution_time: now.toISOString(),
-              next_execution_time: new Date(now.getTime() + (followUp.delay_minutes * 60000)).toISOString()
+              next_execution_time: nextExecutionTime.toISOString()
             })
             .eq('id', followUp.id)
 
@@ -106,7 +125,7 @@ serve(async (req) => {
             details: { 
               executionCount: executionCount + 1, 
               maxAttempts,
-              nextExecutionTime: new Date(now.getTime() + (followUp.delay_minutes * 60000)).toISOString()
+              nextExecutionTime: nextExecutionTime.toISOString()
             }
           }
         } catch (error) {
