@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { useToast } from "@/components/ui/use-toast"
-import { Plus, Trash2, Users, Play, AlertCircle } from "lucide-react"
+import { Plus, Trash2, Users, Play, AlertCircle, Edit } from "lucide-react"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -158,6 +158,69 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
     }
   }, [followUp])
 
+  // Query para buscar as mensagens do follow-up
+  const { data: followUpMessages = [], isLoading: isLoadingMessages } = useQuery({
+    queryKey: ['follow-up-messages', followUp?.id],
+    queryFn: async () => {
+      if (!followUp?.id) return []
+      
+      const { data, error } = await supabase
+        .from('follow_up_messages')
+        .select('*')
+        .eq('follow_up_id', followUp.id)
+        .order('delay_minutes', { ascending: true })
+
+      if (error) {
+        console.error('❌ [ERROR] Error fetching follow-up messages:', error)
+        throw error
+      }
+
+      console.log('✅ [DEBUG] Follow-up messages loaded:', data)
+      return data
+    },
+    enabled: !!followUp?.id
+  })
+
+  // Mutation para deletar uma mensagem
+  const deleteMessageMutation = useMutation({
+    mutationFn: async (messageId: string) => {
+      const { error } = await supabase
+        .from('follow_up_messages')
+        .delete()
+        .eq('id', messageId)
+
+      if (error) throw error
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['follow-up-messages'] })
+      toast({
+        title: "Sucesso",
+        description: "Mensagem removida com sucesso.",
+      })
+    },
+    onError: (error) => {
+      console.error('❌ [ERROR] Error deleting message:', error)
+      toast({
+        title: "Erro",
+        description: "Não foi possível remover a mensagem.",
+        variant: "destructive",
+      })
+    }
+  })
+
+  // Atualiza o formData quando as mensagens são carregadas
+  useEffect(() => {
+    if (followUpMessages.length > 0) {
+      setFormData(prev => ({
+        ...prev,
+        manual_messages: followUpMessages.map(msg => ({
+          message: msg.message,
+          delay_minutes: msg.delay_minutes
+        }))
+      }))
+    }
+  }, [followUpMessages])
+
   const saveMutation = useMutation({
     mutationFn: async (values: FormData) => {
       console.log('💾 [DEBUG] Saving follow-up with values:', values)
@@ -230,42 +293,6 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
       toast({
         title: "Erro",
         description: "Não foi possível salvar as configurações. Por favor, tente novamente.",
-        variant: "destructive",
-      })
-    }
-  })
-
-  const deleteMutation = useMutation({
-    mutationFn: async () => {
-      if (!followUp?.id) return
-      
-      const { error } = await supabase
-        .from('follow_ups')
-        .delete()
-        .eq('id', followUp.id)
-
-      if (error) throw error
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['follow-up'] })
-      toast({
-        title: "Sucesso",
-        description: "Follow-up excluído com sucesso.",
-      })
-      setFormData({
-        is_active: false,
-        type: "manual",
-        stop_on_reply: true,
-        stop_on_keyword: ['comprou', 'agendou', 'agendado', 'comprado'],
-        manual_messages: [],
-        system_prompt: ''
-      })
-    },
-    onError: (error) => {
-      console.error('❌ [ERROR] Erro ao excluir follow-up:', error)
-      toast({
-        title: "Erro",
-        description: "Não foi possível excluir o follow-up.",
         variant: "destructive",
       })
     }
@@ -482,16 +509,18 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
                   <div key={index} className="space-y-2 p-4 border rounded-lg">
                     <div className="flex justify-between items-start">
                       <Label>Mensagem {index + 1}</Label>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setFormData(prev => ({
-                          ...prev,
-                          manual_messages: prev.manual_messages.filter((_, i) => i !== index)
-                        }))}
-                      >
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
+                      <div className="flex gap-2">
+                        {followUpMessages[index]?.id && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => deleteMessageMutation.mutate(followUpMessages[index].id)}
+                            disabled={deleteMessageMutation.isPending}
+                          >
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        )}
+                      </div>
                     </div>
                     <Textarea
                       value={msg.message}
@@ -522,31 +551,6 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
               </div>
             )}
 
-            <div className="space-y-4">
-              <div className="flex items-center gap-2">
-                <Switch
-                  checked={formData.stop_on_reply}
-                  onCheckedChange={(checked) => setFormData(prev => ({ ...prev, stop_on_reply: checked }))}
-                />
-                <Label>Parar ao receber resposta</Label>
-              </div>
-              
-              <div className="grid gap-2">
-                <Label>Palavras-chave para parar o follow-up</Label>
-                <Input
-                  placeholder="Ex: comprou, agendou (separadas por vírgula)"
-                  value={formData.stop_on_keyword.join(', ')}
-                  onChange={(e) => setFormData(prev => ({ 
-                    ...prev, 
-                    stop_on_keyword: e.target.value.split(',').map(k => k.trim()).filter(Boolean)
-                  }))}
-                />
-                <p className="text-sm text-muted-foreground">
-                  O follow-up será interrompido se alguma dessas palavras for detectada na resposta
-                </p>
-              </div>
-            </div>
-
             <div className="flex justify-end gap-2">
               <Button
                 variant="outline"
@@ -557,7 +561,10 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
                       type: followUp.type || "manual",
                       stop_on_reply: followUp.settings?.stop_on_reply ?? true,
                       stop_on_keyword: followUp.settings?.stop_on_keyword || ['comprou', 'agendou', 'agendado', 'comprado'],
-                      manual_messages: [],
+                      manual_messages: followUpMessages.map(msg => ({
+                        message: msg.message,
+                        delay_minutes: msg.delay_minutes
+                      })),
                       system_prompt: followUp.settings?.system_prompt || ''
                     })
                   }
@@ -567,8 +574,9 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
               </Button>
               <Button 
                 onClick={() => saveMutation.mutate(formData)}
+                disabled={saveMutation.isPending}
               >
-                Salvar
+                {saveMutation.isPending ? "Salvando..." : "Salvar"}
               </Button>
             </div>
           </div>
