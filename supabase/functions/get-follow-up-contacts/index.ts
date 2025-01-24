@@ -87,41 +87,16 @@ serve(async (req) => {
         try {
           console.log('🔢 [DEBUG] Raw follow-up data:', followUp)
 
-          // Ensure numeric values are properly converted
-          const executionCount = parseInt(followUp.execution_count?.toString() || '0')
-          const maxAttempts = parseInt(followUp.max_attempts?.toString() || '3')
-          const delayMinutes = parseInt(followUp.delay_minutes?.toString() || '60')
+          // Convert numeric values safely
+          const executionCount = typeof followUp.execution_count === 'number' ? followUp.execution_count : 0
+          const maxAttempts = typeof followUp.max_attempts === 'number' ? followUp.max_attempts : 3
+          const delayMinutes = typeof followUp.delay_minutes === 'number' ? followUp.delay_minutes : 60
 
-          // Validate the converted numbers
-          if (isNaN(executionCount) || isNaN(maxAttempts) || isNaN(delayMinutes)) {
-            console.error('❌ [ERROR] Invalid numeric values:', {
-              executionCount,
-              maxAttempts,
-              delayMinutes,
-              raw: {
-                execution_count: followUp.execution_count,
-                max_attempts: followUp.max_attempts,
-                delay_minutes: followUp.delay_minutes
-              }
-            })
-            throw new Error('Invalid numeric values in follow-up data')
-          }
-
-          console.log('✅ [DEBUG] Converted numeric values:', {
+          console.log('✅ [DEBUG] Numeric values before update:', {
             executionCount,
             maxAttempts,
             delayMinutes
           })
-
-          if (executionCount >= maxAttempts) {
-            console.log(`⏭️ [DEBUG] Skipping follow-up ${followUp.id} - max attempts reached (${executionCount}/${maxAttempts})`)
-            return {
-              success: false,
-              followUpId: followUp.id,
-              reason: 'max_attempts_reached',
-              details: { executionCount, maxAttempts }
-            }
-          }
 
           // Calculate next execution time in São Paulo timezone
           const nextExecutionTime = new Date(saoPauloTime.getTime() + (delayMinutes * 60 * 1000))
