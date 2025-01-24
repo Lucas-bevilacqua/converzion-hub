@@ -9,10 +9,10 @@ const corsHeaders = {
 interface FollowUpContact {
   id: string;
   instance_id: string;
-  execution_count: number;
-  max_attempts: number;
+  execution_count: number | null;
+  max_attempts: number | null;
   next_execution_time: string | null;
-  delay_minutes: number;
+  delay_minutes: number | null;
 }
 
 serve(async (req) => {
@@ -85,10 +85,19 @@ serve(async (req) => {
     const results = await Promise.all(
       (followUps ?? []).map(async (followUp: FollowUpContact) => {
         try {
-          // Ensure we're working with numbers
-          const executionCount = Number(followUp.execution_count || 0)
-          const maxAttempts = Number(followUp.max_attempts || 3)
-          const delayMinutes = Number(followUp.delay_minutes || 60)
+          // Ensure we're working with numbers and provide default values
+          const executionCount = followUp.execution_count === null ? 0 : Number(followUp.execution_count)
+          const maxAttempts = followUp.max_attempts === null ? 3 : Number(followUp.max_attempts)
+          const delayMinutes = followUp.delay_minutes === null ? 60 : Number(followUp.delay_minutes)
+
+          console.log('🔢 [DEBUG] Numeric values:', {
+            executionCount,
+            maxAttempts,
+            delayMinutes,
+            rawExecutionCount: followUp.execution_count,
+            rawMaxAttempts: followUp.max_attempts,
+            rawDelayMinutes: followUp.delay_minutes
+          })
 
           if (executionCount >= maxAttempts) {
             console.log(`⏭️ [DEBUG] Skipping follow-up ${followUp.id} - max attempts reached (${executionCount}/${maxAttempts})`)
