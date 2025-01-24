@@ -139,17 +139,22 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
       console.log('🔌 [DEBUG] Status da instância:', data?.instance?.connection_status)
 
       // Parse manual_messages from Json to ManualMessage[]
-      const parsedData = {
-        ...data,
-        manual_messages: Array.isArray(data?.manual_messages) 
-          ? (data.manual_messages as any[]).map(msg => ({
-              message: String(msg.message || ''),
-              delay_minutes: Number(msg.delay_minutes || 1)
-            }))
-          : []
-      } as unknown as FollowUpData
+      const parsedManualMessages = Array.isArray(data?.manual_messages) 
+        ? (data.manual_messages as any[]).map(msg => ({
+            message: String(msg.message || ''),
+            delay_minutes: Number(msg.delay_minutes || 1)
+          }))
+        : [];
 
-      return parsedData
+      const parsedData: FollowUpData = {
+        ...data,
+        manual_messages: data?.manual_messages || []
+      };
+
+      return {
+        ...parsedData,
+        manual_messages: parsedManualMessages
+      } as unknown as FollowUpData;
     }
   })
 
@@ -223,6 +228,13 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
   useEffect(() => {
     if (followUp) {
       console.log('🔄 [DEBUG] Updating form data with follow-up:', followUp)
+      const parsedManualMessages = Array.isArray(followUp.manual_messages) 
+        ? (followUp.manual_messages as any[]).map(msg => ({
+            message: String(msg.message || ''),
+            delay_minutes: Number(msg.delay_minutes || 1)
+          }))
+        : [];
+
       setFormData({
         is_active: followUp.is_active || false,
         follow_up_type: followUp.follow_up_type || "manual",
@@ -231,12 +243,7 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
         max_attempts: followUp.max_attempts || 3,
         stop_on_reply: followUp.stop_on_reply ?? true,
         stop_on_keyword: followUp.stop_on_keyword || ['comprou', 'agendou', 'agendado', 'comprado'],
-        manual_messages: Array.isArray(followUp.manual_messages) 
-          ? (followUp.manual_messages as any[]).map(msg => ({
-              message: String(msg.message || ''),
-              delay_minutes: Number(msg.delay_minutes || 1)
-            }))
-          : [],
+        manual_messages: parsedManualMessages,
         system_prompt: followUp.system_prompt || ''
       })
     }
