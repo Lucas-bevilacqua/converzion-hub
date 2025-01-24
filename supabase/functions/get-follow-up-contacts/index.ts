@@ -11,7 +11,7 @@ interface FollowUpContact {
   instance_id: string;
   execution_count: number;
   max_attempts: number;
-  next_execution_time: string;
+  next_execution_time: string | null;
   delay_minutes: number;
 }
 
@@ -76,9 +76,9 @@ serve(async (req) => {
       (followUps ?? []).map(async (followUp: FollowUpContact) => {
         try {
           // Ensure we're working with numbers
-          const executionCount = Number(followUp.execution_count) || 0
-          const maxAttempts = Number(followUp.max_attempts) || 3
-          const delayMinutes = Number(followUp.delay_minutes) || 60
+          const executionCount = parseInt(String(followUp.execution_count || 0))
+          const maxAttempts = parseInt(String(followUp.max_attempts || 3))
+          const delayMinutes = parseInt(String(followUp.delay_minutes || 60))
 
           if (executionCount >= maxAttempts) {
             console.log(`⏭️ [DEBUG] Skipping follow-up ${followUp.id} - max attempts reached (${executionCount}/${maxAttempts})`)
