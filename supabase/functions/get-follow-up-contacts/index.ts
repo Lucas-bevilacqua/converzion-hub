@@ -33,6 +33,7 @@ serve(async (req) => {
       `)
       .eq('status', 'pending')
       .is('completed_at', null)
+      .lte('scheduled_for', new Date().toISOString())
 
     if (followUpsError) {
       console.error('❌ [ERROR] Erro ao buscar follow-ups:', followUpsError)
@@ -109,6 +110,22 @@ serve(async (req) => {
     const results = await Promise.all(
       validFollowUps.map(async (followUp) => {
         try {
+          console.log(`🔄 [DEBUG] Processando follow-up ${followUp.id} para instância ${followUp.instance?.name}`)
+          
+          // Buscar mensagens do follow-up
+          const { data: messages, error: messagesError } = await supabaseClient
+            .from('follow_up_messages')
+            .select('*')
+            .eq('follow_up_id', followUp.id)
+            .order('delay_minutes', { ascending: true })
+
+          if (messagesError) {
+            console.error(`❌ [ERROR] Erro ao buscar mensagens do follow-up ${followUp.id}:`, messagesError)
+            throw messagesError
+          }
+
+          console.log(`📨 [DEBUG] Mensagens encontradas para follow-up ${followUp.id}:`, messages?.length || 0)
+
           // Update follow-up status to in_progress
           const { error: updateError } = await supabaseClient
             .from('follow_ups')
@@ -118,12 +135,18 @@ serve(async (req) => {
             })
             .eq('id', followUp.id)
 
-          if (updateError) throw updateError
+          if (updateError) {
+            console.error(`❌ [ERROR] Erro ao atualizar status do follow-up ${followUp.id}:`, updateError)
+            throw updateError
+          }
+
+          console.log(`✅ [DEBUG] Follow-up ${followUp.id} atualizado para in_progress`)
 
           return {
             followUpId: followUp.id,
             instanceId: followUp.instance_id,
-            status: 'processed'
+            status: 'processed',
+            messages: messages?.length || 0
           }
         } catch (error) {
           console.error(`❌ [ERROR] Erro ao processar follow-up ${followUp.id}:`, error)
@@ -136,6 +159,8 @@ serve(async (req) => {
         }
       })
     )
+
+    console.log('✅ [DEBUG] Resultados do processamento:', JSON.stringify(results, null, 2))
 
     return new Response(
       JSON.stringify({
