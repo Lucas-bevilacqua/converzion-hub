@@ -2,7 +2,7 @@ import { Bot, Menu } from "lucide-react"
 import { useAuth } from "@/contexts/auth/AuthContext"
 import { Link } from "react-router-dom"
 
-const Header = () => {
+export const Header = () => {
   const { user } = useAuth()
 
   return (
