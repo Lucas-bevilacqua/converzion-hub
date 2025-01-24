@@ -9,7 +9,6 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { useToast } from "@/components/ui/use-toast"
 import { Plus, Trash2, Users, Play, AlertCircle } from "lucide-react"
-import { Json } from "@/integrations/supabase/types"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -41,7 +40,7 @@ interface FollowUpSectionProps {
   instanceId: string
 }
 
-type FollowUpType = "ai_generated" | "manual" | "automatic";
+type FollowUpType = "manual" | "ai";
 
 interface ManualMessage {
   message: string;
@@ -51,35 +50,32 @@ interface ManualMessage {
 interface FollowUpData {
   id: string;
   instance_id: string;
-  is_active: boolean;
-  follow_up_type: FollowUpType;
-  delay_minutes: number;
-  template_message: string;
-  max_attempts: number;
-  stop_on_reply: boolean;
-  stop_on_keyword: string[];
-  manual_messages: ManualMessage[];
-  system_prompt?: string;
-  created_at?: string;
-  updated_at?: string;
-  last_execution_time?: string;
-  next_execution_time?: string;
-  execution_count?: number;
+  status: 'pending' | 'in_progress' | 'completed' | 'failed';
+  type: FollowUpType;
+  created_at: string;
+  updated_at: string;
+  scheduled_for: string;
+  completed_at?: string;
+  settings: {
+    is_active?: boolean;
+    stop_on_reply?: boolean;
+    stop_on_keyword?: string[];
+    system_prompt?: string;
+  };
+  metadata: Record<string, any>;
   instance?: {
+    id: string;
     connection_status?: string;
   }
 }
 
 interface FormData {
-  is_active: boolean
-  follow_up_type: FollowUpType
-  delay_minutes: number
-  template_message: string
-  max_attempts: number
-  stop_on_reply: boolean
-  stop_on_keyword: string[]
-  manual_messages: ManualMessage[]
-  system_prompt?: string
+  is_active: boolean;
+  type: FollowUpType;
+  stop_on_reply: boolean;
+  stop_on_keyword: string[];
+  manual_messages: ManualMessage[];
+  system_prompt?: string;
 }
 
 const MAX_RETRIES = 3;
@@ -88,7 +84,7 @@ const INITIAL_DELAY = 1000;
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 async function retryWithBackoff<T>(
-  operation: () => Promise<T>, 
+  operation: () => Promise<T>,
   retries: number = MAX_RETRIES,
   delay: number = INITIAL_DELAY
 ): Promise<T> {
@@ -116,7 +112,7 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
     queryFn: async () => {
       console.log('🔄 [DEBUG] Buscando configuração de follow-up para instância:', instanceId)
       const { data, error } = await supabase
-        .from('instance_follow_ups')
+        .from('follow_ups')
         .select(`
           *,
           instance:evolution_instances (
@@ -125,6 +121,8 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
           )
         `)
         .eq('instance_id', instanceId)
+        .order('created_at', { ascending: false })
+        .limit(1)
         .maybeSingle()
 
       if (error) {
@@ -132,122 +130,30 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
         throw error
       }
 
-      console.log('✅ [DEBUG] Dados do follow-up brutos:', data)
-
-      if (!data) {
-        console.log('⚠️ [DEBUG] Nenhum follow-up encontrado para a instância')
-        return null
-      }
-
-      // Parse manual_messages from Json to ManualMessage[]
-      const parsedManualMessages = Array.isArray(data.manual_messages) 
-        ? (data.manual_messages as any[]).map(msg => ({
-            message: String(msg.message || ''),
-            delay_minutes: Number(msg.delay_minutes || 1)
-          }))
-        : [];
-
-      console.log('✅ [DEBUG] Manual messages parseadas:', parsedManualMessages)
-      console.log('⏰ [DEBUG] Última execução:', data.last_execution_time)
-      console.log('⏰ [DEBUG] Próxima execução:', data.next_execution_time)
-      console.log('📊 [DEBUG] Contagem de execuções:', data.execution_count)
-      console.log('🔌 [DEBUG] Status da instância:', data.instance?.connection_status)
-
-      return {
-        ...data,
-        manual_messages: parsedManualMessages
-      } as FollowUpData;
+      console.log('✅ [DEBUG] Dados do follow-up:', data)
+      return data as FollowUpData | null
     },
     enabled: !!instanceId
   })
 
-  const processFollowUpMutation = useMutation({
-    mutationFn: async () => {
-      if (!followUp?.is_active || !user?.id) {
-        console.log('⏸️ [DEBUG] Follow-up não está ativo ou usuário não está logado')
-        return null
-      }
-
-      console.log('🔄 [DEBUG] Processando follow-up manualmente', {
-        instanceId,
-        userId: user.id,
-        followUpId: followUp.id,
-        currentLastExecution: followUp.last_execution_time
-      });
-
-      return await retryWithBackoff(async () => {
-        const { data, error } = await supabase.functions.invoke('get-follow-up-contacts', {
-          body: { 
-            instanceId,
-            userId: user.id,
-            followUpId: followUp.id,
-            source: 'manual-trigger'
-          }
-        });
-
-        if (error) {
-          console.error('❌ [ERROR] Erro ao processar follow-up:', error);
-          throw error;
-        }
-
-        console.log('✅ [DEBUG] Follow-up processado com sucesso:', data);
-        return data;
-      });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['follow-up'] });
-      toast({
-        title: "Sucesso",
-        description: "Follow-up processado com sucesso.",
-      });
-    },
-    onError: (error) => {
-      console.error('❌ [ERROR] Erro ao processar follow-up:', error);
-      toast({
-        title: "Erro",
-        description: "Não foi possível processar o follow-up. Tentativas esgotadas.",
-        variant: "destructive",
-      });
-    }
-  })
-
   const [formData, setFormData] = useState<FormData>({
-    is_active: followUp?.is_active || false,
-    follow_up_type: followUp?.follow_up_type || "manual",
-    delay_minutes: followUp?.delay_minutes || 1,
-    template_message: followUp?.template_message || '',
-    max_attempts: followUp?.max_attempts || 3,
-    stop_on_reply: followUp?.stop_on_reply ?? true,
-    stop_on_keyword: followUp?.stop_on_keyword || ['comprou', 'agendou', 'agendado', 'comprado'],
-    manual_messages: Array.isArray(followUp?.manual_messages) 
-      ? (followUp.manual_messages as any[]).map(msg => ({
-          message: String(msg.message || ''),
-          delay_minutes: Number(msg.delay_minutes || 1)
-        }))
-      : [],
-    system_prompt: followUp?.system_prompt || ''
+    is_active: followUp?.settings?.is_active || false,
+    type: followUp?.type || "manual",
+    stop_on_reply: followUp?.settings?.stop_on_reply ?? true,
+    stop_on_keyword: followUp?.settings?.stop_on_keyword || ['comprou', 'agendou', 'agendado', 'comprado'],
+    manual_messages: [],
+    system_prompt: followUp?.settings?.system_prompt || ''
   })
 
   useEffect(() => {
     if (followUp) {
-      console.log('🔄 [DEBUG] Updating form data with follow-up:', followUp)
-      const parsedManualMessages = Array.isArray(followUp.manual_messages) 
-        ? (followUp.manual_messages as any[]).map(msg => ({
-            message: String(msg.message || ''),
-            delay_minutes: Number(msg.delay_minutes || 1)
-          }))
-        : [];
-
       setFormData({
-        is_active: followUp.is_active || false,
-        follow_up_type: followUp.follow_up_type || "manual",
-        delay_minutes: followUp.delay_minutes || 1,
-        template_message: followUp.template_message || '',
-        max_attempts: followUp.max_attempts || 3,
-        stop_on_reply: followUp.stop_on_reply ?? true,
-        stop_on_keyword: followUp.stop_on_keyword || ['comprou', 'agendou', 'agendado', 'comprado'],
-        manual_messages: parsedManualMessages,
-        system_prompt: followUp.system_prompt || ''
+        is_active: followUp.settings?.is_active || false,
+        type: followUp.type || "manual",
+        stop_on_reply: followUp.settings?.stop_on_reply ?? true,
+        stop_on_keyword: followUp.settings?.stop_on_keyword || ['comprou', 'agendou', 'agendado', 'comprado'],
+        manual_messages: [],
+        system_prompt: followUp.settings?.system_prompt || ''
       })
     }
   }, [followUp])
@@ -258,37 +164,42 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
       
       const dataToSave = {
         instance_id: instanceId,
-        is_active: values.is_active,
-        follow_up_type: values.follow_up_type,
-        delay_minutes: Math.max(1, values.delay_minutes),
-        template_message: values.template_message,
-        max_attempts: values.max_attempts,
-        stop_on_reply: values.stop_on_reply,
-        stop_on_keyword: values.stop_on_keyword,
-        manual_messages: values.manual_messages.map(msg => ({
-          message: msg.message,
-          delay_minutes: msg.delay_minutes
-        })) as unknown as Json,
-        system_prompt: values.system_prompt,
-        updated_at: new Date().toISOString()
+        type: values.type,
+        settings: {
+          is_active: values.is_active,
+          stop_on_reply: values.stop_on_reply,
+          stop_on_keyword: values.stop_on_keyword,
+          system_prompt: values.system_prompt,
+        },
+        status: 'pending' as const,
+        scheduled_for: new Date().toISOString()
       }
 
       const operation = followUp
         ? supabase
-            .from('instance_follow_ups')
+            .from('follow_ups')
             .update(dataToSave)
             .eq('id', followUp.id)
         : supabase
-            .from('instance_follow_ups')
+            .from('follow_ups')
             .insert(dataToSave)
 
       const { error } = await operation
-      if (error) {
-        console.error('❌ [ERROR] Error saving follow-up:', error)
-        throw error
-      }
+      if (error) throw error
 
-      console.log('✅ [DEBUG] Follow-up saved successfully')
+      // Save messages if it's a manual follow-up
+      if (values.type === 'manual' && values.manual_messages.length > 0) {
+        const { error: messagesError } = await supabase
+          .from('follow_up_messages')
+          .insert(
+            values.manual_messages.map(msg => ({
+              follow_up_id: followUp?.id,
+              message: msg.message,
+              delay_minutes: msg.delay_minutes
+            }))
+          )
+        if (messagesError) throw messagesError
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['follow-up'] })
@@ -309,10 +220,12 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
 
   const deleteMutation = useMutation({
     mutationFn: async () => {
+      if (!followUp?.id) return
+      
       const { error } = await supabase
-        .from('instance_follow_ups')
+        .from('follow_ups')
         .delete()
-        .eq('instance_id', instanceId)
+        .eq('id', followUp.id)
 
       if (error) throw error
     },
@@ -320,102 +233,78 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
       queryClient.invalidateQueries({ queryKey: ['follow-up'] })
       toast({
         title: "Sucesso",
-        description: "Configurações de follow-up excluídas com sucesso.",
+        description: "Follow-up excluído com sucesso.",
       })
       setFormData({
         is_active: false,
-        follow_up_type: "manual",
-        delay_minutes: 1,
-        template_message: '',
-        max_attempts: 3,
+        type: "manual",
         stop_on_reply: true,
         stop_on_keyword: ['comprou', 'agendou', 'agendado', 'comprado'],
-        manual_messages: []
+        manual_messages: [],
+        system_prompt: ''
       })
     },
     onError: (error) => {
       console.error('❌ [ERROR] Erro ao excluir follow-up:', error)
       toast({
         title: "Erro",
-        description: "Não foi possível excluir as configurações.",
+        description: "Não foi possível excluir o follow-up.",
         variant: "destructive",
       })
     }
   })
 
-  const resetExecutionMutation = useMutation({
+  const processFollowUpMutation = useMutation({
     mutationFn: async () => {
-      console.log('🔄 Resetting execution count for follow-up')
-      const { error } = await supabase
-        .from('instance_follow_ups')
-        .update({ 
-          execution_count: 0,
-          next_execution_time: new Date().toISOString()
-        })
-        .eq('id', followUp?.id)
+      if (!followUp?.settings?.is_active || !user?.id) {
+        console.log('⏸️ [DEBUG] Follow-up não está ativo ou usuário não está logado')
+        return null
+      }
 
-      if (error) throw error
+      return await retryWithBackoff(async () => {
+        const { data, error } = await supabase.functions.invoke('get-follow-up-contacts', {
+          body: { 
+            followUpId: followUp.id,
+            userId: user.id,
+            source: 'manual-trigger'
+          }
+        })
+
+        if (error) throw error
+        return data
+      })
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['follow-up'] })
       toast({
         title: "Sucesso",
-        description: "Contador de execuções reiniciado.",
+        description: "Follow-up processado com sucesso.",
       })
     },
     onError: (error) => {
-      console.error('Error resetting execution count:', error)
+      console.error('❌ [ERROR] Erro ao processar follow-up:', error)
       toast({
         title: "Erro",
-        description: "Não foi possível reiniciar o contador.",
+        description: "Não foi possível processar o follow-up.",
         variant: "destructive",
       })
     }
   })
 
   const isInstanceConnected = (instance?: { connection_status?: string | null }) => {
-    console.log('🔍 Checking instance connection status:', {
-      rawStatus: instance?.connection_status,
-      instance
-    });
-
-    if (!instance?.connection_status) {
-      console.log('❌ No connection status found');
-      return false;
-    }
-
-    const status = instance.connection_status.toLowerCase();
-    const isConnected = status === 'connected' || status === 'Connected'.toLowerCase();
-    
-    console.log('📊 Connection status analysis:', {
-      normalizedStatus: status,
-      isConnected,
-      matchType: isConnected ? 'exact match: connected' : 'no match found'
-    });
-
-    return isConnected;
-  };
+    if (!instance?.connection_status) return false
+    return instance.connection_status.toLowerCase() === 'connected'
+  }
 
   const FollowUpStatus = () => {
     if (!followUp) {
-      console.log('❌ No follow-up data available');
-      return null;
+      console.log('❌ No follow-up data available')
+      return null
     }
 
-    const hasReachedMaxAttempts = followUp.execution_count >= followUp.max_attempts;
-    const isDisconnected = !isInstanceConnected(followUp.instance);
+    const isDisconnected = !isInstanceConnected(followUp.instance)
 
-    console.log('🔄 Follow-up status check:', {
-      followUp,
-      isDisconnected,
-      connectionStatus: followUp.instance?.connection_status,
-      hasReachedMaxAttempts,
-      executionCount: followUp.execution_count,
-      maxAttempts: followUp.max_attempts,
-      instance: followUp.instance
-    });
-
-    if (!followUp.is_active) {
+    if (!followUp.settings?.is_active) {
       return (
         <Alert className="mb-4">
           <AlertCircle className="h-4 w-4" />
@@ -424,7 +313,7 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
             Ative o follow-up para começar a enviar mensagens.
           </AlertDescription>
         </Alert>
-      );
+      )
     }
 
     if (isDisconnected) {
@@ -436,27 +325,7 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
             Conecte a instância para que os follow-ups possam ser enviados.
           </AlertDescription>
         </Alert>
-      );
-    }
-
-    if (hasReachedMaxAttempts) {
-      return (
-        <Alert variant="destructive" className="mb-4">
-          <AlertCircle className="h-4 w-4" />
-          <AlertTitle>Máximo de Tentativas Atingido</AlertTitle>
-          <AlertDescription className="flex items-center gap-2">
-            O follow-up atingiu o número máximo de tentativas.
-            <Button 
-              variant="outline" 
-              size="sm"
-              onClick={() => resetExecutionMutation.mutate()}
-              disabled={resetExecutionMutation.isPending}
-            >
-              Reiniciar Contador
-            </Button>
-          </AlertDescription>
-        </Alert>
-      );
+      )
     }
 
     return (
@@ -464,21 +333,13 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
         <AlertCircle className="h-4 w-4" />
         <AlertTitle>Follow-up Ativo</AlertTitle>
         <AlertDescription>
-          Próxima execução: {followUp.next_execution_time ? new Date(followUp.next_execution_time).toLocaleString('pt-BR', { 
-            timeZone: 'America/Sao_Paulo',
-            day: '2-digit',
-            month: '2-digit',
-            year: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit',
-            second: '2-digit'
-          }) : '-'}
+          Próxima execução: {followUp.scheduled_for ? new Date(followUp.scheduled_for).toLocaleString() : '-'}
           <br />
-          Execuções: {followUp.execution_count}/{followUp.max_attempts}
+          Status: {followUp.status}
         </AlertDescription>
       </Alert>
     )
-  };
+  }
 
   return (
     <div className="space-y-6">
@@ -494,7 +355,7 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
             variant="outline"
             size="sm"
             onClick={() => processFollowUpMutation.mutate()}
-            disabled={!followUp?.is_active}
+            disabled={!followUp?.settings?.is_active}
           >
             <Play className="h-4 w-4 mr-2" />
             Testar
@@ -552,52 +413,38 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
             <div className="grid gap-2">
               <Label>Tipo de Follow-up</Label>
               <Select
-                value={formData.follow_up_type}
-                onValueChange={(value: FollowUpType) => setFormData(prev => ({ ...prev, follow_up_type: value }))}
+                value={formData.type}
+                onValueChange={(value: FollowUpType) => setFormData(prev => ({ ...prev, type: value }))}
               >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="manual">Manual</SelectItem>
-                  <SelectItem value="ai_generated">Gerado por IA</SelectItem>
+                  <SelectItem value="ai">Gerado por IA</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
-            {formData.follow_up_type === 'ai_generated' && (
-              <>
-                <div className="grid gap-2">
-                  <Label>Prompt do Sistema (Instruções para a IA)</Label>
-                  <Textarea
-                    value={formData.system_prompt}
-                    onChange={(e) => setFormData(prev => ({ 
-                      ...prev, 
-                      system_prompt: e.target.value 
-                    }))}
-                    placeholder="Instruções para a IA sobre como gerar as mensagens de follow-up"
-                    className="min-h-[100px]"
-                  />
-                  <p className="text-sm text-muted-foreground">
-                    Este prompt ajuda a IA a entender como deve gerar as mensagens de follow-up
-                  </p>
-                </div>
-                <div className="grid gap-2">
-                  <Label>Intervalo entre mensagens (minutos)</Label>
-                  <Input
-                    type="number"
-                    min="1"
-                    value={formData.delay_minutes}
-                    onChange={(e) => setFormData(prev => ({ 
-                      ...prev, 
-                      delay_minutes: parseInt(e.target.value) 
-                    }))}
-                  />
-                </div>
-              </>
+            {formData.type === 'ai' && (
+              <div className="grid gap-2">
+                <Label>Prompt do Sistema (Instruções para a IA)</Label>
+                <Textarea
+                  value={formData.system_prompt}
+                  onChange={(e) => setFormData(prev => ({ 
+                    ...prev, 
+                    system_prompt: e.target.value 
+                  }))}
+                  placeholder="Instruções para a IA sobre como gerar as mensagens de follow-up"
+                  className="min-h-[100px]"
+                />
+                <p className="text-sm text-muted-foreground">
+                  Este prompt ajuda a IA a entender como deve gerar as mensagens de follow-up
+                </p>
+              </div>
             )}
 
-            {formData.follow_up_type === 'manual' && (
+            {formData.type === 'manual' && (
               <div className="space-y-4">
                 <div className="flex justify-between items-center">
                   <Label>Sequência de Mensagens</Label>
@@ -658,16 +505,6 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
               </div>
             )}
 
-            <div className="grid gap-2">
-              <Label>Número Máximo de Tentativas</Label>
-              <Input
-                type="number"
-                min="1"
-                value={formData.max_attempts}
-                onChange={(e) => setFormData(prev => ({ ...prev, max_attempts: parseInt(e.target.value) }))}
-              />
-            </div>
-
             <div className="space-y-4">
               <div className="flex items-center gap-2">
                 <Switch
@@ -699,15 +536,12 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
                 onClick={() => {
                   if (followUp) {
                     setFormData({
-                      is_active: followUp.is_active || false,
-                      follow_up_type: followUp.follow_up_type || "manual",
-                      delay_minutes: followUp.delay_minutes || 1,
-                      template_message: followUp.template_message || '',
-                      max_attempts: followUp.max_attempts || 3,
-                      stop_on_reply: followUp.stop_on_reply ?? true,
-                      stop_on_keyword: followUp.stop_on_keyword || ['comprou', 'agendou', 'agendado', 'comprado'],
-                      manual_messages: followUp.manual_messages || [],
-                      system_prompt: followUp.system_prompt || ''
+                      is_active: followUp.settings?.is_active || false,
+                      type: followUp.type || "manual",
+                      stop_on_reply: followUp.settings?.stop_on_reply ?? true,
+                      stop_on_keyword: followUp.settings?.stop_on_keyword || ['comprou', 'agendou', 'agendado', 'comprado'],
+                      manual_messages: [],
+                      system_prompt: followUp.settings?.system_prompt || ''
                     })
                   }
                 }}

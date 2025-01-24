@@ -9,48 +9,6 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      ai_follow_up_job_logs: {
-        Row: {
-          details: Json | null
-          execution_time: string | null
-          id: number
-          status: string | null
-        }
-        Insert: {
-          details?: Json | null
-          execution_time?: string | null
-          id?: number
-          status?: string | null
-        }
-        Update: {
-          details?: Json | null
-          execution_time?: string | null
-          id?: number
-          status?: string | null
-        }
-        Relationships: []
-      }
-      ai_follow_up_logs: {
-        Row: {
-          details: Json | null
-          execution_time: string | null
-          id: number
-          status: string | null
-        }
-        Insert: {
-          details?: Json | null
-          execution_time?: string | null
-          id?: number
-          status?: string | null
-        }
-        Update: {
-          details?: Json | null
-          execution_time?: string | null
-          id?: number
-          status?: string | null
-        }
-        Relationships: []
-      }
       ai_settings: {
         Row: {
           created_at: string
@@ -259,32 +217,134 @@ export type Database = {
           },
         ]
       }
-      follow_up_executions: {
+      follow_up_contacts: {
         Row: {
-          details: Json | null
-          execution_time: string | null
+          created_at: string
+          follow_up_id: string
           id: string
-          next_run_time: string | null
-          next_scheduled_run: string | null
-          status: string | null
+          metadata: Json
+          phone: string
+          reply_at: string | null
+          sent_at: string | null
+          status: string
+          updated_at: string
         }
         Insert: {
-          details?: Json | null
-          execution_time?: string | null
+          created_at?: string
+          follow_up_id: string
           id?: string
-          next_run_time?: string | null
-          next_scheduled_run?: string | null
-          status?: string | null
+          metadata?: Json
+          phone: string
+          reply_at?: string | null
+          sent_at?: string | null
+          status?: string
+          updated_at?: string
         }
         Update: {
-          details?: Json | null
-          execution_time?: string | null
+          created_at?: string
+          follow_up_id?: string
           id?: string
-          next_run_time?: string | null
-          next_scheduled_run?: string | null
-          status?: string | null
+          metadata?: Json
+          phone?: string
+          reply_at?: string | null
+          sent_at?: string | null
+          status?: string
+          updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "follow_up_contacts_follow_up_id_fkey"
+            columns: ["follow_up_id"]
+            isOneToOne: false
+            referencedRelation: "follow_ups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      follow_up_messages: {
+        Row: {
+          created_at: string
+          delay_minutes: number
+          follow_up_id: string
+          id: string
+          message: string
+          metadata: Json
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          delay_minutes?: number
+          follow_up_id: string
+          id?: string
+          message: string
+          metadata?: Json
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          delay_minutes?: number
+          follow_up_id?: string
+          id?: string
+          message?: string
+          metadata?: Json
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "follow_up_messages_follow_up_id_fkey"
+            columns: ["follow_up_id"]
+            isOneToOne: false
+            referencedRelation: "follow_ups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      follow_ups: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          id: string
+          instance_id: string
+          metadata: Json
+          scheduled_for: string
+          settings: Json
+          status: string
+          type: string
+          updated_at: string
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          instance_id: string
+          metadata?: Json
+          scheduled_for?: string
+          settings?: Json
+          status?: string
+          type?: string
+          updated_at?: string
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          instance_id?: string
+          metadata?: Json
+          scheduled_for?: string
+          settings?: Json
+          status?: string
+          type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "follow_ups_instance_id_fkey"
+            columns: ["instance_id"]
+            isOneToOne: false
+            referencedRelation: "evolution_instances"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       instance_configurations: {
         Row: {
@@ -319,74 +379,6 @@ export type Database = {
             foreignKeyName: "instance_configurations_instance_id_fkey"
             columns: ["instance_id"]
             isOneToOne: true
-            referencedRelation: "evolution_instances"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      instance_follow_ups: {
-        Row: {
-          created_at: string
-          delay_minutes: number | null
-          execution_count: number | null
-          follow_up_type: Database["public"]["Enums"]["follow_up_type"] | null
-          id: string
-          instance_id: string
-          is_active: boolean | null
-          last_execution_time: string | null
-          manual_messages: Json | null
-          max_attempts: number | null
-          next_execution_time: string | null
-          settings: Json | null
-          stop_on_keyword: string[] | null
-          stop_on_reply: boolean | null
-          system_prompt: string | null
-          template_message: string | null
-          updated_at: string
-        }
-        Insert: {
-          created_at?: string
-          delay_minutes?: number | null
-          execution_count?: number | null
-          follow_up_type?: Database["public"]["Enums"]["follow_up_type"] | null
-          id?: string
-          instance_id: string
-          is_active?: boolean | null
-          last_execution_time?: string | null
-          manual_messages?: Json | null
-          max_attempts?: number | null
-          next_execution_time?: string | null
-          settings?: Json | null
-          stop_on_keyword?: string[] | null
-          stop_on_reply?: boolean | null
-          system_prompt?: string | null
-          template_message?: string | null
-          updated_at?: string
-        }
-        Update: {
-          created_at?: string
-          delay_minutes?: number | null
-          execution_count?: number | null
-          follow_up_type?: Database["public"]["Enums"]["follow_up_type"] | null
-          id?: string
-          instance_id?: string
-          is_active?: boolean | null
-          last_execution_time?: string | null
-          manual_messages?: Json | null
-          max_attempts?: number | null
-          next_execution_time?: string | null
-          settings?: Json | null
-          stop_on_keyword?: string[] | null
-          stop_on_reply?: boolean | null
-          system_prompt?: string | null
-          template_message?: string | null
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "instance_follow_ups_instance_id_fkey"
-            columns: ["instance_id"]
-            isOneToOne: false
             referencedRelation: "evolution_instances"
             referencedColumns: ["id"]
           },
