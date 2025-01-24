@@ -57,12 +57,13 @@ export function InstanceSlotCard({
           throw error
         }
 
-        const isConnected = data?.instance?.state?.toLowerCase() === 'open'
+        const isConnected = data?.instance?.state === 'open'
         return { state: isConnected ? 'connected' : 'disconnected' }
       } catch (error) {
         console.error('Erro na verificação de estado:', error)
+        // Retorna o último estado conhecido em caso de erro de conexão
         return { 
-          state: instance?.connection_status?.toLowerCase() || 'disconnected',
+          state: instance?.connection_status || 'disconnected',
           error: true
         }
       }
@@ -83,7 +84,7 @@ export function InstanceSlotCard({
         variant: "destructive",
       })
     }
-  }, [stateError, toast])
+  }, [stateError])
 
   const handleDelete = async () => {
     if (!instance?.id) return
@@ -128,7 +129,7 @@ export function InstanceSlotCard({
     }
   }
 
-  const isConnected = stateData?.state?.toLowerCase() === 'connected' || instance?.connection_status?.toLowerCase() === 'connected'
+  const isConnected = stateData?.state === 'connected' || instance?.connection_status?.toLowerCase() === 'connected'
 
   const handleConnect = async () => {
     if (!instance?.id) return
