@@ -308,40 +308,107 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
     )
   }
 
-  const deleteMutation = useMutation({
-    mutationFn: async () => {
-      if (!followUp?.id) throw new Error("No follow-up to delete")
+  const saveMutation = useMutation({
+    mutationFn: async (data: FormData) => {
+      console.log('🔄 [DEBUG] Saving follow-up settings:', data);
       
-      const { error: messagesError } = await supabase
-        .from('follow_up_messages')
-        .delete()
-        .eq('follow_up_id', followUp.id)
+      if (!followUp?.id) {
+        // Create new follow-up
+        const { data: newFollowUp, error: createError } = await supabase
+          .from('follow_ups')
+          .insert({
+            instance_id: instanceId,
+            type: data.type,
+            settings: {
+              is_active: data.is_active,
+              stop_on_reply: data.stop_on_reply,
+              stop_on_keyword: data.stop_on_keyword,
+              system_prompt: data.system_prompt
+            }
+          })
+          .select()
+          .single()
 
-      if (messagesError) throw messagesError
+        if (createError) throw createError
 
-      const { error: followUpError } = await supabase
-        .from('follow_ups')
-        .delete()
-        .eq('id', followUp.id)
+        // Create messages if manual type
+        if (data.type === 'manual' && data.manual_messages.length > 0) {
+          const { error: messagesError } = await supabase
+            .from('follow_up_messages')
+            .insert(
+              data.manual_messages.map(msg => ({
+                follow_up_id: newFollowUp.id,
+                message: msg.message,
+                delay_minutes: msg.delay_minutes
+              }))
+            )
 
-      if (followUpError) throw followUpError
+          if (messagesError) throw messagesError
+        }
+
+        return newFollowUp
+      } else {
+        // Update existing follow-up
+        const { error: updateError } = await supabase
+          .from('follow_ups')
+          .update({
+            type: data.type,
+            settings: {
+              is_active: data.is_active,
+              stop_on_reply: data.stop_on_reply,
+              stop_on_keyword: data.stop_on_keyword,
+              system_prompt: data.system_prompt
+            }
+          })
+          .eq('id', followUp.id)
+
+        if (updateError) throw updateError
+
+        // Update messages if manual type
+        if (data.type === 'manual' && data.manual_messages.length > 0) {
+          // Delete existing messages
+          const { error: deleteError } = await supabase
+            .from('follow_up_messages')
+            .delete()
+            .eq('follow_up_id', followUp.id)
+
+          if (deleteError) throw deleteError
+
+          // Insert new messages
+          const { error: messagesError } = await supabase
+            .from('follow_up_messages')
+            .insert(
+              data.manual_messages.map(msg => ({
+                follow_up_id: followUp.id,
+                message: msg.message,
+                delay_minutes: msg.delay_minutes
+              }))
+            )
+
+          if (messagesError) throw messagesError
+        }
+
+        return followUp
+      }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['follow-up'] })
+      console.log('✅ [DEBUG] Follow-up settings saved successfully');
+      queryClient.invalidateQueries({ queryKey: ['follow-up', instanceId] })
+      queryClient.invalidateQueries({ queryKey: ['follow-up-messages'] })
       toast({
         title: "Sucesso",
-        description: "Follow-up excluído com sucesso.",
+        description: "Configurações salvas com sucesso.",
       })
     },
     onError: (error) => {
-      console.error('❌ [ERROR] Error deleting follow-up:', error)
+      console.error('❌ [ERROR] Error saving follow-up settings:', error);
       toast({
         title: "Erro",
-        description: "Não foi possível excluir o follow-up.",
+        description: "Não foi possível salvar as configurações.",
         variant: "destructive",
       })
     }
-  });
+  })
 
   return (
     <div className="space-y-6">
