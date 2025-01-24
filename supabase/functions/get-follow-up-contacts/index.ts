@@ -83,18 +83,28 @@ serve(async (req) => {
     console.log('📊 [DEBUG] Follow-ups details:', followUps)
 
     const results = await Promise.all(
-      (followUps ?? []).map(async (followUp: FollowUpContact) => {
+      (followUps ?? []).map(async (followUp: any) => {
         try {
           console.log('🔢 [DEBUG] Raw follow-up data:', followUp)
 
           // Ensure numeric values are properly converted
-          const executionCount = Number(followUp.execution_count) || 0
-          const maxAttempts = Number(followUp.max_attempts) || 3
-          const delayMinutes = Number(followUp.delay_minutes) || 60
+          const executionCount = parseInt(followUp.execution_count?.toString() || '0')
+          const maxAttempts = parseInt(followUp.max_attempts?.toString() || '3')
+          const delayMinutes = parseInt(followUp.delay_minutes?.toString() || '60')
 
           // Validate the converted numbers
           if (isNaN(executionCount) || isNaN(maxAttempts) || isNaN(delayMinutes)) {
-            throw new Error(`Invalid numeric values: executionCount=${executionCount}, maxAttempts=${maxAttempts}, delayMinutes=${delayMinutes}`)
+            console.error('❌ [ERROR] Invalid numeric values:', {
+              executionCount,
+              maxAttempts,
+              delayMinutes,
+              raw: {
+                execution_count: followUp.execution_count,
+                max_attempts: followUp.max_attempts,
+                delay_minutes: followUp.delay_minutes
+              }
+            })
+            throw new Error('Invalid numeric values in follow-up data')
           }
 
           console.log('✅ [DEBUG] Converted numeric values:', {
