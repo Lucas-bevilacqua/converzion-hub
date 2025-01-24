@@ -32,7 +32,8 @@ serve(async (req) => {
         )
       `)
       .eq('status', 'pending')
-      .lt('scheduled_for', new Date().toISOString())
+      .is('completed_at', null)
+      .lte('scheduled_for', new Date().toISOString())
 
     if (followUpsError) {
       console.error('❌ [ERROR] Erro ao buscar follow-ups:', followUpsError)
@@ -43,9 +44,11 @@ serve(async (req) => {
     console.log('📊 [DEBUG] Detalhes dos follow-ups:', followUps)
 
     // Filtrar follow-ups com instâncias conectadas
-    const validFollowUps = followUps?.filter(followUp => 
-      followUp.instance?.connection_status?.toLowerCase() === 'connected'
-    ) || []
+    const validFollowUps = followUps?.filter(followUp => {
+      const isConnected = followUp.instance?.connection_status?.toLowerCase() === 'connected'
+      console.log(`🔍 [DEBUG] Follow-up ${followUp.id} - Instância ${followUp.instance?.name} - Status: ${followUp.instance?.connection_status} - Válido: ${isConnected}`)
+      return isConnected
+    }) || []
 
     console.log(`🔍 [DEBUG] Follow-ups válidos (com instâncias conectadas): ${validFollowUps.length}`)
     
