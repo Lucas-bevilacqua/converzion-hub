@@ -34,8 +34,8 @@ import {
   TabsList,
   TabsTrigger,
 } from "@/components/ui/tabs"
-import { ContactsTable } from "./ContactsTable"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { ContactsTable } from "./ContactsTable"
 
 interface FollowUpSectionProps {
   instanceId: string
@@ -353,24 +353,48 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
     }
   })
 
-  // Add status check function
+  // Improved connection status check with detailed logging
   const isInstanceConnected = (instance?: { connection_status?: string | null }) => {
-    if (!instance?.connection_status) return false;
-    return instance.connection_status.toLowerCase().includes('connect');
+    console.log('🔍 Checking instance connection status:', {
+      rawStatus: instance?.connection_status,
+      instance
+    });
+
+    if (!instance?.connection_status) {
+      console.log('❌ No connection status found');
+      return false;
+    }
+
+    const status = instance.connection_status.toLowerCase();
+    const isConnected = status.includes('connect');
+    
+    console.log('📊 Connection status analysis:', {
+      normalizedStatus: status,
+      isConnected,
+      matchType: isConnected ? 'connected found in status' : 'no match found'
+    });
+
+    return isConnected;
   };
 
-  // Modify the FollowUpStatus component
+  // Modified FollowUpStatus component with enhanced logging
   const FollowUpStatus = () => {
-    if (!followUp) return null;
+    if (!followUp) {
+      console.log('❌ No follow-up data available');
+      return null;
+    }
 
     const hasReachedMaxAttempts = followUp.execution_count >= followUp.max_attempts;
     const isDisconnected = !isInstanceConnected(followUp.instance);
 
-    console.log('Status check:', {
+    console.log('🔄 Follow-up status check:', {
       followUp,
       isDisconnected,
       connectionStatus: followUp.instance?.connection_status,
-      hasReachedMaxAttempts
+      hasReachedMaxAttempts,
+      executionCount: followUp.execution_count,
+      maxAttempts: followUp.max_attempts,
+      instance: followUp.instance
     });
 
     if (!followUp.is_active) {
