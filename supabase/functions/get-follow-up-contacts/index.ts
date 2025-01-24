@@ -48,7 +48,12 @@ serve(async (req) => {
     const { data: followUps, error: followUpsError } = await supabaseClient
       .from('instance_follow_ups')
       .select(`
-        *,
+        id,
+        instance_id,
+        execution_count,
+        max_attempts,
+        next_execution_time,
+        delay_minutes,
         evolution_instances!inner(
           id,
           connection_status
@@ -70,8 +75,10 @@ serve(async (req) => {
     const results = await Promise.all(
       (followUps ?? []).map(async (followUp: FollowUpContact) => {
         try {
+          // Ensure we're working with numbers
           const executionCount = Number(followUp.execution_count) || 0
           const maxAttempts = Number(followUp.max_attempts) || 3
+          const delayMinutes = Number(followUp.delay_minutes) || 60
 
           if (executionCount >= maxAttempts) {
             console.log(`⏭️ [DEBUG] Skipping follow-up ${followUp.id} - max attempts reached (${executionCount}/${maxAttempts})`)
@@ -84,7 +91,6 @@ serve(async (req) => {
           }
 
           // Calculate next execution time in São Paulo timezone
-          const delayMinutes = followUp.delay_minutes || 60
           const nextExecutionTime = new Date(saoPauloTime.getTime() + (delayMinutes * 60 * 1000))
           const nextExecutionISO = nextExecutionTime.toISOString()
 
