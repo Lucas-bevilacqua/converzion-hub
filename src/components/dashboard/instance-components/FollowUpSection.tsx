@@ -378,7 +378,7 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
     }
 
     const status = instance.connection_status.toLowerCase();
-    const isConnected = status === 'connected';
+    const isConnected = status === 'connected' || status === 'Connected'.toLowerCase();
     
     console.log('📊 Connection status analysis:', {
       normalizedStatus: status,
