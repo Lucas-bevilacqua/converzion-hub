@@ -6,6 +6,15 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+interface FollowUp {
+  id: string
+  instance_id: string
+  execution_count: number
+  max_attempts: number
+  delay_minutes: number
+  is_active: boolean
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
@@ -36,6 +45,7 @@ serve(async (req) => {
         execution_count,
         max_attempts,
         delay_minutes,
+        is_active,
         evolution_instances!inner (
           id,
           connection_status
@@ -43,7 +53,6 @@ serve(async (req) => {
       `)
       .eq('is_active', true)
       .eq('evolution_instances.connection_status', 'connected')
-      .lt('execution_count', 'max_attempts')
       .or(`next_execution_time.is.null,next_execution_time.lte.${now.toISOString()}`)
 
     if (followUpsError) {
@@ -57,19 +66,31 @@ serve(async (req) => {
     
     for (const followUp of (followUps || [])) {
       try {
-        console.log('🔄 [DEBUG] Processing follow-up:', followUp.id)
+        console.log('🔄 [DEBUG] Processing follow-up:', followUp)
+
+        // Ensure numeric values are properly typed
+        const executionCount = Number(followUp.execution_count) || 0
+        const maxAttempts = Number(followUp.max_attempts) || 3
+        const delayMinutes = Number(followUp.delay_minutes) || 60
+
+        // Skip if max attempts reached
+        if (executionCount >= maxAttempts) {
+          console.log('⚠️ [DEBUG] Max attempts reached for follow-up:', followUp.id)
+          continue
+        }
 
         // Update follow-up execution count and times
         const { error: updateError } = await supabase
           .from('instance_follow_ups')
           .update({
-            execution_count: (followUp.execution_count || 0) + 1,
+            execution_count: executionCount + 1,
             last_execution_time: now.toISOString(),
-            next_execution_time: new Date(now.getTime() + ((followUp.delay_minutes || 60) * 60 * 1000)).toISOString()
+            next_execution_time: new Date(now.getTime() + (delayMinutes * 60 * 1000)).toISOString()
           })
           .eq('id', followUp.id)
 
         if (updateError) {
+          console.error('❌ [ERROR] Error updating follow-up:', updateError)
           throw updateError
         }
 
@@ -82,6 +103,7 @@ serve(async (req) => {
           .limit(50)
 
         if (contactsError) {
+          console.error('❌ [ERROR] Error fetching contacts:', contactsError)
           throw contactsError
         }
 
@@ -91,7 +113,9 @@ serve(async (req) => {
           contactsCount: contacts?.length || 0,
           executionDetails: {
             executionTime: now.toISOString(),
-            nextExecutionTime: new Date(now.getTime() + ((followUp.delay_minutes || 60) * 60 * 1000)).toISOString()
+            nextExecutionTime: new Date(now.getTime() + (delayMinutes * 60 * 1000)).toISOString(),
+            currentExecutionCount: executionCount + 1,
+            maxAttempts: maxAttempts
           }
         })
 
