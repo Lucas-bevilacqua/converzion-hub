@@ -85,7 +85,6 @@ serve(async (req) => {
     const results = await Promise.all(
       (followUps ?? []).map(async (followUp: FollowUpContact) => {
         try {
-          // Log raw values before any processing
           console.log('🔢 [DEBUG] Raw follow-up data:', followUp)
 
           // Ensure numeric values are properly converted
