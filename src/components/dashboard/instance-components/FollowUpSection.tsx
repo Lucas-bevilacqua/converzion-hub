@@ -48,18 +48,6 @@ interface ManualMessage {
   delay_minutes: number;
 }
 
-interface FormData {
-  is_active: boolean
-  follow_up_type: FollowUpType
-  delay_minutes: number
-  template_message: string
-  max_attempts: number
-  stop_on_reply: boolean
-  stop_on_keyword: string[]
-  manual_messages: ManualMessage[]
-  system_prompt?: string
-}
-
 interface FollowUpData {
   id: string;
   instance_id: string;
@@ -70,7 +58,7 @@ interface FollowUpData {
   max_attempts: number;
   stop_on_reply: boolean;
   stop_on_keyword: string[];
-  manual_messages: Json;
+  manual_messages: ManualMessage[];
   system_prompt?: string;
   created_at?: string;
   updated_at?: string;
@@ -80,6 +68,18 @@ interface FollowUpData {
   instance?: {
     connection_status?: string;
   }
+}
+
+interface FormData {
+  is_active: boolean
+  follow_up_type: FollowUpType
+  delay_minutes: number
+  template_message: string
+  max_attempts: number
+  stop_on_reply: boolean
+  stop_on_keyword: string[]
+  manual_messages: ManualMessage[]
+  system_prompt?: string
 }
 
 const MAX_RETRIES = 3;
@@ -148,6 +148,10 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
         : [];
 
       console.log('✅ [DEBUG] Manual messages parseadas:', parsedManualMessages)
+      console.log('⏰ [DEBUG] Última execução:', data.last_execution_time)
+      console.log('⏰ [DEBUG] Próxima execução:', data.next_execution_time)
+      console.log('📊 [DEBUG] Contagem de execuções:', data.execution_count)
+      console.log('🔌 [DEBUG] Status da instância:', data.instance?.connection_status)
 
       return {
         ...data,
