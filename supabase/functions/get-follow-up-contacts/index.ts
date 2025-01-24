@@ -89,17 +89,9 @@ serve(async (req) => {
           console.log('🔢 [DEBUG] Raw follow-up data:', followUp)
 
           // Ensure numeric values are properly converted
-          const executionCount = typeof followUp.execution_count === 'string' 
-            ? parseInt(followUp.execution_count, 10) 
-            : followUp.execution_count || 0
-
-          const maxAttempts = typeof followUp.max_attempts === 'string'
-            ? parseInt(followUp.max_attempts, 10)
-            : followUp.max_attempts || 3
-
-          const delayMinutes = typeof followUp.delay_minutes === 'string'
-            ? parseInt(followUp.delay_minutes, 10)
-            : followUp.delay_minutes || 60
+          const executionCount = Number(followUp.execution_count) || 0
+          const maxAttempts = Number(followUp.max_attempts) || 3
+          const delayMinutes = Number(followUp.delay_minutes) || 60
 
           // Validate the converted numbers
           if (isNaN(executionCount) || isNaN(maxAttempts) || isNaN(delayMinutes)) {
