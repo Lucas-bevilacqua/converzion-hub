@@ -70,7 +70,7 @@ interface FollowUpData {
   max_attempts: number;
   stop_on_reply: boolean;
   stop_on_keyword: string[];
-  manual_messages: ManualMessage[];
+  manual_messages: Json;
   system_prompt?: string;
   created_at?: string;
   updated_at?: string;
@@ -139,11 +139,21 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
       console.log('📊 [DEBUG] Contagem de execuções:', data?.execution_count)
       console.log('🔌 [DEBUG] Status da instância:', data?.instance?.connection_status)
 
-      return data
+      // Parse manual_messages from Json to ManualMessage[]
+      const parsedData = {
+        ...data,
+        manual_messages: Array.isArray(data?.manual_messages) 
+          ? (data.manual_messages as any[]).map(msg => ({
+              message: String(msg.message || ''),
+              delay_minutes: Number(msg.delay_minutes || 1)
+            }))
+          : []
+      } as unknown as FollowUpData
+
+      return parsedData
     }
   })
 
-  // Mutation to process follow-ups manually
   const processFollowUpMutation = useMutation({
     mutationFn: async () => {
       if (!followUp?.is_active || !user?.id) {
@@ -202,7 +212,12 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
     max_attempts: followUp?.max_attempts || 3,
     stop_on_reply: followUp?.stop_on_reply ?? true,
     stop_on_keyword: followUp?.stop_on_keyword || ['comprou', 'agendou', 'agendado', 'comprado'],
-    manual_messages: followUp?.manual_messages || [],
+    manual_messages: Array.isArray(followUp?.manual_messages) 
+      ? (followUp.manual_messages as any[]).map(msg => ({
+          message: String(msg.message || ''),
+          delay_minutes: Number(msg.delay_minutes || 1)
+        }))
+      : [],
     system_prompt: followUp?.system_prompt || ''
   })
 
@@ -217,7 +232,12 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
         max_attempts: followUp.max_attempts || 3,
         stop_on_reply: followUp.stop_on_reply ?? true,
         stop_on_keyword: followUp.stop_on_keyword || ['comprou', 'agendou', 'agendado', 'comprado'],
-        manual_messages: followUp.manual_messages || [],
+        manual_messages: Array.isArray(followUp.manual_messages) 
+          ? (followUp.manual_messages as any[]).map(msg => ({
+              message: String(msg.message || ''),
+              delay_minutes: Number(msg.delay_minutes || 1)
+            }))
+          : [],
         system_prompt: followUp.system_prompt || ''
       })
     }
