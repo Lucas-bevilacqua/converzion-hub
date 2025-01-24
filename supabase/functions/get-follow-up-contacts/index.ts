@@ -88,10 +88,18 @@ serve(async (req) => {
           // Log raw values before any processing
           console.log('🔢 [DEBUG] Raw follow-up data:', followUp)
 
-          // Ensure we have valid numbers by explicitly converting and validating
-          const executionCount = parseInt(followUp.execution_count?.toString() || '0', 10)
-          const maxAttempts = parseInt(followUp.max_attempts?.toString() || '3', 10)
-          const delayMinutes = parseInt(followUp.delay_minutes?.toString() || '60', 10)
+          // Ensure numeric values are properly converted
+          const executionCount = typeof followUp.execution_count === 'string' 
+            ? parseInt(followUp.execution_count, 10) 
+            : followUp.execution_count || 0
+
+          const maxAttempts = typeof followUp.max_attempts === 'string'
+            ? parseInt(followUp.max_attempts, 10)
+            : followUp.max_attempts || 3
+
+          const delayMinutes = typeof followUp.delay_minutes === 'string'
+            ? parseInt(followUp.delay_minutes, 10)
+            : followUp.delay_minutes || 60
 
           // Validate the converted numbers
           if (isNaN(executionCount) || isNaN(maxAttempts) || isNaN(delayMinutes)) {
@@ -120,26 +128,9 @@ serve(async (req) => {
 
           console.log('⏰ [DEBUG] Time calculations:', {
             followUpId: followUp.id,
-            currentSaoPauloTime: new Date(saoPauloISO).toLocaleString('pt-BR', { 
-              timeZone: 'America/Sao_Paulo',
-              day: '2-digit',
-              month: '2-digit',
-              year: 'numeric',
-              hour: '2-digit',
-              minute: '2-digit',
-              second: '2-digit'
-            }),
+            currentSaoPauloTime: saoPauloISO,
             delayMinutes,
-            nextExecutionSaoPaulo: new Date(nextExecutionISO).toLocaleString('pt-BR', { 
-              timeZone: 'America/Sao_Paulo',
-              day: '2-digit',
-              month: '2-digit',
-              year: 'numeric',
-              hour: '2-digit',
-              minute: '2-digit',
-              second: '2-digit'
-            }),
-            nextExecutionISO
+            nextExecutionTime: nextExecutionISO
           })
 
           const { error: updateError } = await supabaseClient
@@ -176,16 +167,7 @@ serve(async (req) => {
               executionCount: executionCount + 1, 
               maxAttempts,
               nextExecutionTime: nextExecutionISO,
-              currentTime: saoPauloISO,
-              readableTime: new Date(saoPauloISO).toLocaleString('pt-BR', { 
-                timeZone: 'America/Sao_Paulo',
-                day: '2-digit',
-                month: '2-digit',
-                year: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit',
-                second: '2-digit'
-              })
+              currentTime: saoPauloISO
             }
           }
         } catch (error) {
