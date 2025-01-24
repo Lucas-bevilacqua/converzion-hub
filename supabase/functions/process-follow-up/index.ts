@@ -23,12 +23,8 @@ async function retryOperation<T>(operation: () => Promise<T>, retries = MAX_RETR
 }
 
 serve(async (req) => {
-  // Handle CORS preflight
   if (req.method === 'OPTIONS') {
-    return new Response(null, { 
-      headers: corsHeaders,
-      status: 204
-    })
+    return new Response(null, { headers: corsHeaders })
   }
 
   try {
@@ -57,7 +53,7 @@ serve(async (req) => {
         .eq('is_active', true)
         .gt('next_execution_time', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()) 
         .lt('next_execution_time', new Date().toISOString())
-        .lt('execution_count', 'max_attempts') // Removida a comparação direta com a string
+        .lt('execution_count', 'max_attempts')
     });
 
     if (followUpsError) {
@@ -89,6 +85,7 @@ serve(async (req) => {
         console.log(`📱 [DEBUG] Phone number: ${followUp.instance.phone_number}`)
         console.log(`⏰ [DEBUG] Next execution time: ${followUp.next_execution_time}`)
         console.log(`📊 [DEBUG] Execution count: ${followUp.execution_count}/${followUp.max_attempts}`)
+        console.log(`⏰ [DEBUG] Current last_execution_time: ${followUp.last_execution_time}`)
 
         const endpoint = followUp.follow_up_type === 'ai_generated' 
           ? 'process-ai-follow-up'
@@ -112,23 +109,30 @@ serve(async (req) => {
         });
 
         // Update follow-up execution count and time
+        const currentTime = new Date().toISOString();
+        console.log(`⏰ [DEBUG] Updating last_execution_time to: ${currentTime}`);
+        
         const { error: updateError } = await supabaseClient
           .from('instance_follow_ups')
           .update({
             execution_count: (followUp.execution_count || 0) + 1,
-            last_execution_time: new Date().toISOString(),
+            last_execution_time: currentTime,
             next_execution_time: new Date(Date.now() + (followUp.delay_minutes * 60 * 1000)).toISOString()
           })
           .eq('id', followUp.id);
 
         if (updateError) {
           console.error(`❌ [ERROR] Failed to update follow-up ${followUp.id}:`, updateError)
+          throw updateError;
         }
+
+        console.log(`✅ [DEBUG] Successfully updated follow-up times for ${followUp.id}`);
 
         processedFollowUps.push({
           followUpId: followUp.id,
           status: 'success',
-          result
+          result,
+          last_execution_time: currentTime
         });
 
       } catch (error) {

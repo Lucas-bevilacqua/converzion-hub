@@ -121,6 +121,9 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
       }
 
       console.log('✅ [DEBUG] Dados do follow-up:', data)
+      console.log('⏰ [DEBUG] Última execução:', data?.last_execution_time)
+      console.log('⏰ [DEBUG] Próxima execução:', data?.next_execution_time)
+      console.log('📊 [DEBUG] Contagem de execuções:', data?.execution_count)
 
       const parsedData = {
         ...data,
@@ -152,7 +155,8 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
       console.log('🔄 [DEBUG] Processando follow-up manualmente', {
         instanceId,
         userId: user.id,
-        followUpId: followUp.id
+        followUpId: followUp.id,
+        currentLastExecution: followUp.last_execution_time
       });
 
       return await retryWithBackoff(async () => {
@@ -175,6 +179,7 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
       });
     },
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['follow-up'] });
       toast({
         title: "Sucesso",
         description: "Follow-up processado com sucesso.",
