@@ -49,19 +49,23 @@ serve(async (req) => {
 
     // Filtrar follow-ups com instâncias conectadas
     const validFollowUps = followUps?.filter(followUp => {
-      const isConnected = followUp.instance?.connection_status?.toLowerCase() === 'connected'
+      // Normalizar status para case-insensitive
+      const instanceStatus = followUp.instance?.connection_status?.toLowerCase() || ''
+      const isConnected = instanceStatus === 'connected'
       const isActive = followUp.settings?.is_active === true
       const scheduledTime = new Date(followUp.scheduled_for).getTime()
       const currentTime = new Date().getTime()
       const isTimeToProcess = scheduledTime <= currentTime
 
       console.log(`🔍 [DEBUG] Validando follow-up ${followUp.id}:`, {
+        instanceStatus,
         isConnected,
         isActive,
         scheduledTime: new Date(followUp.scheduled_for).toISOString(),
         currentTime: new Date().toISOString(),
         isTimeToProcess,
-        connection_status: followUp.instance?.connection_status
+        connection_status: followUp.instance?.connection_status,
+        settings: followUp.settings
       })
 
       return isConnected && isActive && isTimeToProcess
@@ -80,7 +84,7 @@ serve(async (req) => {
         if (!followUps?.some(f => new Date(f.scheduled_for).getTime() <= new Date().getTime())) {
           console.log('- Data agendada ainda não chegou')
         }
-        if (!followUps?.some(f => f.instance?.connection_status?.toLowerCase() === 'connected')) {
+        if (!followUps?.some(f => (f.instance?.connection_status || '').toLowerCase() === 'connected')) {
           console.log('- Instâncias estão desconectadas')
         }
       }
