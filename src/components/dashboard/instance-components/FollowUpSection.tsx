@@ -73,6 +73,9 @@ interface FollowUpData {
   system_prompt?: string;
   created_at?: string;
   updated_at?: string;
+  last_execution_time?: string;
+  next_execution_time?: string;
+  execution_count?: number;
 }
 
 const MAX_RETRIES = 3;
@@ -563,3 +566,4 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
     </div>
   )
 }
+
