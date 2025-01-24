@@ -10,6 +10,32 @@ import { Textarea } from "@/components/ui/textarea"
 import { useToast } from "@/components/ui/use-toast"
 import { Plus, Trash2, Users, Play, AlertCircle } from "lucide-react"
 import { Json } from "@/integrations/supabase/types"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/components/ui/tabs"
+import { ContactsTable } from "./ContactsTable"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 
 interface FollowUpSectionProps {
   instanceId: string
