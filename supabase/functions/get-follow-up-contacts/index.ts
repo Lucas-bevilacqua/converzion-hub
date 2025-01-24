@@ -9,10 +9,10 @@ const corsHeaders = {
 interface FollowUpContact {
   id: string;
   instance_id: string;
-  execution_count: number | null;
-  max_attempts: number | null;
+  execution_count: number;
+  max_attempts: number;
   next_execution_time: string | null;
-  delay_minutes: number | null;
+  delay_minutes: number;
 }
 
 serve(async (req) => {
@@ -86,9 +86,9 @@ serve(async (req) => {
       (followUps ?? []).map(async (followUp: FollowUpContact) => {
         try {
           // Ensure numeric values are properly converted
-          const executionCount = Number(followUp.execution_count || 0)
-          const maxAttempts = Number(followUp.max_attempts || 3)
-          const delayMinutes = Number(followUp.delay_minutes || 60)
+          const executionCount = parseInt(String(followUp.execution_count || '0'), 10)
+          const maxAttempts = parseInt(String(followUp.max_attempts || '3'), 10)
+          const delayMinutes = parseInt(String(followUp.delay_minutes || '60'), 10)
 
           console.log('🔢 [DEBUG] Numeric values:', {
             executionCount,
