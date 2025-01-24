@@ -26,7 +26,9 @@ serve(async (req) => {
         *,
         instance:evolution_instances (
           id,
-          connection_status
+          name,
+          connection_status,
+          user_id
         )
       `)
       .eq('status', 'pending')
@@ -61,6 +63,8 @@ serve(async (req) => {
           throw messagesError
         }
 
+        console.log(`✅ Found ${messages.length} messages for follow-up ${followUp.id}`)
+
         // Get existing contacts to avoid duplicates
         const { data: existingContacts, error: contactsError } = await supabase
           .from('follow_up_contacts')
@@ -72,11 +76,14 @@ serve(async (req) => {
           throw contactsError
         }
 
-        // Get potential contacts from users_clientes
+        console.log(`✅ Found ${existingContacts.length} existing contacts for follow-up ${followUp.id}`)
+
+        // Get potential contacts from users_clientes with last message within 24 hours
         const { data: contacts, error: usersError } = await supabase
           .from('users_clientes')
           .select('*')
           .eq('nomedaempresa', followUp.instance_id)
+          .gt('last_message_time', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
           .not('telefoneclientes', 'in', existingContacts.map(c => c.phone))
 
         if (usersError) {
@@ -84,7 +91,7 @@ serve(async (req) => {
           throw usersError
         }
 
-        console.log(`✅ Processing follow-up ${followUp.id} with ${messages.length} messages and ${contacts.length} new contacts`)
+        console.log(`✅ Found ${contacts.length} new contacts for follow-up ${followUp.id}`)
 
         // Create follow-up contacts
         if (contacts.length > 0) {
@@ -96,7 +103,8 @@ serve(async (req) => {
               status: 'pending',
               metadata: {
                 contact_name: contact.nomeclientes,
-                last_message_time: contact.last_message_time
+                last_message_time: contact.last_message_time,
+                instance_id: followUp.instance_id
               }
             })))
 
@@ -104,9 +112,11 @@ serve(async (req) => {
             console.error(`❌ Error inserting contacts for follow-up ${followUp.id}:`, insertError)
             throw insertError
           }
+
+          console.log(`✅ Successfully inserted ${contacts.length} new contacts for follow-up ${followUp.id}`)
         }
 
-        // Update follow-up status
+        // Update follow-up status to in_progress
         const { error: updateError } = await supabase
           .from('follow_ups')
           .update({ 
@@ -120,11 +130,14 @@ serve(async (req) => {
           throw updateError
         }
 
+        console.log(`✅ Successfully updated follow-up ${followUp.id} status to in_progress`)
+
         return {
           followUpId: followUp.id,
           status: 'success',
-          messages: messages,
-          newContacts: contacts.length
+          messages: messages.length,
+          newContacts: contacts.length,
+          existingContacts: existingContacts.length
         }
       } catch (error) {
         console.error(`❌ Error processing follow-up ${followUp.id}:`, error)
