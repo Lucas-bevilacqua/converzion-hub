@@ -35,8 +35,10 @@ serve(async (req) => {
     // Initialize Supabase client
     const supabaseClient = createClient(supabaseUrl, supabaseKey)
 
-    const now = new Date().toISOString()
-    console.log('⏰ [DEBUG] Current time:', now)
+    // Get current time in UTC/GMT
+    const now = new Date()
+    const nowISO = now.toISOString()
+    console.log('⏰ [DEBUG] Current UTC time:', nowISO)
 
     // Get all active follow-ups that are due for execution
     const { data: followUps, error: followUpsError } = await supabaseClient
@@ -51,7 +53,7 @@ serve(async (req) => {
       .eq('is_active', true)
       .eq('evolution_instances.connection_status', 'connected')
       .lt('execution_count', 'max_attempts')
-      .or(`next_execution_time.is.null,next_execution_time.lte.${now}`)
+      .or(`next_execution_time.is.null,next_execution_time.lte.${nowISO}`)
 
     if (followUpsError) {
       console.error('❌ [ERROR] Error fetching follow-ups:', followUpsError)
@@ -79,24 +81,24 @@ serve(async (req) => {
             }
           }
 
-          // Update execution count and time
-          const now = new Date()
-          const nextExecutionTime = new Date(now.getTime() + (followUp.delay_minutes * 60000))
-          
-          console.log('⏰ [DEBUG] Updating follow-up timing:', {
+          // Calculate next execution time in UTC
+          const delayMinutes = followUp.delay_minutes || 60 // Default to 60 minutes if not set
+          const nextExecutionTime = new Date(now.getTime() + (delayMinutes * 60 * 1000))
+          const nextExecutionISO = nextExecutionTime.toISOString()
+
+          console.log('⏰ [DEBUG] Time calculations:', {
             followUpId: followUp.id,
-            currentCount: executionCount,
-            newCount: executionCount + 1,
-            lastExecutionTime: now.toISOString(),
-            nextExecutionTime: nextExecutionTime.toISOString()
+            currentUTCTime: nowISO,
+            delayMinutes: delayMinutes,
+            nextExecutionUTC: nextExecutionISO
           })
 
           const { error: updateError } = await supabaseClient
             .from('instance_follow_ups')
             .update({
               execution_count: executionCount + 1,
-              last_execution_time: now.toISOString(),
-              next_execution_time: nextExecutionTime.toISOString()
+              last_execution_time: nowISO,
+              next_execution_time: nextExecutionISO
             })
             .eq('id', followUp.id)
 
@@ -125,7 +127,8 @@ serve(async (req) => {
             details: { 
               executionCount: executionCount + 1, 
               maxAttempts,
-              nextExecutionTime: nextExecutionTime.toISOString()
+              nextExecutionTime: nextExecutionISO,
+              currentTime: nowISO
             }
           }
         } catch (error) {
@@ -144,7 +147,7 @@ serve(async (req) => {
       JSON.stringify({ 
         success: true, 
         results,
-        timestamp: new Date().toISOString()
+        timestamp: nowISO
       }),
       { 
         headers: { 
