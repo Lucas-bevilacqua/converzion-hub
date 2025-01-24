@@ -227,6 +227,39 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
     }
   });
 
+  const deleteMessageMutation = useMutation({
+    mutationFn: async (messageId: string) => {
+      console.log('🔄 [DEBUG] Deleting message:', messageId)
+      
+      const { error } = await supabase
+        .from('follow_up_messages')
+        .delete()
+        .eq('id', messageId)
+
+      if (error) {
+        console.error('❌ [ERROR] Error deleting message:', error)
+        throw error
+      }
+      
+      console.log('✅ [DEBUG] Message deleted successfully')
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['follow-up-messages'] })
+      toast({
+        title: "Sucesso",
+        description: "Mensagem removida com sucesso.",
+      })
+    },
+    onError: (error) => {
+      console.error('❌ [ERROR] Error deleting message:', error)
+      toast({
+        title: "Erro",
+        description: "Não foi possível remover a mensagem.",
+        variant: "destructive",
+      })
+    }
+  });
+
   const processFollowUpMutation = useMutation({
     mutationFn: async () => {
       if (!followUp?.settings?.is_active || !user?.id) {
