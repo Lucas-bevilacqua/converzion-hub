@@ -85,10 +85,18 @@ serve(async (req) => {
     const results = await Promise.all(
       (followUps ?? []).map(async (followUp: FollowUpContact) => {
         try {
-          // Ensure we're working with numbers and provide default values
-          const executionCount = followUp.execution_count === null ? 0 : Number(followUp.execution_count)
-          const maxAttempts = followUp.max_attempts === null ? 3 : Number(followUp.max_attempts)
-          const delayMinutes = followUp.delay_minutes === null ? 60 : Number(followUp.delay_minutes)
+          // Parse numeric values safely with explicit type checking
+          const executionCount = typeof followUp.execution_count === 'string' 
+            ? parseInt(followUp.execution_count) 
+            : (followUp.execution_count ?? 0)
+
+          const maxAttempts = typeof followUp.max_attempts === 'string' 
+            ? parseInt(followUp.max_attempts) 
+            : (followUp.max_attempts ?? 3)
+
+          const delayMinutes = typeof followUp.delay_minutes === 'string' 
+            ? parseInt(followUp.delay_minutes) 
+            : (followUp.delay_minutes ?? 60)
 
           console.log('🔢 [DEBUG] Numeric values:', {
             executionCount,
@@ -96,7 +104,10 @@ serve(async (req) => {
             delayMinutes,
             rawExecutionCount: followUp.execution_count,
             rawMaxAttempts: followUp.max_attempts,
-            rawDelayMinutes: followUp.delay_minutes
+            rawDelayMinutes: followUp.delay_minutes,
+            typeofExecutionCount: typeof followUp.execution_count,
+            typeofMaxAttempts: typeof followUp.max_attempts,
+            typeofDelayMinutes: typeof followUp.delay_minutes
           })
 
           if (executionCount >= maxAttempts) {
