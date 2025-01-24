@@ -1,4 +1,4 @@
-import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const corsHeaders = {
@@ -12,12 +12,12 @@ serve(async (req) => {
   }
 
   try {
+    console.log('🔄 Starting follow-up contacts processing')
+
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
-
-    console.log('🔄 Starting follow-up contacts processing')
 
     // Get active follow-ups with pending status
     const { data: followUps, error: followUpsError } = await supabase
