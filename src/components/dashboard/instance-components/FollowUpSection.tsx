@@ -260,106 +260,6 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
     }
   });
 
-  const processFollowUpMutation = useMutation({
-    mutationFn: async () => {
-      if (!followUp?.settings?.is_active || !user?.id) {
-        console.log('⏸️ [DEBUG] Follow-up not active or user not logged in');
-        return null;
-      }
-
-      console.log('🔄 [DEBUG] Processing follow-up:', {
-        followUpId: followUp.id,
-        userId: user.id,
-        instanceId: instanceId
-      });
-
-      return await retryWithBackoff(async () => {
-        const { data, error } = await supabase.functions.invoke('get-follow-up-contacts', {
-          body: { 
-            followUpId: followUp.id,
-            userId: user.id,
-            source: 'manual-trigger',
-            instanceId: instanceId
-          }
-        });
-
-        if (error) {
-          console.error('❌ [ERROR] Error processing follow-up:', error);
-          throw error;
-        }
-
-        console.log('✅ [DEBUG] Follow-up processed successfully:', data);
-        return data;
-      });
-    },
-    onSuccess: (data) => {
-      console.log('✅ [DEBUG] Follow-up mutation succeeded:', data);
-      queryClient.invalidateQueries({ queryKey: ['follow-up'] });
-      toast({
-        title: "Sucesso",
-        description: "Follow-up processado com sucesso.",
-      });
-    },
-    onError: (error) => {
-      console.error('❌ [ERROR] Error in follow-up mutation:', error);
-      toast({
-        title: "Erro",
-        description: "Não foi possível processar o follow-up.",
-        variant: "destructive",
-      });
-    }
-  });
-
-  const isInstanceConnected = (instance?: { connection_status?: string | null }) => {
-    if (!instance?.connection_status) return false
-    return instance.connection_status.toLowerCase() === 'connected'
-  }
-
-  const FollowUpStatus = () => {
-    if (!followUp) {
-      console.log('❌ No follow-up data available')
-      return null
-    }
-
-    const isDisconnected = !isInstanceConnected(followUp.instance)
-
-    if (!followUp.settings?.is_active) {
-      return (
-        <Alert className="mb-4">
-          <AlertCircle className="h-4 w-4" />
-          <AlertTitle>Follow-up Inativo</AlertTitle>
-          <AlertDescription>
-            Ative o follow-up para começar a enviar mensagens.
-          </AlertDescription>
-        </Alert>
-      )
-    }
-
-    if (isDisconnected) {
-      return (
-        <Alert variant="destructive" className="mb-4">
-          <AlertCircle className="h-4 w-4" />
-          <AlertTitle>Instância Desconectada</AlertTitle>
-          <AlertDescription>
-            Conecte a instância para que os follow-ups possam ser enviados.
-          </AlertDescription>
-        </Alert>
-      )
-    }
-
-    return (
-      <Alert variant="default" className="mb-4">
-        <AlertCircle className="h-4 w-4" />
-        <AlertTitle>Follow-up Ativo</AlertTitle>
-        <AlertDescription>
-          Próxima execução: {followUp.scheduled_for ? new Date(followUp.scheduled_for).toLocaleString() : '-'}
-          <br />
-          Status: {followUp.status}
-        </AlertDescription>
-      </Alert>
-    )
-  }
-
   const saveMutation = useMutation({
     mutationFn: async (data: FormData) => {
       console.log('🔄 [DEBUG] Saving follow-up settings:', data);
@@ -458,9 +358,59 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
         title: "Erro",
         description: "Não foi possível salvar as configurações.",
         variant: "destructive",
-      })
+      });
     }
-  })
+  });
+
+  const isInstanceConnected = (instance?: { connection_status?: string | null }) => {
+    if (!instance?.connection_status) return false
+    return instance.connection_status.toLowerCase() === 'connected'
+  }
+
+  const FollowUpStatus = () => {
+    if (!followUp) {
+      console.log('❌ No follow-up data available')
+      return null
+    }
+
+    const isDisconnected = !isInstanceConnected(followUp.instance)
+
+    if (!followUp.settings?.is_active) {
+      return (
+        <Alert className="mb-4">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Follow-up Inativo</AlertTitle>
+          <AlertDescription>
+            Ative o follow-up para começar a enviar mensagens.
+          </AlertDescription>
+        </Alert>
+      )
+    }
+
+    if (isDisconnected) {
+      return (
+        <Alert variant="destructive" className="mb-4">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Instância Desconectada</AlertTitle>
+          <AlertDescription>
+            Conecte a instância para que os follow-ups possam ser enviados.
+          </AlertDescription>
+        </Alert>
+      )
+    }
+
+    return (
+      <Alert variant="default" className="mb-4">
+        <AlertCircle className="h-4 w-4" />
+        <AlertTitle>Follow-up Ativo</AlertTitle>
+        <AlertDescription>
+          Próxima execução: {followUp.scheduled_for ? new Date(followUp.scheduled_for).toLocaleString() : '-'}
+          <br />
+          Status: {followUp.status}
+        </AlertDescription>
+      </Alert>
+    )
+  }
 
   return (
     <div className="space-y-6">
@@ -475,7 +425,7 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => processFollowUpMutation.mutate()}
+            onClick={() => saveMutation.mutate(formData)}
             disabled={!followUp?.settings?.is_active}
           >
             <Play className="h-4 w-4 mr-2" />
