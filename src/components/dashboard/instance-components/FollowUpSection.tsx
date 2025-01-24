@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { useToast } from "@/components/ui/use-toast"
-import { Plus, Trash2, Users, Play, AlertCircle, Edit } from "lucide-react"
+import { Plus, Trash2, Users, Play, AlertCircle } from "lucide-react"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -101,16 +101,16 @@ async function retryWithBackoff<T>(
 }
 
 export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
+  console.log('🔄 [DEBUG] FollowUpSection - Mounting component with instanceId:', instanceId);
+  
   const { user } = useAuth()
   const { toast } = useToast()
   const queryClient = useQueryClient()
 
-  console.log('🔄 [DEBUG] FollowUpSection - Iniciando com instanceId:', instanceId)
-
   const { data: followUp, isLoading } = useQuery({
     queryKey: ['follow-up', instanceId],
     queryFn: async () => {
-      console.log('🔄 [DEBUG] Buscando configuração de follow-up para instância:', instanceId)
+      console.log('🔄 [DEBUG] Fetching follow-up data for instance:', instanceId);
       const { data, error } = await supabase
         .from('follow_ups')
         .select(`
@@ -126,15 +126,15 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
         .maybeSingle()
 
       if (error) {
-        console.error('❌ [ERROR] Erro ao buscar follow-up:', error)
-        throw error
+        console.error('❌ [ERROR] Error fetching follow-up:', error);
+        throw error;
       }
 
-      console.log('✅ [DEBUG] Dados do follow-up:', data)
-      return data as FollowUpData | null
+      console.log('✅ [DEBUG] Follow-up data retrieved:', data);
+      return data as FollowUpData | null;
     },
     enabled: !!instanceId
-  })
+  });
 
   const [formData, setFormData] = useState<FormData>({
     is_active: followUp?.settings?.is_active || false,
@@ -143,9 +143,10 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
     stop_on_keyword: followUp?.settings?.stop_on_keyword || ['comprou', 'agendou', 'agendado', 'comprado'],
     manual_messages: [],
     system_prompt: followUp?.settings?.system_prompt || ''
-  })
+  });
 
   useEffect(() => {
+    console.log('🔄 [DEBUG] useEffect triggered - followUp changed:', followUp);
     if (followUp) {
       setFormData({
         is_active: followUp.settings?.is_active || false,
@@ -154,31 +155,32 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
         stop_on_keyword: followUp.settings?.stop_on_keyword || ['comprou', 'agendou', 'agendado', 'comprado'],
         manual_messages: [],
         system_prompt: followUp.settings?.system_prompt || ''
-      })
+      });
     }
-  }, [followUp])
+  }, [followUp]);
 
   const { data: followUpMessages = [], isLoading: isLoadingMessages } = useQuery({
     queryKey: ['follow-up-messages', followUp?.id],
     queryFn: async () => {
-      if (!followUp?.id) return []
+      if (!followUp?.id) return [];
       
+      console.log('🔄 [DEBUG] Fetching messages for follow-up:', followUp.id);
       const { data, error } = await supabase
         .from('follow_up_messages')
         .select('*')
         .eq('follow_up_id', followUp.id)
-        .order('delay_minutes', { ascending: true })
+        .order('delay_minutes', { ascending: true });
 
       if (error) {
-        console.error('❌ [ERROR] Error fetching follow-up messages:', error)
-        throw error
+        console.error('❌ [ERROR] Error fetching follow-up messages:', error);
+        throw error;
       }
 
-      console.log('✅ [DEBUG] Follow-up messages loaded:', data)
-      return data
+      console.log('✅ [DEBUG] Follow-up messages loaded:', data);
+      return data;
     },
     enabled: !!followUp?.id
-  })
+  });
 
   const deleteMessageMutation = useMutation({
     mutationFn: async (messageId: string) => {
@@ -204,131 +206,57 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
         variant: "destructive",
       })
     }
-  })
-
-  useEffect(() => {
-    if (followUpMessages.length > 0) {
-      setFormData(prev => ({
-        ...prev,
-        manual_messages: followUpMessages.map(msg => ({
-          message: msg.message,
-          delay_minutes: msg.delay_minutes
-        }))
-      }))
-    }
-  }, [followUpMessages])
-
-  const saveMutation = useMutation({
-    mutationFn: async (values: FormData) => {
-      console.log('💾 [DEBUG] Saving follow-up with values:', values)
-      
-      const followUpData = {
-        instance_id: instanceId,
-        type: values.type,
-        settings: {
-          is_active: values.is_active,
-          stop_on_reply: values.stop_on_reply,
-          stop_on_keyword: values.stop_on_keyword,
-          system_prompt: values.system_prompt,
-        },
-        status: 'pending' as const,
-        scheduled_for: new Date().toISOString()
-      }
-
-      let followUpId: string;
-
-      if (followUp) {
-        const { data: updatedFollowUp, error: updateError } = await supabase
-          .from('follow_ups')
-          .update(followUpData)
-          .eq('id', followUp.id)
-          .select()
-          .single()
-
-        if (updateError) throw updateError
-        followUpId = followUp.id
-      } else {
-        const { data: newFollowUp, error: insertError } = await supabase
-          .from('follow_ups')
-          .insert(followUpData)
-          .select()
-          .single()
-
-        if (insertError) throw insertError
-        followUpId = newFollowUp.id
-      }
-
-      if (values.type === 'manual' && values.manual_messages.length > 0) {
-        const messagesData = values.manual_messages.map(msg => ({
-          follow_up_id: followUpId,
-          message: msg.message,
-          delay_minutes: msg.delay_minutes,
-          metadata: {}
-        }))
-
-        const { error: messagesError } = await supabase
-          .from('follow_up_messages')
-          .insert(messagesData)
-
-        if (messagesError) {
-          console.error('❌ [ERROR] Error inserting messages:', messagesError)
-          throw messagesError
-        }
-      }
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['follow-up'] })
-      toast({
-        title: "Sucesso",
-        description: "Configurações de follow-up salvas com sucesso.",
-      })
-    },
-    onError: (error) => {
-      console.error('❌ [ERROR] Error in save mutation:', error)
-      toast({
-        title: "Erro",
-        description: "Não foi possível salvar as configurações. Por favor, tente novamente.",
-        variant: "destructive",
-      })
-    }
-  })
+  });
 
   const processFollowUpMutation = useMutation({
     mutationFn: async () => {
       if (!followUp?.settings?.is_active || !user?.id) {
-        console.log('⏸️ [DEBUG] Follow-up não está ativo ou usuário não está logado')
-        return null
+        console.log('⏸️ [DEBUG] Follow-up not active or user not logged in');
+        return null;
       }
+
+      console.log('🔄 [DEBUG] Processing follow-up:', {
+        followUpId: followUp.id,
+        userId: user.id,
+        instanceId: instanceId
+      });
 
       return await retryWithBackoff(async () => {
         const { data, error } = await supabase.functions.invoke('get-follow-up-contacts', {
           body: { 
             followUpId: followUp.id,
             userId: user.id,
-            source: 'manual-trigger'
+            source: 'manual-trigger',
+            instanceId: instanceId
           }
-        })
+        });
 
-        if (error) throw error
-        return data
-      })
+        if (error) {
+          console.error('❌ [ERROR] Error processing follow-up:', error);
+          throw error;
+        }
+
+        console.log('✅ [DEBUG] Follow-up processed successfully:', data);
+        return data;
+      });
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['follow-up'] })
+    onSuccess: (data) => {
+      console.log('✅ [DEBUG] Follow-up mutation succeeded:', data);
+      queryClient.invalidateQueries({ queryKey: ['follow-up'] });
       toast({
         title: "Sucesso",
         description: "Follow-up processado com sucesso.",
-      })
+      });
     },
     onError: (error) => {
-      console.error('❌ [ERROR] Erro ao processar follow-up:', error)
+      console.error('❌ [ERROR] Error in follow-up mutation:', error);
       toast({
         title: "Erro",
         description: "Não foi possível processar o follow-up.",
         variant: "destructive",
-      })
+      });
     }
-  })
+  });
 
   const isInstanceConnected = (instance?: { connection_status?: string | null }) => {
     if (!instance?.connection_status) return false
@@ -380,12 +308,10 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
     )
   }
 
-  // Adicionar mutation para deletar follow-up
   const deleteMutation = useMutation({
     mutationFn: async () => {
       if (!followUp?.id) throw new Error("No follow-up to delete")
       
-      // Primeiro deletar as mensagens associadas
       const { error: messagesError } = await supabase
         .from('follow_up_messages')
         .delete()
@@ -393,7 +319,6 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
 
       if (messagesError) throw messagesError
 
-      // Depois deletar o follow-up
       const { error: followUpError } = await supabase
         .from('follow_ups')
         .delete()
@@ -416,7 +341,7 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
         variant: "destructive",
       })
     }
-  })
+  });
 
   return (
     <div className="space-y-6">
