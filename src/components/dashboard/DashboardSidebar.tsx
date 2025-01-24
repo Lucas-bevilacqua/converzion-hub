@@ -1,96 +1,69 @@
-import { Home, MessageSquare, Crown, LogOut } from "lucide-react"
-import { useNavigate } from "react-router-dom"
-import { useAuth } from "@/contexts/auth/AuthContext"
-import { useToast } from "@/components/ui/use-toast"
-import { useIsMobile } from "@/hooks/use-mobile"
-import {
-  Sidebar,
-  SidebarContent,
-  SidebarGroup,
-  SidebarGroupContent,
-  SidebarGroupLabel,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
-} from "@/components/ui/sidebar"
+import { Brain, MessageSquare, ChartColumn, Settings2, Zap, Users, Shield, Bot } from "lucide-react";
+import { useAuth } from "@/contexts/auth/AuthContext";
+import { useState } from "react";
+import { Sidebar } from "@/components/ui/sidebar";
+import { SidebarItem } from "@/components/ui/sidebar/SidebarItem";
 
-interface DashboardSidebarProps {
-  onSectionChange: (section: string) => void
-  activeSection: string
-}
+export function DashboardSidebar({ onSectionChange, activeSection }: { onSectionChange: (section: string) => void; activeSection: string; }) {
+  const { user } = useAuth();
+  const [isOpen, setIsOpen] = useState(false);
 
-export function DashboardSidebar({ onSectionChange, activeSection }: DashboardSidebarProps) {
-  const navigate = useNavigate()
-  const { signOut } = useAuth()
-  const { toast } = useToast()
-  const isMobile = useIsMobile()
-
-  console.log("DashboardSidebar - Mobile:", isMobile, "Active Section:", activeSection)
-
-  const handleSignOut = async () => {
-    try {
-      await signOut()
-      toast({
-        title: "Desconectado com sucesso",
-        description: "Você foi desconectado da sua conta.",
-      })
-      navigate("/login")
-    } catch (error) {
-      console.error("Error signing out:", error)
-      toast({
-        variant: "destructive",
-        title: "Erro ao desconectar",
-        description: "Ocorreu um erro ao tentar desconectar. Tente novamente.",
-      })
-    }
-  }
-
-  const menuItems = [
-    {
-      title: "Visão Geral",
-      icon: Home,
-      id: "overview"
-    },
-    {
-      title: "Instâncias WhatsApp",
-      icon: MessageSquare,
-      id: "instances"
-    },
-    {
-      title: "Assinatura",
-      icon: Crown,
-      id: "subscription"
-    }
-  ]
+  const handleSectionChange = (section: string) => {
+    onSectionChange(section);
+    setIsOpen(false);
+  };
 
   return (
-    <Sidebar variant={isMobile ? "floating" : "sidebar"} collapsible="offcanvas">
-      <SidebarContent>
-        <SidebarGroup>
-          <SidebarGroupLabel>Menu</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {menuItems.map((item) => (
-                <SidebarMenuItem key={item.id}>
-                  <SidebarMenuButton 
-                    onClick={() => onSectionChange(item.id)}
-                    data-active={activeSection === item.id}
-                  >
-                    <item.icon className="h-4 w-4" />
-                    <span>{item.title}</span>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-              <SidebarMenuItem>
-                <SidebarMenuButton onClick={handleSignOut}>
-                  <LogOut className="h-4 w-4" />
-                  <span>Sair</span>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-      </SidebarContent>
+    <Sidebar open={isOpen} onOpenChange={setIsOpen}>
+      <SidebarItem
+        icon={<Bot className="h-5 w-5" />}
+        onClick={() => handleSectionChange("overview")}
+        active={activeSection === "overview"}
+      >
+        Visão Geral
+      </SidebarItem>
+      <SidebarItem
+        icon={<MessageSquare className="h-5 w-5" />}
+        onClick={() => handleSectionChange("instances")}
+        active={activeSection === "instances"}
+      >
+        Instâncias
+      </SidebarItem>
+      <SidebarItem
+        icon={<ChartColumn className="h-5 w-5" />}
+        onClick={() => handleSectionChange("metrics")}
+        active={activeSection === "metrics"}
+      >
+        Métricas
+      </SidebarItem>
+      <SidebarItem
+        icon={<Settings2 className="h-5 w-5" />}
+        onClick={() => handleSectionChange("settings")}
+        active={activeSection === "settings"}
+      >
+        Configurações
+      </SidebarItem>
+      <SidebarItem
+        icon={<Zap className="h-5 w-5" />}
+        onClick={() => handleSectionChange("subscription")}
+        active={activeSection === "subscription"}
+      >
+        Assinatura
+      </SidebarItem>
+      <SidebarItem
+        icon={<Users className="h-5 w-5" />}
+        onClick={() => handleSectionChange("users")}
+        active={activeSection === "users"}
+      >
+        Usuários
+      </SidebarItem>
+      <SidebarItem
+        icon={<Shield className="h-5 w-5" />}
+        onClick={() => handleSectionChange("security")}
+        active={activeSection === "security"}
+      >
+        Segurança
+      </SidebarItem>
     </Sidebar>
-  )
+  );
 }
