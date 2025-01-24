@@ -537,18 +537,20 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
                   <div key={index} className="space-y-2 p-4 border rounded-lg">
                     <div className="flex justify-between items-start">
                       <Label>Mensagem {index + 1}</Label>
-                      <div className="flex gap-2">
-                        {followUpMessages[index]?.id && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => deleteMessageMutation.mutate(followUpMessages[index].id)}
-                            disabled={deleteMessageMutation.isPending}
-                          >
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                          </Button>
-                        )}
-                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          const newMessages = [...formData.manual_messages];
+                          newMessages.splice(index, 1);
+                          setFormData(prev => ({
+                            ...prev,
+                            manual_messages: newMessages
+                          }));
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
                     </div>
                     <Textarea
                       value={msg.message}
@@ -594,7 +596,7 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
                         delay_minutes: msg.delay_minutes
                       })),
                       system_prompt: followUp.settings?.system_prompt || ''
-                    })
+                    });
                   }
                 }}
               >
