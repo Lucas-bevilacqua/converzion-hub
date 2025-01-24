@@ -85,19 +85,20 @@ serve(async (req) => {
     const results = await Promise.all(
       (followUps ?? []).map(async (followUp: FollowUpContact) => {
         try {
-          // Log raw values before conversion
-          console.log('🔢 [DEBUG] Raw values:', {
-            execution_count: followUp.execution_count,
-            max_attempts: followUp.max_attempts,
-            delay_minutes: followUp.delay_minutes
-          })
+          // Log raw values before any processing
+          console.log('🔢 [DEBUG] Raw follow-up data:', followUp)
 
-          // Ensure numeric values are properly handled with fallbacks
-          const executionCount = typeof followUp.execution_count === 'number' ? followUp.execution_count : 0
-          const maxAttempts = typeof followUp.max_attempts === 'number' ? followUp.max_attempts : 3
-          const delayMinutes = typeof followUp.delay_minutes === 'number' ? followUp.delay_minutes : 60
+          // Ensure we have valid numbers by explicitly converting and validating
+          const executionCount = parseInt(followUp.execution_count?.toString() || '0', 10)
+          const maxAttempts = parseInt(followUp.max_attempts?.toString() || '3', 10)
+          const delayMinutes = parseInt(followUp.delay_minutes?.toString() || '60', 10)
 
-          console.log('🔢 [DEBUG] Converted numeric values:', {
+          // Validate the converted numbers
+          if (isNaN(executionCount) || isNaN(maxAttempts) || isNaN(delayMinutes)) {
+            throw new Error(`Invalid numeric values: executionCount=${executionCount}, maxAttempts=${maxAttempts}, delayMinutes=${delayMinutes}`)
+          }
+
+          console.log('✅ [DEBUG] Converted numeric values:', {
             executionCount,
             maxAttempts,
             delayMinutes
