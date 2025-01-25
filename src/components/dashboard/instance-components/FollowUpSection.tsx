@@ -427,7 +427,9 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
     const isConnected = status === 'connected' || 
                        status === 'open' || 
                        status.includes('open') ||
-                       instance.connection_status === 'open';
+                       status.includes('connected') ||
+                       instance.connection_status === 'open' ||
+                       instance.connection_status === 'connected';
     
     console.log('🔄 [DEBUG] Connection status check:', {
       rawStatus: instance.connection_status,
