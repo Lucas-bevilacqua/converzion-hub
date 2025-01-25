@@ -69,7 +69,7 @@ export function InstancePromptDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl">
+      <DialogContent className="w-[95vw] max-w-4xl mx-auto h-[90vh] overflow-y-auto md:h-auto">
         <DialogHeader>
           <DialogTitle>Configurar Instância</DialogTitle>
           <DialogDescription>
@@ -78,7 +78,7 @@ export function InstancePromptDialog({
         </DialogHeader>
 
         <Tabs defaultValue="general" className="w-full">
-          <TabsList className="w-full">
+          <TabsList className="w-full grid grid-cols-3 mb-4">
             <TabsTrigger value="general">Geral</TabsTrigger>
             <TabsTrigger value="follow-up">Follow-up</TabsTrigger>
             <TabsTrigger value="tools">Ferramentas</TabsTrigger>
@@ -111,9 +111,10 @@ export function InstancePromptDialog({
                   value={values.prompt}
                   onChange={(e) => setValues((prev) => ({ ...prev, prompt: e.target.value }))}
                   placeholder="Digite as instruções para o assistente..."
+                  className="min-h-[200px]"
                 />
               </div>
-              <div className="flex justify-end space-x-2">
+              <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 sm:space-x-2">
                 <Button variant="outline" onClick={() => onOpenChange(false)}>
                   Cancelar
                 </Button>
