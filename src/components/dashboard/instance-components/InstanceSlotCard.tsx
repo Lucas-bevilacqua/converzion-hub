@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Dialog } from "@/components/ui/dialog"
 import { QRCodeDialog } from "./QRCodeDialog"
 import { useToast } from "@/hooks/use-toast"
-import { Loader2, QrCode, Power } from "lucide-react"
+import { Loader2, QrCode, Power, Settings } from "lucide-react"
 import type { EvolutionInstance } from "@/integrations/supabase/database-types/evolution-instances"
 
 interface InstanceSlotCardProps {
@@ -126,6 +126,16 @@ export function InstanceSlotCard({ instance, isUsed, onClick, onDisconnect }: In
                 >
                   <QrCode className="h-4 w-4 mr-2" />
                   QR Code
+                </Button>
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => window.location.href = `/dashboard/instances/${instance?.id}/settings`}
+                  disabled={!instance}
+                >
+                  <Settings className="h-4 w-4 mr-2" />
+                  Configurações
                 </Button>
               </>
             ) : (
