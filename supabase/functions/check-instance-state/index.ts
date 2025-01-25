@@ -57,7 +57,6 @@ serve(async (req) => {
     const connectionStateUrl = `${baseUrl}/instance/connectionState/${instance.name}`
     
     console.log('Fazendo requisição para:', connectionStateUrl)
-    console.log('Usando Evolution API Key:', evolutionApiKey.substring(0, 5) + '...')
 
     const response = await fetch(connectionStateUrl, {
       method: 'GET',
@@ -82,16 +81,16 @@ serve(async (req) => {
     const data = await response.json()
     console.log('Resposta da Evolution API:', data)
 
-    // Verificar se a instância está conectada (estado 'open' ou 'connected')
-    const isConnected = data.state === 'open' || 
-                       data.instance?.instance?.state === 'open' || 
-                       data.state === 'connected' ||
-                       data.instance?.instance?.state === 'connected'
+    // Extrair o estado da resposta da API
+    const rawState = data.state || data?.instance?.instance?.state
+    const instanceState = data?.instance?.instance?.state
+    const isConnected = rawState === 'open' || instanceState === 'open' || 
+                       rawState === 'connected' || instanceState === 'connected'
 
-    console.log('Estado da conexão:', {
-      rawState: data.state,
-      instanceState: data.instance?.instance?.state,
-      isConnected
+    console.log('Estado da conexão:', { 
+      rawState, 
+      instanceState, 
+      isConnected 
     })
 
     // Atualizar estado da instância no banco
