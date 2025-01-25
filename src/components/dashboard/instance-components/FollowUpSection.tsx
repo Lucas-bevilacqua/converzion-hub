@@ -109,6 +109,7 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
   const queryClient = useQueryClient()
   const [displayDate, setDisplayDate] = useState<Date | null>(null)
   const [testPhoneNumber, setTestPhoneNumber] = useState("")
+  const [showTestDialog, setShowTestDialog] = useState(false)
 
   const { data: followUp, isLoading } = useQuery({
     queryKey: ['follow-up', instanceId],
@@ -307,6 +308,7 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
         description: "Follow-up testado com sucesso. Verifique o WhatsApp.",
       })
       setTestPhoneNumber("") // Clear the phone number after successful test
+      setShowTestDialog(false) // Close the dialog
     },
     onError: (error) => {
       console.error('❌ [ERROR] Error testing follow-up:', error)
@@ -539,7 +541,7 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <AlertDialog>
+          <AlertDialog open={showTestDialog} onOpenChange={setShowTestDialog}>
             <AlertDialogTrigger asChild>
               <Button
                 variant="outline"
