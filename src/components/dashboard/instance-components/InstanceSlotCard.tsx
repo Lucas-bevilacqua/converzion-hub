@@ -31,7 +31,6 @@ export function InstanceSlotCard({
   const [showFollowUpDialog, setShowFollowUpDialog] = useState(false)
   const [qrCodeData, setQrCodeData] = useState<string | null>(null)
 
-  // Query para verificar o estado do número
   const { data: stateData, error: stateError } = useQuery({
     queryKey: ['instanceState', instance?.id],
     queryFn: async () => {
@@ -57,11 +56,10 @@ export function InstanceSlotCard({
           throw error
         }
 
-        const isConnected = data?.instance?.state === 'open'
-        return { state: isConnected ? 'connected' : 'disconnected' }
+        console.log('Estado recebido da API:', data)
+        return data
       } catch (error) {
         console.error('Erro na verificação de estado:', error)
-        // Retorna o último estado conhecido em caso de erro de conexão
         return { 
           state: instance?.connection_status || 'disconnected',
           error: true
@@ -74,7 +72,6 @@ export function InstanceSlotCard({
     retryDelay: 1000
   })
 
-  // Se houver erro na verificação de estado, mostra toast apenas uma vez
   React.useEffect(() => {
     if (stateError) {
       console.error('Erro ao verificar estado:', stateError)
@@ -92,7 +89,6 @@ export function InstanceSlotCard({
     try {
       console.log('Deletando configurações da instância:', instance.id)
       
-      // Primeiro deleta as configurações
       const { error: configError } = await supabase
         .from('instance_configurations')
         .delete()
@@ -105,7 +101,6 @@ export function InstanceSlotCard({
 
       console.log('Configurações deletadas, agora deletando a instância')
       
-      // Depois deleta a instância
       const { error: instanceError } = await supabase
         .from('evolution_instances')
         .delete()
@@ -129,7 +124,7 @@ export function InstanceSlotCard({
     }
   }
 
-  const isConnected = stateData?.state === 'connected' || instance?.connection_status?.toLowerCase() === 'connected'
+  const isConnected = stateData?.state === 'connected' || instance?.connection_status === 'connected'
 
   const handleConnect = async () => {
     if (!instance?.id) return
