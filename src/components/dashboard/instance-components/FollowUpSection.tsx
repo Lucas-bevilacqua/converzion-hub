@@ -419,10 +419,15 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
       console.log('❌ [DEBUG] No connection status found:', instance);
       return false;
     }
+    
+    // Normalize the status to lowercase for consistent comparison
     const status = instance.connection_status.toLowerCase();
-    // Considerar tanto 'connected' quanto 'open' como estados conectados
-    const isConnected = status === 'connected' || status === 'open' || 
-                       instance?.connection_status?.includes('open');
+    
+    // Check both the direct status and the instance state
+    const isConnected = status === 'connected' || 
+                       status === 'open' || 
+                       status.includes('open') ||
+                       instance.connection_status === 'open';
     
     console.log('🔄 [DEBUG] Connection status check:', {
       rawStatus: instance.connection_status,
