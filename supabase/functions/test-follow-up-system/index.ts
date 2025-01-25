@@ -31,6 +31,12 @@ Deno.serve(async (req) => {
       throw new Error('Test phone number is required')
     }
 
+    // Format phone number - remove any non-numeric characters
+    const formattedPhone = testPhoneNumber.replace(/[^0-9]/g, '')
+    if (formattedPhone.length < 10) {
+      throw new Error('Invalid phone number format')
+    }
+
     // Get follow-up data
     const { data: followUp, error: followUpError } = await supabaseClient
       .from('follow_ups')
@@ -91,7 +97,7 @@ Deno.serve(async (req) => {
       normalizedStatus: status,
       isConnected,
       instanceName: instance.name,
-      testPhoneNumber
+      testPhoneNumber: formattedPhone
     })
 
     if (!isConnected) {
@@ -105,13 +111,19 @@ Deno.serve(async (req) => {
       throw new Error('Evolution API configuration missing')
     }
 
+    console.log('Evolution API configuration:', {
+      url: evolutionApiUrl,
+      hasKey: !!evolutionApiKey,
+      instanceName: instance.name
+    })
+
     if (executeFullSequence) {
       // Insert test contact into follow_up_contacts with test flag
       const { error: contactError } = await supabaseClient
         .from('follow_up_contacts')
         .insert({
           follow_up_id: followUpId,
-          phone: testPhoneNumber.replace(/[^0-9]/g, ''),
+          phone: formattedPhone,
           status: 'pending',
           metadata: { 
             is_test: true,
@@ -127,76 +139,95 @@ Deno.serve(async (req) => {
       console.log('✅ Test contact created successfully')
 
       // Send initial confirmation
-      const response = await fetch(`${evolutionApiUrl}/message/sendText/${instance.name}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'apikey': evolutionApiKey,
-        },
-        body: JSON.stringify({
-          number: testPhoneNumber.replace(/[^0-9]/g, ''),
-          text: `[TESTE DE FOLLOW-UP]\n\nIniciando sequência de follow-up...\n\nVocê receberá ${messages.length} mensagens com os intervalos configurados:\n\n${messages.map((msg, index) => 
-            `${index + 1}. Em ${msg.delay_minutes} minutos`
-          ).join('\n')}`,
-        }),
-      })
-
-      if (!response.ok) {
-        const errorText = await response.text()
-        throw new Error(`Failed to send test message: ${errorText}`)
-      }
-
-      console.log('✅ Initial confirmation sent successfully')
-
-      // Trigger immediate processing for this contact
-      const processingResponse = await fetch(`${evolutionApiUrl}/message/sendText/${instance.name}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'apikey': evolutionApiKey,
-        },
-        body: JSON.stringify({
-          number: testPhoneNumber.replace(/[^0-9]/g, ''),
-          text: messages[0].message
-        }),
-      })
-
-      if (!processingResponse.ok) {
-        const errorText = await processingResponse.text()
-        throw new Error(`Failed to send first message: ${errorText}`)
-      }
-
-      console.log('✅ First message sent successfully')
-
-      // Update contact status
-      const { error: updateError } = await supabaseClient
-        .from('follow_up_contacts')
-        .update({
-          status: 'in_progress',
-          sent_at: new Date().toISOString()
+      try {
+        const confirmationResponse = await fetch(`${evolutionApiUrl}/message/sendText/${instance.name}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': evolutionApiKey,
+          },
+          body: JSON.stringify({
+            number: formattedPhone,
+            text: `[TESTE DE FOLLOW-UP]\n\nIniciando sequência de follow-up...\n\nVocê receberá ${messages.length} mensagens com os intervalos configurados:\n\n${messages.map((msg, index) => 
+              `${index + 1}. Em ${msg.delay_minutes} minutos`
+            ).join('\n')}`,
+          }),
         })
-        .eq('follow_up_id', followUpId)
-        .eq('phone', testPhoneNumber.replace(/[^0-9]/g, ''))
 
-      if (updateError) {
-        console.error('Error updating contact status:', updateError)
+        if (!confirmationResponse.ok) {
+          const errorText = await confirmationResponse.text()
+          console.error('Error sending confirmation:', errorText)
+          throw new Error(`Failed to send confirmation: ${errorText}`)
+        }
+
+        console.log('✅ Initial confirmation sent successfully')
+
+        // Send first message immediately
+        const firstMessageResponse = await fetch(`${evolutionApiUrl}/message/sendText/${instance.name}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': evolutionApiKey,
+          },
+          body: JSON.stringify({
+            number: formattedPhone,
+            text: messages[0].message
+          }),
+        })
+
+        if (!firstMessageResponse.ok) {
+          const errorText = await firstMessageResponse.text()
+          console.error('Error sending first message:', errorText)
+          throw new Error(`Failed to send first message: ${errorText}`)
+        }
+
+        console.log('✅ First message sent successfully')
+
+        // Update contact status
+        const { error: updateError } = await supabaseClient
+          .from('follow_up_contacts')
+          .update({
+            status: 'in_progress',
+            sent_at: new Date().toISOString()
+          })
+          .eq('follow_up_id', followUpId)
+          .eq('phone', formattedPhone)
+
+        if (updateError) {
+          console.error('Error updating contact status:', updateError)
+        }
+
+      } catch (error) {
+        console.error('Error in Evolution API communication:', error)
+        throw new Error(`Evolution API error: ${error.message}`)
       }
 
     } else {
       // Send preview message only
-      await fetch(`${evolutionApiUrl}/message/sendText/${instance.name}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'apikey': evolutionApiKey,
-        },
-        body: JSON.stringify({
-          number: testPhoneNumber.replace(/[^0-9]/g, ''),
-          text: `[TESTE DE FOLLOW-UP]\n\nMensagens configuradas:\n\n${messages.map((msg, index) => 
-            `${index + 1}. Após ${msg.delay_minutes} minutos:\n${msg.message}`
-          ).join('\n\n')}`,
-        }),
-      })
+      try {
+        const previewResponse = await fetch(`${evolutionApiUrl}/message/sendText/${instance.name}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': evolutionApiKey,
+          },
+          body: JSON.stringify({
+            number: formattedPhone,
+            text: `[TESTE DE FOLLOW-UP]\n\nMensagens configuradas:\n\n${messages.map((msg, index) => 
+              `${index + 1}. Após ${msg.delay_minutes} minutos:\n${msg.message}`
+            ).join('\n\n')}`,
+          }),
+        })
+
+        if (!previewResponse.ok) {
+          const errorText = await previewResponse.text()
+          console.error('Error sending preview:', errorText)
+          throw new Error(`Failed to send preview: ${errorText}`)
+        }
+      } catch (error) {
+        console.error('Error in Evolution API communication:', error)
+        throw new Error(`Evolution API error: ${error.message}`)
+      }
     }
 
     console.log('✅ Test sequence initiated successfully')
