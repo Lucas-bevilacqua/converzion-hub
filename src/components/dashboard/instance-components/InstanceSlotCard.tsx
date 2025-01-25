@@ -61,18 +61,26 @@ export function InstanceSlotCard({ instance, isUsed, onClick, onDisconnect }: In
 
         if (updateError) {
           console.error('Erro ao atualizar estado da instância:', updateError)
+          toast({
+            title: "Erro",
+            description: "Falha ao atualizar estado da instância. Tente novamente.",
+            variant: "destructive",
+          })
           throw updateError
-        } else {
-          console.log('Estado atualizado com sucesso no banco')
         }
+
+        console.log('Estado atualizado com sucesso no banco')
+        return data
       }
 
       return data
     },
     enabled: !!instance?.id,
-    refetchInterval: 2000, // Aumentado frequência para 2 segundos
+    refetchInterval: 2000,
     retry: true,
-    retryDelay: 1000
+    retryDelay: 1000,
+    staleTime: 0,
+    cacheTime: 0
   })
 
   // Updated connection status logic to properly handle the 'open' state
