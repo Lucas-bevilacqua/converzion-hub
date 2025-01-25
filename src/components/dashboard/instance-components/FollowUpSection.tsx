@@ -420,8 +420,17 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
       return false;
     }
     const status = instance.connection_status.toLowerCase();
-    const isConnected = status === 'connected' || status === 'open';
-    console.log('🔄 [DEBUG] Connection status:', status, 'Is connected:', isConnected);
+    // Considerar tanto 'connected' quanto 'open' como estados conectados
+    const isConnected = status === 'connected' || status === 'open' || 
+                       instance?.connection_status?.includes('open');
+    
+    console.log('🔄 [DEBUG] Connection status check:', {
+      rawStatus: instance.connection_status,
+      normalizedStatus: status,
+      isConnected: isConnected,
+      instance: instance
+    });
+    
     return isConnected;
   }
 
@@ -457,7 +466,11 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
     }
 
     const isDisconnected = !isInstanceConnected(followUp.instance)
-    console.log('🔄 [DEBUG] Instance connection status:', followUp.instance?.connection_status, 'Is disconnected:', isDisconnected);
+    console.log('🔄 [DEBUG] Follow-up status check:', {
+      instanceStatus: followUp.instance?.connection_status,
+      isDisconnected: isDisconnected,
+      instance: followUp.instance
+    });
     
     if (!followUp.settings?.is_active) {
       return (
