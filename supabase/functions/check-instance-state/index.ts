@@ -13,13 +13,21 @@ serve(async (req) => {
   }
 
   try {
-    const { instanceId, instanceName } = await req.json()
-    console.log('Checking state for instance:', { instanceId, instanceName })
+    const requestData = await req.json()
+    console.log('Received request data:', requestData)
+
+    const { instanceId, instanceName } = requestData
 
     // Validate input
     if (!instanceId) {
       console.error('Missing instanceId in request')
-      throw new Error('Instance ID is required')
+      return new Response(
+        JSON.stringify({ error: 'Instance ID is required' }),
+        { 
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      )
     }
 
     // Get environment variables
@@ -35,7 +43,13 @@ serve(async (req) => {
         hasSupabaseUrl: !!supabaseUrl,
         hasSupabaseKey: !!supabaseKey
       })
-      throw new Error('Server configuration error')
+      return new Response(
+        JSON.stringify({ error: 'Server configuration error' }),
+        { 
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      )
     }
 
     // Create Supabase client
@@ -52,12 +66,24 @@ serve(async (req) => {
 
       if (instanceError) {
         console.error('Error fetching instance:', instanceError)
-        throw instanceError
+        return new Response(
+          JSON.stringify({ error: 'Failed to fetch instance details' }),
+          { 
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          }
+        )
       }
 
       if (!instance) {
         console.error('Instance not found:', instanceId)
-        throw new Error('Instance not found')
+        return new Response(
+          JSON.stringify({ error: 'Instance not found' }),
+          { 
+            status: 404,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          }
+        )
       }
 
       finalInstanceName = instance.name
@@ -75,12 +101,22 @@ serve(async (req) => {
     })
 
     if (!response.ok) {
+      const responseText = await response.text()
       console.error('Evolution API error:', {
         status: response.status,
         statusText: response.statusText,
-        body: await response.text()
+        body: responseText
       })
-      throw new Error('Failed to check instance state')
+      return new Response(
+        JSON.stringify({ 
+          error: 'Failed to check instance state',
+          details: responseText
+        }),
+        { 
+          status: response.status,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      )
     }
 
     const data = await response.json()
@@ -118,10 +154,10 @@ serve(async (req) => {
     console.error('Error in check-instance-state:', error)
     return new Response(
       JSON.stringify({
-        error: error.message
+        error: error.message || 'An unexpected error occurred'
       }),
       { 
-        status: 400,
+        status: 500,
         headers: {
           ...corsHeaders,
           'Content-Type': 'application/json'
