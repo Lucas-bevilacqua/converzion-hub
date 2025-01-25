@@ -8,6 +8,7 @@ import { InstancePromptDialog } from "./InstancePromptDialog"
 import { useToast } from "@/hooks/use-toast"
 import { Loader2, QrCode, Power, Settings } from "lucide-react"
 import type { EvolutionInstance } from "@/integrations/supabase/database-types/evolution-instances"
+import { useAuth } from "@/contexts/auth/AuthContext"
 
 interface InstanceSlotCardProps {
   instance: EvolutionInstance | null
@@ -20,6 +21,7 @@ export function InstanceSlotCard({ instance, isUsed, onClick, onDisconnect }: In
   const [showQRCode, setShowQRCode] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
   const { toast } = useToast()
+  const { user } = useAuth()
 
   const { data: stateData, isLoading: isLoadingState } = useQuery({
     queryKey: ['instance-state', instance?.id],
@@ -27,55 +29,64 @@ export function InstanceSlotCard({ instance, isUsed, onClick, onDisconnect }: In
       if (!instance?.id) return null
       console.log('Verificando estado do número:', instance.id)
       
-      const { data, error } = await supabase.functions.invoke('check-instance-state', {
-        body: { instanceId: instance.id }
-      })
-
-      if (error) {
-        console.error('Erro ao verificar estado:', error)
-        throw error
-      }
-
-      console.log('Estado recebido da API:', data)
-
-      // Update instance status in database
-      if (data?.state || data?.instance?.instance?.state) {
-        const state = data?.state || data?.instance?.instance?.state
-        const isConnected = state === 'open' || state === 'connected'
-        
-        console.log('Atualizando estado no banco:', {
-          instanceId: instance.id,
-          state,
-          isConnected,
-          timestamp: new Date().toISOString()
+      try {
+        const { data, error } = await supabase.functions.invoke('check-instance-state', {
+          body: { instanceId: instance.id }
         })
-        
-        const { error: updateError } = await supabase
-          .from('evolution_instances')
-          .update({ 
-            connection_status: isConnected ? 'connected' : 'disconnected',
-            status: isConnected ? 'connected' : 'disconnected',
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', instance.id)
 
-        if (updateError) {
-          console.error('Erro ao atualizar estado da instância:', updateError)
-          toast({
-            title: "Erro",
-            description: "Falha ao atualizar estado da instância. Tente novamente.",
-            variant: "destructive",
-          })
-          throw updateError
+        if (error) {
+          console.error('Erro ao verificar estado:', error)
+          throw error
         }
 
-        console.log('Estado atualizado com sucesso no banco')
-        return data
-      }
+        console.log('Estado recebido da API:', data)
 
-      return data
+        // Update instance status in database
+        if (data?.state || data?.instance?.instance?.state) {
+          const state = data?.state || data?.instance?.instance?.state
+          const isConnected = state === 'open' || state === 'connected'
+          
+          console.log('Atualizando estado no banco:', {
+            instanceId: instance.id,
+            state,
+            isConnected,
+            timestamp: new Date().toISOString()
+          })
+          
+          const { error: updateError } = await supabase
+            .from('evolution_instances')
+            .update({ 
+              connection_status: isConnected ? 'connected' : 'disconnected',
+              status: isConnected ? 'connected' : 'disconnected',
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', instance.id)
+
+          if (updateError) {
+            console.error('Erro ao atualizar estado da instância:', updateError)
+            toast({
+              title: "Erro",
+              description: "Falha ao atualizar estado da instância. Tente novamente.",
+              variant: "destructive",
+            })
+            throw updateError
+          }
+
+          console.log('Estado atualizado com sucesso no banco')
+        }
+
+        return data
+      } catch (error) {
+        console.error('Erro ao verificar estado:', error)
+        toast({
+          title: "Erro",
+          description: "Falha ao verificar estado da instância. Tente novamente.",
+          variant: "destructive",
+        })
+        throw error
+      }
     },
-    enabled: !!instance?.id,
+    enabled: !!instance?.id && !!user,
     refetchInterval: 2000,
     retry: true,
     retryDelay: 1000,
@@ -98,6 +109,15 @@ export function InstanceSlotCard({ instance, isUsed, onClick, onDisconnect }: In
   })
 
   const handleConnect = async () => {
+    if (!user) {
+      toast({
+        title: "Erro",
+        description: "Você precisa estar logado para conectar uma instância",
+        variant: "destructive",
+      })
+      return
+    }
+
     try {
       console.log('Iniciando conexão para instância:', instance?.id)
       
