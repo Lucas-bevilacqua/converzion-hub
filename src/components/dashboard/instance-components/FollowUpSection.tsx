@@ -136,7 +136,7 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
       return data as FollowUpData | null;
     },
     enabled: !!instanceId,
-    refetchInterval: 5000 // Adicionar refetch a cada 5 segundos para manter o status atualizado
+    refetchInterval: 5000
   });
 
   const { data: followUpMessages = [], isLoading: isLoadingMessages } = useQuery({
@@ -171,7 +171,6 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
     system_prompt: followUp?.settings?.system_prompt || ''
   });
 
-  // Update formData when followUp or followUpMessages change
   useEffect(() => {
     console.log('🔄 [DEBUG] useEffect triggered - followUp changed:', followUp);
     if (followUp) {
@@ -426,7 +425,6 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
     return isConnected;
   }
 
-  // Modified effect to only update when follow-up status changes
   useEffect(() => {
     if (!followUp) return;
 
@@ -434,12 +432,10 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
       const now = new Date()
       const nextExecution = followUp.scheduled_for ? new Date(followUp.scheduled_for) : null
       
-      // Only update if we have a valid scheduled time and the follow-up is active
       if (followUp.settings?.is_active) {
         if (nextExecution && nextExecution > now) {
           setDisplayDate(nextExecution)
         } else {
-          // If scheduled time is in the past or not set, use first message delay
           const firstMessageDelay = followUpMessages[0]?.delay_minutes || 1
           setDisplayDate(new Date(now.getTime() + (firstMessageDelay * 60 * 1000)))
         }
@@ -448,7 +444,6 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
       }
     }
 
-    // Update only when follow-up data changes
     updateDisplayDate()
   }, [followUp, followUpMessages])
 
