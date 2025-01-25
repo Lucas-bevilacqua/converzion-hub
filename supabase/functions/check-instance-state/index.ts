@@ -40,6 +40,7 @@ serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, supabaseKey)
 
+    // Primeiro, buscar a instância para obter o user_id
     const { data: instance, error: instanceError } = await supabase
       .from('evolution_instances')
       .select('*')
@@ -91,7 +92,7 @@ serve(async (req) => {
       rawResponse: data
     })
 
-    // Atualizar estado da instância no banco
+    // Atualizar estado da instância no banco usando o service role
     const { error: updateError } = await supabase
       .from('evolution_instances')
       .update({ 
@@ -100,10 +101,14 @@ serve(async (req) => {
         updated_at: new Date().toISOString()
       })
       .eq('id', instanceId)
+      .eq('user_id', instance.user_id) // Importante: garantir que estamos atualizando a instância correta
 
     if (updateError) {
       console.error('Erro ao atualizar estado da instância:', updateError)
+      throw updateError
     }
+
+    console.log('Estado atualizado com sucesso no banco')
 
     return new Response(
       JSON.stringify({
