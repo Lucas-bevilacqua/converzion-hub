@@ -1,3 +1,4 @@
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { corsHeaders } from '../_shared/cors.ts'
 
@@ -110,25 +111,35 @@ Deno.serve(async (req) => {
 
     if (executeFullSequence) {
       try {
-        // Insert test contact with correct initial status
-        const { error: contactError } = await supabaseClient
+        // Check if contact already exists to avoid duplicates
+        const { data: existingContact } = await supabaseClient
           .from('follow_up_contacts')
-          .insert({
-            follow_up_id: followUpId,
-            phone: formattedPhone,
-            status: 'pending',
-            metadata: { 
-              is_test: true,
-              contact_name: 'Test Contact',
-              last_message_time: new Date().toISOString()
-            }
-          })
+          .select('*')
+          .eq('follow_up_id', followUpId)
+          .eq('phone', formattedPhone)
+          .single()
 
-        if (contactError) {
-          throw new Error(`Failed to create test contact: ${contactError.message}`)
+        if (!existingContact) {
+          // Insert test contact with correct initial status
+          const { error: contactError } = await supabaseClient
+            .from('follow_up_contacts')
+            .insert({
+              follow_up_id: followUpId,
+              phone: formattedPhone,
+              status: 'pending',
+              metadata: { 
+                is_test: true,
+                contact_name: 'Test Contact',
+                last_message_time: new Date().toISOString()
+              }
+            })
+
+          if (contactError) {
+            throw new Error(`Failed to create test contact: ${contactError.message}`)
+          }
         }
 
-        console.log('✅ Test contact created successfully')
+        console.log('✅ Test contact created/verified successfully')
 
         // Send initial confirmation
         const confirmationResponse = await fetch(`${evolutionApiUrl}/message/sendText/${followUp.instance?.name}`, {
@@ -183,6 +194,19 @@ Deno.serve(async (req) => {
             try {
               console.log(`🔄 Sending message ${i + 1} after ${message.delay_minutes} minutes`)
               
+              // Check if we should still send the message (no reply received)
+              const { data: contact } = await supabaseClient
+                .from('follow_up_contacts')
+                .select('*')
+                .eq('follow_up_id', followUpId)
+                .eq('phone', formattedPhone)
+                .single()
+
+              if (contact?.reply_at) {
+                console.log('⚠️ Contact has replied, stopping sequence')
+                return
+              }
+              
               const response = await fetch(`${evolutionApiUrl}/message/sendText/${followUp.instance?.name}`, {
                 method: 'POST',
                 headers: {
@@ -199,6 +223,15 @@ Deno.serve(async (req) => {
                 console.error(`Failed to send message ${i + 1}:`, await response.text())
               } else {
                 console.log(`✅ Message ${i + 1} sent successfully`)
+                
+                // Update sent_at timestamp
+                await supabaseClient
+                  .from('follow_up_contacts')
+                  .update({
+                    sent_at: new Date().toISOString()
+                  })
+                  .eq('follow_up_id', followUpId)
+                  .eq('phone', formattedPhone)
               }
             } catch (error) {
               console.error(`Error sending message ${i + 1}:`, error)
