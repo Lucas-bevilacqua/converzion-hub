@@ -41,10 +41,26 @@ serve(async (req) => {
 
     console.log('✅ Found follow-ups:', followUps)
 
+    // Debug log to check settings
+    followUps?.forEach(followUp => {
+      console.log('📝 Follow-up details:', {
+        id: followUp.id,
+        instance_id: followUp.instance_id,
+        status: followUp.status,
+        settings: followUp.settings,
+        instance_status: followUp.instance?.connection_status
+      })
+    })
+
     // Filter out follow-ups where instance is not connected
-    const activeFollowUps = followUps.filter(followUp => 
-      followUp.instance?.connection_status?.toLowerCase() === 'connected'
-    )
+    const activeFollowUps = followUps?.filter(followUp => {
+      const isConnected = followUp.instance?.connection_status?.toLowerCase() === 'connected'
+      console.log(`🔌 Instance ${followUp.instance_id} connection status:`, {
+        status: followUp.instance?.connection_status,
+        isConnected
+      })
+      return isConnected
+    }) || []
 
     console.log('✅ Active follow-ups after filtering:', activeFollowUps)
 
