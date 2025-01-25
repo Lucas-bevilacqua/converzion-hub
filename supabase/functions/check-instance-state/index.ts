@@ -81,7 +81,7 @@ serve(async (req) => {
     const data = await response.json()
     console.log('Resposta da Evolution API:', data)
 
-    // Extrair o estado diretamente do objeto instance.state
+    // Extrair o estado diretamente do objeto instance.state ou do state principal
     const state = data?.instance?.instance?.state || data?.state || 'disconnected'
     const isConnected = state === 'open' || state === 'connected'
 
@@ -96,6 +96,7 @@ serve(async (req) => {
       .from('evolution_instances')
       .update({ 
         connection_status: isConnected ? 'connected' : 'disconnected',
+        status: isConnected ? 'connected' : 'disconnected',
         updated_at: new Date().toISOString()
       })
       .eq('id', instanceId)
