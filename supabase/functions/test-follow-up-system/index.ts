@@ -37,10 +37,17 @@ Deno.serve(async (req) => {
       throw new Error('Invalid phone number format')
     }
 
-    // Get follow-up data
+    // Get follow-up data with messages
     const { data: followUp, error: followUpError } = await supabaseClient
       .from('follow_ups')
-      .select('*, instance:evolution_instances(*)')
+      .select(`
+        *,
+        instance:evolution_instances (
+          id,
+          name,
+          connection_status
+        )
+      `)
       .eq('id', followUpId)
       .single()
 
@@ -69,34 +76,18 @@ Deno.serve(async (req) => {
       throw new Error('No messages found for this follow-up')
     }
 
-    // Get instance data
-    const { data: instance, error: instanceError } = await supabaseClient
-      .from('evolution_instances')
-      .select('*')
-      .eq('id', instanceId)
-      .single()
-
-    if (instanceError) {
-      console.error('Error fetching instance:', instanceError)
-      throw instanceError
-    }
-
-    if (!instance) {
-      throw new Error('Instance not found')
-    }
-
     // Check connection status
-    const status = (instance.connection_status || '').toLowerCase()
+    const status = (followUp.instance?.connection_status || '').toLowerCase()
     const isConnected = status === 'connected' || 
                        status === 'open' || 
                        status.includes('open') ||
                        status.includes('connected')
 
     console.log('Connection status check:', {
-      rawStatus: instance.connection_status,
+      rawStatus: followUp.instance?.connection_status,
       normalizedStatus: status,
       isConnected,
-      instanceName: instance.name,
+      instanceName: followUp.instance?.name,
       testPhoneNumber: formattedPhone
     })
 
@@ -114,33 +105,33 @@ Deno.serve(async (req) => {
     console.log('Evolution API configuration:', {
       url: evolutionApiUrl,
       hasKey: !!evolutionApiKey,
-      instanceName: instance.name
+      instanceName: followUp.instance?.name
     })
 
     if (executeFullSequence) {
-      // Insert test contact into follow_up_contacts with test flag
-      const { error: contactError } = await supabaseClient
-        .from('follow_up_contacts')
-        .insert({
-          follow_up_id: followUpId,
-          phone: formattedPhone,
-          status: 'pending',
-          metadata: { 
-            is_test: true,
-            contact_name: 'Test Contact',
-            last_message_time: new Date().toISOString()
-          }
-        })
-
-      if (contactError) {
-        throw new Error(`Failed to create test contact: ${contactError.message}`)
-      }
-
-      console.log('✅ Test contact created successfully')
-
-      // Send initial confirmation
       try {
-        const confirmationResponse = await fetch(`${evolutionApiUrl}/message/sendText/${instance.name}`, {
+        // Insert test contact
+        const { error: contactError } = await supabaseClient
+          .from('follow_up_contacts')
+          .insert({
+            follow_up_id: followUpId,
+            phone: formattedPhone,
+            status: 'pending',
+            metadata: { 
+              is_test: true,
+              contact_name: 'Test Contact',
+              last_message_time: new Date().toISOString()
+            }
+          })
+
+        if (contactError) {
+          throw new Error(`Failed to create test contact: ${contactError.message}`)
+        }
+
+        console.log('✅ Test contact created successfully')
+
+        // Send initial confirmation
+        const confirmationResponse = await fetch(`${evolutionApiUrl}/message/sendText/${followUp.instance?.name}`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -163,7 +154,7 @@ Deno.serve(async (req) => {
         console.log('✅ Initial confirmation sent successfully')
 
         // Send first message immediately
-        const firstMessageResponse = await fetch(`${evolutionApiUrl}/message/sendText/${instance.name}`, {
+        const firstMessageResponse = await fetch(`${evolutionApiUrl}/message/sendText/${followUp.instance?.name}`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -182,6 +173,36 @@ Deno.serve(async (req) => {
         }
 
         console.log('✅ First message sent successfully')
+
+        // Schedule remaining messages
+        for (let i = 1; i < messages.length; i++) {
+          const message = messages[i]
+          const delay = message.delay_minutes * 60000 // Convert to milliseconds
+          
+          setTimeout(async () => {
+            try {
+              const response = await fetch(`${evolutionApiUrl}/message/sendText/${followUp.instance?.name}`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'apikey': evolutionApiKey,
+                },
+                body: JSON.stringify({
+                  number: formattedPhone,
+                  text: message.message
+                }),
+              })
+
+              if (!response.ok) {
+                console.error(`Failed to send message ${i + 1}:`, await response.text())
+              } else {
+                console.log(`✅ Message ${i + 1} sent successfully`)
+              }
+            } catch (error) {
+              console.error(`Error sending message ${i + 1}:`, error)
+            }
+          }, delay)
+        }
 
         // Update contact status
         const { error: updateError } = await supabaseClient
@@ -205,7 +226,7 @@ Deno.serve(async (req) => {
     } else {
       // Send preview message only
       try {
-        const previewResponse = await fetch(`${evolutionApiUrl}/message/sendText/${instance.name}`, {
+        const previewResponse = await fetch(`${evolutionApiUrl}/message/sendText/${followUp.instance?.name}`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
