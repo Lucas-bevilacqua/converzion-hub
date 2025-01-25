@@ -26,10 +26,28 @@ export function InstanceSlotCard({ instance, isUsed, onClick, onDisconnect }: In
   const { data: stateData, isLoading: isLoadingState } = useQuery({
     queryKey: ['instance-state', instance?.id],
     queryFn: async () => {
-      if (!instance?.id) return null
+      if (!instance?.id || !user) {
+        console.log('Usuário não autenticado ou instância não encontrada')
+        return null
+      }
+      
       console.log('Verificando estado do número:', instance.id)
       
       try {
+        const { data: instanceData, error: instanceError } = await supabase
+          .from('evolution_instances')
+          .select('*')
+          .eq('id', instance.id)
+          .eq('user_id', user.id)
+          .single()
+
+        if (instanceError) {
+          console.error('Erro ao verificar instância:', instanceError)
+          return null
+        }
+
+        console.log('Instância encontrada:', instanceData)
+
         const { data, error } = await supabase.functions.invoke('check-instance-state', {
           body: { instanceId: instance.id }
         })
@@ -46,36 +64,41 @@ export function InstanceSlotCard({ instance, isUsed, onClick, onDisconnect }: In
           const state = data?.state || data?.instance?.instance?.state
           const isConnected = state === 'open' || state === 'connected'
           
-          console.log('Atualizando estado no banco:', {
+          console.log('Tentando atualizar estado no banco:', {
             instanceId: instance.id,
-            userId: user?.id,
+            userId: user.id,
             state,
             isConnected,
             timestamp: new Date().toISOString()
           })
-          
-          const { data: updateData, error: updateError } = await supabase
-            .from('evolution_instances')
-            .update({ 
-              connection_status: isConnected ? 'connected' : 'disconnected',
-              status: isConnected ? 'connected' : 'disconnected',
-              updated_at: new Date().toISOString(),
-              user_id: user?.id // Garantir que o user_id está presente
-            })
-            .eq('id', instance.id)
-            .select()
 
-          if (updateError) {
-            console.error('Erro ao atualizar estado da instância:', updateError)
-            toast({
-              title: "Erro",
-              description: "Falha ao atualizar estado da instância. Tente novamente.",
-              variant: "destructive",
-            })
+          try {
+            const { data: updateData, error: updateError } = await supabase
+              .from('evolution_instances')
+              .update({ 
+                connection_status: isConnected ? 'connected' : 'disconnected',
+                status: isConnected ? 'connected' : 'disconnected',
+                updated_at: new Date().toISOString()
+              })
+              .eq('id', instance.id)
+              .eq('user_id', user.id)
+              .select()
+
+            if (updateError) {
+              console.error('Erro ao atualizar estado da instância:', updateError)
+              toast({
+                title: "Erro",
+                description: "Falha ao atualizar estado da instância. Tente novamente.",
+                variant: "destructive",
+              })
+              throw updateError
+            }
+
+            console.log('Estado atualizado com sucesso no banco:', updateData)
+          } catch (updateError) {
+            console.error('Erro na atualização:', updateError)
             throw updateError
           }
-
-          console.log('Estado atualizado com sucesso no banco:', updateData)
         }
 
         return data
@@ -89,7 +112,7 @@ export function InstanceSlotCard({ instance, isUsed, onClick, onDisconnect }: In
         throw error
       }
     },
-    enabled: !!instance?.id && !!user,
+    enabled: !!instance?.id && !!user?.id,
     refetchInterval: 2000,
     retry: true,
     retryDelay: 1000,
