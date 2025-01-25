@@ -374,7 +374,7 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
     return instance.connection_status.toLowerCase() === 'connected'
   }
 
-  // Add effect to update display date every second
+  // Modified effect to only update when follow-up status changes
   useEffect(() => {
     if (!followUp) return;
 
@@ -382,22 +382,22 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
       const now = new Date()
       const nextExecution = followUp.scheduled_for ? new Date(followUp.scheduled_for) : null
       
-      if (nextExecution && nextExecution < now && followUp.settings?.is_active) {
-        // Get the first message delay as fallback
-        const firstMessageDelay = followUpMessages[0]?.delay_minutes || 1
-        setDisplayDate(new Date(now.getTime() + (firstMessageDelay * 60 * 1000)))
+      // Only update if we have a valid scheduled time and the follow-up is active
+      if (followUp.settings?.is_active) {
+        if (nextExecution && nextExecution > now) {
+          setDisplayDate(nextExecution)
+        } else {
+          // If scheduled time is in the past or not set, use first message delay
+          const firstMessageDelay = followUpMessages[0]?.delay_minutes || 1
+          setDisplayDate(new Date(now.getTime() + (firstMessageDelay * 60 * 1000)))
+        }
       } else {
-        setDisplayDate(nextExecution)
+        setDisplayDate(null)
       }
     }
 
-    // Update immediately
+    // Update only when follow-up data changes
     updateDisplayDate()
-
-    // Then update every second
-    const interval = setInterval(updateDisplayDate, 1000)
-
-    return () => clearInterval(interval)
   }, [followUp, followUpMessages])
 
   const FollowUpStatus = () => {
