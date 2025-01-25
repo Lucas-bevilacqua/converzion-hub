@@ -1,29 +1,30 @@
-import { Badge } from "@/components/ui/badge";
-import { Loader2 } from "lucide-react";
-import type { InstanceStatusProps } from "@/types/instance-status";
+import { Badge } from "@/components/ui/badge"
+import { Loader2 } from "lucide-react"
+import type { EvolutionInstance } from "@/integrations/supabase/database-types/evolution-instances"
 
-export function InstanceConnectionStatus({ instance, stateData, isLoading }: InstanceStatusProps) {
-  console.log('Status atual da conexão:', {
-    stateData,
-    instanceStatus: instance?.connection_status,
-    instanceState: instance?.status
-  });
+interface InstanceConnectionStatusProps {
+  instance: EvolutionInstance
+  stateData: any
+  isLoading: boolean
+}
 
+export function InstanceConnectionStatus({ 
+  instance,
+  stateData,
+  isLoading 
+}: InstanceConnectionStatusProps) {
   if (isLoading) {
-    return <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />;
+    return <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
   }
 
-  const isConnected = 
-    instance?.connection_status === 'connected' ||
-    stateData?.state === 'connected' ||
-    stateData?.instance?.instance?.state === 'open';
+  const isConnected = instance?.connection_status === 'connected'
 
   return (
     <Badge 
       variant="secondary"
-      className={`h-5 px-1.5 ${isConnected ? 'bg-green-100 text-green-800 hover:bg-green-200' : 'bg-gray-100 text-gray-800 hover:bg-gray-200'}`}
+      className={`${isConnected ? 'bg-green-100 text-green-800 hover:bg-green-200' : 'bg-red-100 text-red-800 hover:bg-red-200'}`}
     >
-      {isConnected ? "Conectado" : "Desconectado"}
+      {isConnected ? 'Conectado' : 'Desconectado'}
     </Badge>
-  );
+  )
 }
