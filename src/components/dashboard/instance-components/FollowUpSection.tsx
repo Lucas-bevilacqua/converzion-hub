@@ -9,6 +9,37 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { useToast } from "@/components/ui/use-toast"
 import { Plus, Trash2, Users, Play, AlertCircle, WifiOff } from "lucide-react"
+import { format } from "date-fns"
+import { ContactsTable } from "./ContactsTable"
+import {
+  Alert,
+  AlertDescription,
+  AlertTitle,
+} from "@/components/ui/alert"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/components/ui/tabs"
 
 interface FollowUpSectionProps {
   instanceId: string
@@ -19,6 +50,15 @@ type FollowUpType = "manual" | "ai";
 interface ManualMessage {
   message: string;
   delay_minutes: number;
+}
+
+interface FormData {
+  is_active: boolean;
+  type: FollowUpType;
+  stop_on_reply: boolean;
+  stop_on_keyword: string[];
+  manual_messages: ManualMessage[];
+  system_prompt: string;
 }
 
 interface FollowUpData {
