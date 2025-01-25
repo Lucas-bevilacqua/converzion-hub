@@ -6,9 +6,10 @@ import { Dialog } from "@/components/ui/dialog"
 import { QRCodeDialog } from "./QRCodeDialog"
 import { InstancePromptDialog } from "./InstancePromptDialog"
 import { useToast } from "@/hooks/use-toast"
-import { Loader2, QrCode, Power, Settings } from "lucide-react"
 import type { EvolutionInstance } from "@/integrations/supabase/database-types/evolution-instances"
 import { useAuth } from "@/contexts/auth/AuthContext"
+import { InstanceStatus } from "./InstanceStatus"
+import { InstanceActions } from "./InstanceActions"
 
 interface InstanceSlotCardProps {
   instance: EvolutionInstance | null
@@ -17,7 +18,12 @@ interface InstanceSlotCardProps {
   onDisconnect?: () => void
 }
 
-export function InstanceSlotCard({ instance, isUsed, onClick, onDisconnect }: InstanceSlotCardProps) {
+export function InstanceSlotCard({ 
+  instance, 
+  isUsed, 
+  onClick, 
+  onDisconnect 
+}: InstanceSlotCardProps) {
   const [showQRCode, setShowQRCode] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
   const { toast } = useToast()
@@ -58,49 +64,6 @@ export function InstanceSlotCard({ instance, isUsed, onClick, onDisconnect }: In
         }
 
         console.log('Estado recebido da API:', data)
-
-        // Update instance status in database
-        if (data?.state || data?.instance?.instance?.state) {
-          const state = data?.state || data?.instance?.instance?.state
-          const isConnected = state === 'open' || state === 'connected'
-          
-          console.log('Tentando atualizar estado no banco:', {
-            instanceId: instance.id,
-            userId: user.id,
-            state,
-            isConnected,
-            timestamp: new Date().toISOString()
-          })
-
-          try {
-            const { data: updateData, error: updateError } = await supabase
-              .from('evolution_instances')
-              .update({ 
-                connection_status: isConnected ? 'connected' : 'disconnected',
-                status: isConnected ? 'connected' : 'disconnected',
-                updated_at: new Date().toISOString()
-              })
-              .eq('id', instance.id)
-              .eq('user_id', user.id)
-              .select()
-
-            if (updateError) {
-              console.error('Erro ao atualizar estado da instância:', updateError)
-              toast({
-                title: "Erro",
-                description: "Falha ao atualizar estado da instância. Tente novamente.",
-                variant: "destructive",
-              })
-              throw updateError
-            }
-
-            console.log('Estado atualizado com sucesso no banco:', updateData)
-          } catch (updateError) {
-            console.error('Erro na atualização:', updateError)
-            throw updateError
-          }
-        }
-
         return data
       } catch (error) {
         console.error('Erro ao verificar estado:', error)
@@ -187,58 +150,31 @@ export function InstanceSlotCard({ instance, isUsed, onClick, onDisconnect }: In
                 {instance?.phone_number || "Número não conectado"}
               </p>
             </div>
-            <div className="flex items-center gap-2">
-              {isLoadingState ? (
-                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-              ) : (
-                <div className={`h-2 w-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`} />
-              )}
-            </div>
+            <InstanceStatus 
+              isConnected={isConnected} 
+              isLoading={isLoadingState} 
+            />
           </div>
 
-          <div className="flex flex-wrap gap-2">
-            {isUsed ? (
-              <>
-                <Button
-                  variant={isConnected ? "destructive" : "default"}
-                  size="sm"
-                  onClick={isConnected ? onDisconnect : handleConnect}
-                  disabled={isLoadingState}
-                >
-                  <Power className="h-4 w-4 mr-2" />
-                  {isConnected ? "Desconectar" : "Conectar"}
-                </Button>
-
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setShowQRCode(true)}
-                  disabled={!instance}
-                >
-                  <QrCode className="h-4 w-4 mr-2" />
-                  QR Code
-                </Button>
-
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setShowSettings(true)}
-                  disabled={!instance}
-                >
-                  <Settings className="h-4 w-4 mr-2" />
-                  Configurações
-                </Button>
-              </>
-            ) : (
-              <Button
-                variant="default"
-                size="sm"
-                onClick={onClick}
-              >
-                Adicionar Número
-              </Button>
-            )}
-          </div>
+          {isUsed ? (
+            <InstanceActions
+              instance={instance!}
+              isConnected={isConnected}
+              isLoading={isLoadingState}
+              onConnect={handleConnect}
+              onDisconnect={onDisconnect}
+              onSettings={() => setShowSettings(true)}
+              onQRCode={() => setShowQRCode(true)}
+            />
+          ) : (
+            <Button
+              variant="default"
+              size="sm"
+              onClick={onClick}
+            >
+              Adicionar Número
+            </Button>
+          )}
         </div>
       </div>
 

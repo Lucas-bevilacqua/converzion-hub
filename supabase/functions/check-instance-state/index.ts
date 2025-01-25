@@ -6,6 +6,64 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+interface InstanceState {
+  state: string
+  connected: boolean
+  instance: any
+  updateResult?: any
+  verificationResult?: any
+  timestamp: string
+}
+
+async function checkEvolutionApiState(instanceName: string, evolutionApiKey: string, evolutionApiUrl: string): Promise<any> {
+  const baseUrl = evolutionApiUrl.replace(/\/+$/, '')
+  const connectionStateUrl = `${baseUrl}/instance/connectionState/${instanceName}`
+  
+  console.log('Fazendo requisição para:', connectionStateUrl)
+
+  const response = await fetch(connectionStateUrl, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+      'apikey': evolutionApiKey
+    }
+  })
+
+  console.log('Resposta da Evolution API:', {
+    status: response.status,
+    ok: response.ok,
+    statusText: response.statusText,
+    timestamp: new Date().toISOString()
+  })
+
+  if (!response.ok) {
+    throw new Error(`Evolution API error: ${response.status} ${response.statusText}`)
+  }
+
+  return response.json()
+}
+
+async function updateInstanceStatus(
+  supabase: any,
+  instanceId: string,
+  status: string,
+  timestamp = new Date().toISOString()
+): Promise<any> {
+  const { data, error } = await supabase
+    .from('evolution_instances')
+    .update({ 
+      connection_status: status,
+      status: status,
+      updated_at: timestamp
+    })
+    .eq('id', instanceId)
+    .select()
+    .single()
+
+  if (error) throw error
+  return data
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
@@ -36,8 +94,6 @@ serve(async (req) => {
       throw new Error('Configurações da Evolution API ausentes')
     }
 
-    console.log('Usando URL da Evolution API:', evolutionApiUrl)
-
     const supabase = createClient(supabaseUrl, supabaseServiceKey, {
       auth: {
         persistSession: false,
@@ -59,57 +115,52 @@ serve(async (req) => {
 
     console.log('Verificando estado para instância:', instance.name)
 
-    const baseUrl = evolutionApiUrl.replace(/\/+$/, '')
-    const connectionStateUrl = `${baseUrl}/instance/connectionState/${instance.name}`
-    
-    console.log('Fazendo requisição para:', connectionStateUrl)
-
-    const response = await fetch(connectionStateUrl, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-        'apikey': evolutionApiKey
-      }
-    })
-
-    console.log('Resposta da Evolution API:', {
-      status: response.status,
-      ok: response.ok,
-      statusText: response.statusText,
-      timestamp: new Date().toISOString()
-    })
-
-    if (!response.ok) {
-      console.error('Erro na Evolution API:', {
-        status: response.status,
-        statusText: response.statusText,
+    try {
+      const apiData = await checkEvolutionApiState(instance.name, evolutionApiKey, evolutionApiUrl)
+      console.log('Dados recebidos da Evolution API:', {
+        data: apiData,
         timestamp: new Date().toISOString()
       })
 
-      const errorText = await response.text()
-      console.error('Resposta de erro:', errorText)
+      const state = apiData?.instance?.instance?.state || apiData?.state || 'disconnected'
+      const isConnected = state === 'CONNECTED' || state === 'open' || state === 'connected'
+      const newStatus = isConnected ? 'connected' : 'disconnected'
 
-      // Se a instância não existe na Evolution API, marcar como desconectada
-      const { data: updateData, error: updateError } = await supabase
-        .from('evolution_instances')
-        .update({ 
-          connection_status: 'disconnected',
-          status: 'disconnected',
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', instanceId)
-        .select()
-        .single()
-
-      console.log('Marcando instância como desconectada:', {
-        instanceId,
+      console.log('Análise do estado:', { 
+        state,
+        isConnected,
+        newStatus,
+        rawResponse: apiData,
         timestamp: new Date().toISOString()
       })
 
-      if (updateError) {
-        console.error('Erro ao atualizar status para desconectado:', updateError)
-        throw updateError
+      const updateData = await updateInstanceStatus(supabase, instanceId, newStatus)
+      console.log('Status atualizado com sucesso:', updateData)
+
+      const response: InstanceState = {
+        state: newStatus,
+        connected: isConnected,
+        instance: apiData,
+        updateResult: updateData,
+        timestamp: new Date().toISOString()
       }
+
+      return new Response(
+        JSON.stringify(response),
+        { 
+          headers: {
+            ...corsHeaders,
+            'Content-Type': 'application/json'
+          } 
+        }
+      )
+
+    } catch (error) {
+      console.error('Erro ao verificar estado na Evolution API:', error)
+      
+      // Se houver erro na API, marcar como desconectado
+      const updateData = await updateInstanceStatus(supabase, instanceId, 'disconnected')
+      console.log('Instância marcada como desconectada:', updateData)
 
       return new Response(
         JSON.stringify({
@@ -122,80 +173,6 @@ serve(async (req) => {
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
-
-    const data = await response.json()
-    console.log('Dados recebidos da Evolution API:', {
-      data,
-      timestamp: new Date().toISOString()
-    })
-
-    // Verificar estado diretamente do objeto instance.state ou do state principal
-    const state = data?.instance?.instance?.state || data?.state || 'disconnected'
-    const isConnected = state === 'CONNECTED' || state === 'open' || state === 'connected'
-
-    console.log('Análise do estado:', { 
-      state,
-      isConnected,
-      rawResponse: data,
-      timestamp: new Date().toISOString()
-    })
-
-    const newStatus = isConnected ? 'connected' : 'disconnected'
-    
-    // Atualizar estado da instância
-    const { data: updateData, error: updateError } = await supabase
-      .from('evolution_instances')
-      .update({ 
-        connection_status: newStatus,
-        status: newStatus,
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', instanceId)
-      .select()
-      .single()
-
-    console.log('Resultado da atualização:', {
-      data: updateData,
-      error: updateError,
-      newStatus,
-      timestamp: new Date().toISOString()
-    })
-
-    if (updateError) {
-      console.error('Erro ao atualizar estado:', updateError)
-      throw updateError
-    }
-
-    // Verificar se a atualização foi bem sucedida
-    const { data: verifyData, error: verifyError } = await supabase
-      .from('evolution_instances')
-      .select('*')
-      .eq('id', instanceId)
-      .single()
-
-    console.log('Verificação final:', {
-      data: verifyData,
-      error: verifyError,
-      expectedStatus: newStatus,
-      timestamp: new Date().toISOString()
-    })
-
-    return new Response(
-      JSON.stringify({
-        state: newStatus,
-        connected: isConnected,
-        instance: data,
-        updateResult: updateData,
-        verificationResult: verifyData,
-        timestamp: new Date().toISOString()
-      }),
-      { 
-        headers: {
-          ...corsHeaders,
-          'Content-Type': 'application/json'
-        } 
-      }
-    )
 
   } catch (error) {
     console.error('Erro na função check-instance-state:', error)
