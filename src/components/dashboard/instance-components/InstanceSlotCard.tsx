@@ -6,7 +6,6 @@ import { Dialog } from "@/components/ui/dialog"
 import { QRCodeDialog } from "./QRCodeDialog"
 import { useToast } from "@/hooks/use-toast"
 import { Loader2, QrCode, Power } from "lucide-react"
-import { useInstanceMutations } from "./InstanceMutations"
 import type { EvolutionInstance } from "@/integrations/supabase/database-types/evolution-instances"
 
 interface InstanceSlotCardProps {
@@ -42,10 +41,10 @@ export function InstanceSlotCard({ instance, isUsed, onClick, onDisconnect }: In
     refetchInterval: 5000
   })
 
-  // Improved connection status logic
-  const isConnected = instance?.connection_status === 'connected' && 
-                     (stateData?.instance?.instance?.state === 'open' || 
-                      stateData?.state === 'connected')
+  // Updated connection status logic to properly handle the 'open' state
+  const isConnected = instance?.connection_status === 'connected' || 
+                     stateData?.state === 'connected' || 
+                     stateData?.instance?.instance?.state === 'open'
 
   console.log('Status atual da conexão:', {
     stateData,
