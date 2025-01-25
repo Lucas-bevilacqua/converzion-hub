@@ -425,6 +425,9 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
     return isConnected;
   }
 
+  const isDisconnected = !isInstanceConnected(followUp?.instance);
+  console.log('🔄 [DEBUG] Instance connection status:', followUp?.instance?.connection_status, 'Is disconnected:', isDisconnected);
+
   useEffect(() => {
     if (!followUp) return;
 
