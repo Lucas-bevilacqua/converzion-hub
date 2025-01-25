@@ -80,6 +80,16 @@ Deno.serve(async (req) => {
       throw new Error('Instance is not connected')
     }
 
+    // Log test execution
+    await supabaseClient
+      .from('cron_logs')
+      .insert({
+        job_name: 'test-follow-up',
+        status: 'started',
+        details: `Testing follow-up ${followUpId} for instance ${instanceId}`,
+        execution_time: new Date().toISOString()
+      })
+
     // Send test message using Evolution API
     const evolutionResponse = await fetch(`${Deno.env.get('EVOLUTION_API_URL')}/message/sendText/${instance.id}`, {
       method: 'POST',
@@ -101,6 +111,16 @@ Deno.serve(async (req) => {
       throw new Error('Failed to send test message')
     }
 
+    // Log successful test
+    await supabaseClient
+      .from('cron_logs')
+      .insert({
+        job_name: 'test-follow-up',
+        status: 'completed',
+        details: `Successfully tested follow-up ${followUpId}`,
+        execution_time: new Date().toISOString()
+      })
+
     console.log('✅ Test message sent successfully')
 
     return new Response(
@@ -113,6 +133,22 @@ Deno.serve(async (req) => {
 
   } catch (error) {
     console.error('Error in test-follow-up-system:', error)
+
+    // Log error
+    const supabaseClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    )
+
+    await supabaseClient
+      .from('cron_logs')
+      .insert({
+        job_name: 'test-follow-up',
+        status: 'error',
+        details: `Error testing follow-up: ${error.message}`,
+        execution_time: new Date().toISOString()
+      })
+
     return new Response(
       JSON.stringify({ error: error.message }),
       { 
