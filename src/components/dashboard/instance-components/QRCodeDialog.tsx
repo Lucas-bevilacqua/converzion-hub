@@ -1,7 +1,7 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Loader2 } from "lucide-react"
 
-interface QRCodeDialogProps {
+export interface QRCodeDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   qrCode: string | null

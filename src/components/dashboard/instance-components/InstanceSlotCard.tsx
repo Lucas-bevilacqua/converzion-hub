@@ -5,28 +5,21 @@ import { Button } from "@/components/ui/button"
 import { Dialog } from "@/components/ui/dialog"
 import { QRCodeDialog } from "./QRCodeDialog"
 import { useToast } from "@/hooks/use-toast"
-import { Loader2, QrCode, Power, Trash2 } from "lucide-react"
+import { Loader2, QrCode, Power } from "lucide-react"
 import { useInstanceMutations } from "./InstanceMutations"
-import { useInstanceQueries } from "./useInstanceQueries"
-
-interface Instance {
-  id: string
-  name: string
-  phone_number: string | null
-  status: string
-  connection_status?: string | null
-}
+import type { EvolutionInstance } from "@/integrations/supabase/database-types/evolution-instances"
 
 interface InstanceSlotCardProps {
-  instance: Instance | null
-  onDelete?: () => void
+  instance: EvolutionInstance | null
+  isUsed?: boolean
+  onClick?: () => void
+  onDisconnect?: () => void
 }
 
-export function InstanceSlotCard({ instance, onDelete }: InstanceSlotCardProps) {
+export function InstanceSlotCard({ instance, isUsed, onClick, onDisconnect }: InstanceSlotCardProps) {
   const [showQRCode, setShowQRCode] = useState(false)
   const { toast } = useToast()
-  const { deleteInstance } = useInstanceMutations()
-  const { checkInstanceState } = useInstanceQueries()
+  const { disconnectMutation } = useInstanceMutations()
 
   const { data: stateData, isLoading: isLoadingState } = useQuery({
     queryKey: ['instance-state', instance?.id],
@@ -59,7 +52,7 @@ export function InstanceSlotCard({ instance, onDelete }: InstanceSlotCardProps) 
     instanceStatus: instance?.connection_status,
     instanceState: instance?.status,
     apiState: stateData?.state,
-    instanceState: stateData?.instance?.instance?.state
+    apiInstanceState: stateData?.instance?.instance?.state
   })
 
   const handleConnect = async () => {
@@ -91,52 +84,8 @@ export function InstanceSlotCard({ instance, onDelete }: InstanceSlotCardProps) 
   }
 
   const handleDisconnect = async () => {
-    try {
-      const { data, error } = await supabase.functions.invoke('disconnect-instance', {
-        body: { instanceId: instance?.id }
-      })
-
-      if (error) throw error
-
-      if (!data.success) {
-        throw new Error(data.error || 'Erro ao desconectar instância')
-      }
-
-      toast({
-        title: "Sucesso",
-        description: "Instância desconectada com sucesso.",
-      })
-    } catch (error) {
-      console.error('Erro ao desconectar:', error)
-      toast({
-        title: "Erro",
-        description: error instanceof Error ? error.message : "Erro ao desconectar instância",
-        variant: "destructive",
-      })
-    }
-  }
-
-  const handleDelete = async () => {
-    if (!instance?.id) return
-
-    try {
-      await deleteInstance.mutateAsync(instance.id)
-      
-      toast({
-        title: "Sucesso",
-        description: "Instância excluída com sucesso.",
-      })
-
-      if (onDelete) {
-        onDelete()
-      }
-    } catch (error) {
-      console.error('Erro ao excluir:', error)
-      toast({
-        title: "Erro",
-        description: "Erro ao excluir instância",
-        variant: "destructive",
-      })
+    if (onDisconnect) {
+      onDisconnect()
     }
   }
 
@@ -163,44 +112,50 @@ export function InstanceSlotCard({ instance, onDelete }: InstanceSlotCardProps) 
           </div>
 
           <div className="flex flex-wrap gap-2">
-            <Button
-              variant={isConnected ? "destructive" : "default"}
-              size="sm"
-              onClick={isConnected ? handleDisconnect : handleConnect}
-              disabled={isLoadingState}
-            >
-              <Power className="h-4 w-4 mr-2" />
-              {isConnected ? "Desconectar" : "Conectar"}
-            </Button>
+            {isUsed ? (
+              <>
+                <Button
+                  variant={isConnected ? "destructive" : "default"}
+                  size="sm"
+                  onClick={isConnected ? handleDisconnect : handleConnect}
+                  disabled={isLoadingState}
+                >
+                  <Power className="h-4 w-4 mr-2" />
+                  {isConnected ? "Desconectar" : "Conectar"}
+                </Button>
 
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setShowQRCode(true)}
-              disabled={!isConnected}
-            >
-              <QrCode className="h-4 w-4 mr-2" />
-              QR Code
-            </Button>
-
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleDelete}
-            >
-              <Trash2 className="h-4 w-4 mr-2" />
-              Excluir
-            </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowQRCode(true)}
+                  disabled={!instance}
+                >
+                  <QrCode className="h-4 w-4 mr-2" />
+                  QR Code
+                </Button>
+              </>
+            ) : (
+              <Button
+                variant="default"
+                size="sm"
+                onClick={onClick}
+              >
+                Adicionar Número
+              </Button>
+            )}
           </div>
         </div>
       </div>
 
-      <Dialog open={showQRCode} onOpenChange={setShowQRCode}>
-        <QRCodeDialog
-          instanceId={instance?.id}
-          onClose={() => setShowQRCode(false)}
-        />
-      </Dialog>
+      {instance && (
+        <Dialog open={showQRCode} onOpenChange={setShowQRCode}>
+          <QRCodeDialog
+            open={showQRCode}
+            onOpenChange={setShowQRCode}
+            qrCode={instance.qr_code || null}
+          />
+        </Dialog>
+      )}
     </>
   )
 }
