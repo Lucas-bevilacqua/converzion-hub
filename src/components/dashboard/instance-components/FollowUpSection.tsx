@@ -285,7 +285,8 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
         body: { 
           followUpId: followUp.id,
           instanceId,
-          testPhoneNumber
+          testPhoneNumber,
+          executeFullSequence: true // Add this flag to indicate we want to execute the full sequence
         }
       })
 
@@ -305,7 +306,7 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
       queryClient.invalidateQueries({ queryKey: ['follow-up', instanceId] })
       toast({
         title: "Sucesso",
-        description: "Follow-up testado com sucesso. Verifique o WhatsApp.",
+        description: "Sequência de follow-up iniciada. As mensagens serão enviadas com os intervalos configurados.",
       })
       setTestPhoneNumber("") // Clear the phone number after successful test
       setShowTestDialog(false) // Close the dialog
@@ -573,6 +574,9 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
                       value={testPhoneNumber}
                       onChange={(e) => setTestPhoneNumber(e.target.value)}
                     />
+                    <p className="text-sm text-muted-foreground mt-2">
+                      A sequência completa de mensagens será enviada para este número, respeitando os intervalos configurados.
+                    </p>
                   </div>
                 </AlertDialogDescription>
               </AlertDialogHeader>
@@ -582,7 +586,7 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
                   onClick={() => testMutation.mutate()}
                   disabled={testMutation.isPending || !testPhoneNumber}
                 >
-                  Enviar Teste
+                  Iniciar Sequência
                 </AlertDialogAction>
               </AlertDialogFooter>
             </AlertDialogContent>
