@@ -61,6 +61,7 @@ export function InstanceSlotCard({ instance, isUsed, onClick, onDisconnect }: In
 
         if (updateError) {
           console.error('Erro ao atualizar estado da instância:', updateError)
+          throw updateError
         } else {
           console.log('Estado atualizado com sucesso no banco')
         }
