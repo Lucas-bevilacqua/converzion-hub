@@ -76,6 +76,11 @@ Deno.serve(async (req) => {
       throw new Error('Instance not found')
     }
 
+    // Validate instance phone number
+    if (!instance.phone_number) {
+      throw new Error('Instance phone number not found')
+    }
+
     // Check connection status properly
     const status = (instance.connection_status || '').toLowerCase()
     const isConnected = status === 'connected' || 
@@ -87,7 +92,8 @@ Deno.serve(async (req) => {
       rawStatus: instance.connection_status,
       normalizedStatus: status,
       isConnected,
-      instanceName: instance.name
+      instanceName: instance.name,
+      phoneNumber: instance.phone_number
     })
 
     if (!isConnected) {
@@ -125,25 +131,30 @@ Deno.serve(async (req) => {
         'apikey': evolutionApiKey,
       },
       body: JSON.stringify({
-        number: instance.phone_number,
+        number: instance.phone_number?.replace(/[^0-9]/g, ''), // Remove non-numeric characters
         text: `[TESTE DE FOLLOW-UP]\n\nMensagens configuradas:\n\n${messages.map((msg, index) => 
           `${index + 1}. Após ${msg.delay_minutes} minutos:\n${msg.message}`
         ).join('\n\n')}`,
       }),
     })
 
-    if (!evolutionResponse.ok) {
-      const errorText = await evolutionResponse.text()
-      console.error('Error sending test message:', {
-        status: evolutionResponse.status,
-        response: errorText,
-        instance: instance.name
-      })
-      throw new Error('Failed to send test message')
+    const responseText = await evolutionResponse.text()
+    let responseData
+    try {
+      responseData = JSON.parse(responseText)
+    } catch (e) {
+      responseData = responseText
     }
 
-    const responseData = await evolutionResponse.json()
-    console.log('Evolution API response:', responseData)
+    console.log('Evolution API response:', {
+      status: evolutionResponse.status,
+      response: responseData,
+      instance: instance.name
+    })
+
+    if (!evolutionResponse.ok) {
+      throw new Error(`Failed to send test message: ${responseText}`)
+    }
 
     // Log successful test
     await supabaseClient
@@ -160,7 +171,8 @@ Deno.serve(async (req) => {
     return new Response(
       JSON.stringify({ 
         success: true,
-        message: 'Test message sent successfully'
+        message: 'Test message sent successfully',
+        details: responseData
       }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
