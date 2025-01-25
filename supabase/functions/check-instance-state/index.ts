@@ -26,8 +26,18 @@ serve(async (req) => {
       )
     }
 
+    const evolutionApiKey = Deno.env.get('EVOLUTION_API_KEY')
+    const evolutionApiUrl = Deno.env.get('EVOLUTION_API_URL')
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    
+    if (!evolutionApiKey || !evolutionApiUrl) {
+      console.error('Configurações da Evolution API ausentes')
+      throw new Error('Configurações da Evolution API ausentes')
+    }
+
+    console.log('Usando URL da Evolution API:', evolutionApiUrl)
+
     const supabase = createClient(supabaseUrl, supabaseKey)
 
     const { data: instance, error: instanceError } = await supabase
@@ -38,34 +48,16 @@ serve(async (req) => {
 
     if (instanceError || !instance) {
       console.error('Erro ao buscar instância:', instanceError)
-      return new Response(
-        JSON.stringify({ error: 'Instância não encontrada' }),
-        { 
-          status: 404,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        }
-      )
+      throw new Error('Instância não encontrada')
     }
 
-    const evolutionApiUrl = Deno.env.get('EVOLUTION_API_URL')
-    const evolutionApiKey = Deno.env.get('EVOLUTION_API_KEY')
-
-    if (!evolutionApiUrl || !evolutionApiKey) {
-      console.error('Configuração da Evolution API ausente')
-      return new Response(
-        JSON.stringify({ error: 'Configuração da Evolution API ausente' }),
-        { 
-          status: 500,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        }
-      )
-    }
+    console.log('Verificando estado para instância:', instance.name)
 
     const baseUrl = evolutionApiUrl.replace(/\/+$/, '')
-    console.log('Verificando estado na Evolution API para:', instance.name)
-
     const connectionStateUrl = `${baseUrl}/instance/connectionState/${instance.name}`
-    console.log('URL da requisição:', connectionStateUrl)
+    
+    console.log('Fazendo requisição para:', connectionStateUrl)
+    console.log('Usando Evolution API Key:', evolutionApiKey.substring(0, 5) + '...')
 
     const response = await fetch(connectionStateUrl, {
       method: 'GET',
@@ -82,22 +74,9 @@ serve(async (req) => {
       })
 
       const errorText = await response.text()
-      console.error('Corpo da resposta de erro:', errorText)
+      console.error('Resposta de erro:', errorText)
 
-      return new Response(
-        JSON.stringify({ 
-          error: 'Falha ao verificar estado da instância',
-          details: {
-            status: response.status,
-            error: response.statusText,
-            response: errorText ? JSON.parse(errorText) : null
-          }
-        }),
-        { 
-          status: response.status,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        }
-      )
+      throw new Error(`Erro na Evolution API: ${response.status} ${response.statusText}`)
     }
 
     const data = await response.json()
@@ -105,6 +84,7 @@ serve(async (req) => {
 
     // Mapear o estado 'open' para 'connected'
     const connectionState = data.state === 'open' ? 'connected' : 'disconnected'
+    console.log('Estado mapeado:', connectionState)
 
     // Atualizar estado da instância no banco
     const { error: updateError } = await supabase
@@ -141,7 +121,7 @@ serve(async (req) => {
         details: error.message
       }),
       { 
-        status: 400,
+        status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       }
     )
