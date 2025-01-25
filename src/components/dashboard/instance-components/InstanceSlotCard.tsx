@@ -124,14 +124,17 @@ export function InstanceSlotCard({
     }
   }
 
-  const isConnected = stateData?.state === 'connected' || 
-                     stateData?.instance?.instance?.state === 'open' || 
-                     instance?.connection_status === 'connected'
+  // Atualizada a lógica de verificação de conexão
+  const isConnected = stateData?.instance?.instance?.state === 'open' || 
+                     stateData?.state === 'connected' || 
+                     instance?.connection_status === 'connected' ||
+                     instance?.status === 'connected'
 
   console.log('Status atual da conexão:', {
     stateData,
     isConnected,
-    instanceStatus: instance?.connection_status
+    instanceStatus: instance?.connection_status,
+    instanceState: instance?.status
   })
 
   const handleConnect = async () => {
