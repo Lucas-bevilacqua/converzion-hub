@@ -136,29 +136,6 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
     enabled: !!instanceId
   });
 
-  const [formData, setFormData] = useState<FormData>({
-    is_active: followUp?.settings?.is_active || false,
-    type: followUp?.type || "manual",
-    stop_on_reply: followUp?.settings?.stop_on_reply ?? true,
-    stop_on_keyword: followUp?.settings?.stop_on_keyword || ['comprou', 'agendou', 'agendado', 'comprado'],
-    manual_messages: [],
-    system_prompt: followUp?.settings?.system_prompt || ''
-  });
-
-  useEffect(() => {
-    console.log('🔄 [DEBUG] useEffect triggered - followUp changed:', followUp);
-    if (followUp) {
-      setFormData({
-        is_active: followUp.settings?.is_active || false,
-        type: followUp.type || "manual",
-        stop_on_reply: followUp.settings?.stop_on_reply ?? true,
-        stop_on_keyword: followUp.settings?.stop_on_keyword || ['comprou', 'agendou', 'agendado', 'comprado'],
-        manual_messages: [],
-        system_prompt: followUp.settings?.system_prompt || ''
-      });
-    }
-  }, [followUp]);
-
   const { data: followUpMessages = [], isLoading: isLoadingMessages } = useQuery({
     queryKey: ['follow-up-messages', followUp?.id],
     queryFn: async () => {
@@ -181,6 +158,34 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
     },
     enabled: !!followUp?.id
   });
+
+  const [formData, setFormData] = useState<FormData>({
+    is_active: followUp?.settings?.is_active || false,
+    type: followUp?.type || "manual",
+    stop_on_reply: followUp?.settings?.stop_on_reply ?? true,
+    stop_on_keyword: followUp?.settings?.stop_on_keyword || ['comprou', 'agendou', 'agendado', 'comprado'],
+    manual_messages: [],
+    system_prompt: followUp?.settings?.system_prompt || ''
+  });
+
+  // Update formData when followUp or followUpMessages change
+  useEffect(() => {
+    console.log('🔄 [DEBUG] useEffect triggered - followUp changed:', followUp);
+    if (followUp) {
+      setFormData(prev => ({
+        ...prev,
+        is_active: followUp.settings?.is_active || false,
+        type: followUp.type || "manual",
+        stop_on_reply: followUp.settings?.stop_on_reply ?? true,
+        stop_on_keyword: followUp.settings?.stop_on_keyword || ['comprou', 'agendou', 'agendado', 'comprado'],
+        manual_messages: followUpMessages.map(msg => ({
+          message: msg.message,
+          delay_minutes: msg.delay_minutes
+        })),
+        system_prompt: followUp.settings?.system_prompt || ''
+      }));
+    }
+  }, [followUp, followUpMessages]);
 
   const deleteMutation = useMutation({
     mutationFn: async () => {
@@ -437,7 +442,6 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
                 variant="destructive"
                 size="sm"
                 disabled={!followUp}
-                onClick={() => deleteMutation.mutate()}
               >
                 <Trash2 className="h-4 w-4 mr-2" />
                 Excluir
