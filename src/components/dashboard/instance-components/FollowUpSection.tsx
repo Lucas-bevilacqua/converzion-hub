@@ -108,6 +108,7 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
   const { toast } = useToast()
   const queryClient = useQueryClient()
   const [displayDate, setDisplayDate] = useState<Date | null>(null)
+  const [testPhoneNumber, setTestPhoneNumber] = useState("")
 
   const { data: followUp, isLoading } = useQuery({
     queryKey: ['follow-up', instanceId],
@@ -275,11 +276,15 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
       if (!followUp.instance?.connection_status?.toLowerCase().includes('connected')) {
         throw new Error("A instância precisa estar conectada para testar o follow-up")
       }
+      if (!testPhoneNumber) {
+        throw new Error("Digite o número que receberá o teste")
+      }
 
       const { data, error } = await supabase.functions.invoke('test-follow-up-system', {
         body: { 
           followUpId: followUp.id,
-          instanceId 
+          instanceId,
+          testPhoneNumber
         }
       })
 
@@ -301,6 +306,7 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
         title: "Sucesso",
         description: "Follow-up testado com sucesso. Verifique o WhatsApp.",
       })
+      setTestPhoneNumber("") // Clear the phone number after successful test
     },
     onError: (error) => {
       console.error('❌ [ERROR] Error testing follow-up:', error)
@@ -312,118 +318,14 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
     }
   })
 
-  const saveMutation = useMutation({
-    mutationFn: async (data: FormData) => {
-      console.log('🔄 [DEBUG] Saving follow-up settings:', data);
-      
-      if (!followUp?.id) {
-        // Create new follow-up
-        const { data: newFollowUp, error: createError } = await supabase
-          .from('follow_ups')
-          .insert({
-            instance_id: instanceId,
-            type: data.type,
-            settings: {
-              is_active: data.is_active,
-              stop_on_reply: data.stop_on_reply,
-              stop_on_keyword: data.stop_on_keyword,
-              system_prompt: data.system_prompt
-            }
-          })
-          .select()
-          .single()
-
-        if (createError) throw createError
-
-        // Create messages if manual type
-        if (data.type === 'manual' && data.manual_messages.length > 0) {
-          const { error: messagesError } = await supabase
-            .from('follow_up_messages')
-            .insert(
-              data.manual_messages.map(msg => ({
-                follow_up_id: newFollowUp.id,
-                message: msg.message,
-                delay_minutes: msg.delay_minutes
-              }))
-            )
-
-          if (messagesError) throw messagesError
-        }
-
-        return newFollowUp
-      } else {
-        // Update existing follow-up
-        const { error: updateError } = await supabase
-          .from('follow_ups')
-          .update({
-            type: data.type,
-            settings: {
-              is_active: data.is_active,
-              stop_on_reply: data.stop_on_reply,
-              stop_on_keyword: data.stop_on_keyword,
-              system_prompt: data.system_prompt
-            }
-          })
-          .eq('id', followUp.id)
-
-        if (updateError) throw updateError
-
-        // Update messages if manual type
-        if (data.type === 'manual' && data.manual_messages.length > 0) {
-          // Delete existing messages
-          const { error: deleteError } = await supabase
-            .from('follow_up_messages')
-            .delete()
-            .eq('follow_up_id', followUp.id)
-
-          if (deleteError) throw deleteError
-
-          // Insert new messages
-          const { error: messagesError } = await supabase
-            .from('follow_up_messages')
-            .insert(
-              data.manual_messages.map(msg => ({
-                follow_up_id: followUp.id,
-                message: msg.message,
-                delay_minutes: msg.delay_minutes
-              }))
-            )
-
-          if (messagesError) throw messagesError
-        }
-
-        return followUp
-      }
-    },
-    onSuccess: () => {
-      console.log('✅ [DEBUG] Follow-up settings saved successfully');
-      queryClient.invalidateQueries({ queryKey: ['follow-up', instanceId] })
-      queryClient.invalidateQueries({ queryKey: ['follow-up-messages'] })
-      toast({
-        title: "Sucesso",
-        description: "Configurações salvas com sucesso.",
-      })
-    },
-    onError: (error) => {
-      console.error('❌ [ERROR] Error saving follow-up settings:', error);
-      toast({
-        title: "Erro",
-        description: "Não foi possível salvar as configurações.",
-        variant: "destructive",
-      });
-    }
-  });
-
   const isInstanceConnected = (instance?: { connection_status?: string | null }) => {
     if (!instance?.connection_status) {
       console.log('❌ [DEBUG] No connection status found:', instance);
       return false;
     }
     
-    // Normalize the status to lowercase for consistent comparison
     const status = instance.connection_status.toLowerCase();
     
-    // Check both the direct status and variations
     const isConnected = status === 'connected' || 
                        status === 'open' || 
                        status.includes('open') ||
@@ -523,49 +425,52 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => testMutation.mutate()}
-            disabled={
-              !followUp?.settings?.is_active || 
-              testMutation.isPending || 
-              !isInstanceConnected(followUp?.instance)
-            }
-          >
-            <Play className="h-4 w-4 mr-2" />
-            {testMutation.isPending ? "Testando..." : "Testar"}
-          </Button>
           <AlertDialog>
             <AlertDialogTrigger asChild>
               <Button
-                variant="destructive"
+                variant="outline"
                 size="sm"
-                disabled={!followUp}
+                onClick={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                }}
+                disabled={
+                  !followUp?.settings?.is_active || 
+                  testMutation.isPending || 
+                  !isInstanceConnected(followUp?.instance)
+                }
               >
-                <Trash2 className="h-4 w-4 mr-2" />
-                Excluir
+                <Play className="h-4 w-4 mr-2" />
+                {testMutation.isPending ? "Testando..." : "Testar"}
               </Button>
             </AlertDialogTrigger>
             <AlertDialogContent>
               <AlertDialogHeader>
-                <AlertDialogTitle>Excluir Follow-up</AlertDialogTitle>
+                <AlertDialogTitle>Testar Follow-up</AlertDialogTitle>
                 <AlertDialogDescription>
-                  Tem certeza que deseja excluir todas as configurações de follow-up desta instância?
-                  Esta ação não pode ser desfeita.
+                  Digite o número que receberá o teste do follow-up.
+                  <div className="mt-4">
+                    <Input
+                      type="tel"
+                      placeholder="Ex: 5511999999999"
+                      value={testPhoneNumber}
+                      onChange={(e) => setTestPhoneNumber(e.target.value)}
+                    />
+                  </div>
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
                 <AlertDialogCancel>Cancelar</AlertDialogCancel>
                 <AlertDialogAction
-                  onClick={() => deleteMutation.mutate()}
-                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  onClick={() => testMutation.mutate()}
+                  disabled={testMutation.isPending || !testPhoneNumber}
                 >
-                  Excluir
+                  Enviar Teste
                 </AlertDialogAction>
               </AlertDialogFooter>
             </AlertDialogContent>
           </AlertDialog>
+          
           <Switch
             checked={formData.is_active}
             onCheckedChange={(checked) => setFormData(prev => ({ ...prev, is_active: checked }))}

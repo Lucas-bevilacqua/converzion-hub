@@ -4,6 +4,7 @@ import { corsHeaders } from '../_shared/cors.ts'
 interface WebhookRequest {
   followUpId: string
   instanceId: string
+  testPhoneNumber?: string // Add optional phone number for testing
 }
 
 Deno.serve(async (req) => {
@@ -19,13 +20,17 @@ Deno.serve(async (req) => {
     )
 
     // Get request body
-    const { followUpId, instanceId } = await req.json() as WebhookRequest
+    const { followUpId, instanceId, testPhoneNumber } = await req.json() as WebhookRequest
 
-    console.log('🔄 Testing follow-up:', { followUpId, instanceId })
+    console.log('🔄 Testing follow-up:', { followUpId, instanceId, testPhoneNumber })
 
     // Validate input
     if (!followUpId || !instanceId) {
       throw new Error('Missing required parameters')
+    }
+
+    if (!testPhoneNumber) {
+      throw new Error('Test phone number is required')
     }
 
     // Get follow-up data
@@ -76,11 +81,6 @@ Deno.serve(async (req) => {
       throw new Error('Instance not found')
     }
 
-    // Validate instance phone number
-    if (!instance.phone_number) {
-      throw new Error('Instance phone number not found')
-    }
-
     // Check connection status properly
     const status = (instance.connection_status || '').toLowerCase()
     const isConnected = status === 'connected' || 
@@ -93,7 +93,7 @@ Deno.serve(async (req) => {
       normalizedStatus: status,
       isConnected,
       instanceName: instance.name,
-      phoneNumber: instance.phone_number
+      testPhoneNumber
     })
 
     if (!isConnected) {
@@ -119,7 +119,7 @@ Deno.serve(async (req) => {
 
     console.log('Sending test message to Evolution API:', {
       url: `${evolutionApiUrl}/message/sendText/${instance.name}`,
-      phone: instance.phone_number,
+      phone: testPhoneNumber,
       messageCount: messages.length
     })
 
@@ -131,7 +131,7 @@ Deno.serve(async (req) => {
         'apikey': evolutionApiKey,
       },
       body: JSON.stringify({
-        number: instance.phone_number?.replace(/[^0-9]/g, ''), // Remove non-numeric characters
+        number: testPhoneNumber.replace(/[^0-9]/g, ''), // Remove non-numeric characters
         text: `[TESTE DE FOLLOW-UP]\n\nMensagens configuradas:\n\n${messages.map((msg, index) => 
           `${index + 1}. Após ${msg.delay_minutes} minutos:\n${msg.message}`
         ).join('\n\n')}`,
