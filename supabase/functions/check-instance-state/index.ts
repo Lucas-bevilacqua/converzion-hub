@@ -82,15 +82,23 @@ serve(async (req) => {
     const data = await response.json()
     console.log('Resposta da Evolution API:', data)
 
-    // Mapear o estado 'open' para 'connected'
-    const connectionState = data.state === 'open' ? 'connected' : 'disconnected'
-    console.log('Estado mapeado:', connectionState)
+    // Verificar se a instância está conectada (estado 'open' ou 'connected')
+    const isConnected = data.state === 'open' || 
+                       data.instance?.instance?.state === 'open' || 
+                       data.state === 'connected' ||
+                       data.instance?.instance?.state === 'connected'
+
+    console.log('Estado da conexão:', {
+      rawState: data.state,
+      instanceState: data.instance?.instance?.state,
+      isConnected
+    })
 
     // Atualizar estado da instância no banco
     const { error: updateError } = await supabase
       .from('evolution_instances')
       .update({ 
-        connection_status: connectionState,
+        connection_status: isConnected ? 'connected' : 'disconnected',
         updated_at: new Date().toISOString()
       })
       .eq('id', instanceId)
@@ -102,8 +110,8 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({
         instance: data,
-        state: connectionState,
-        connected: connectionState === 'connected'
+        state: isConnected ? 'connected' : 'disconnected',
+        connected: isConnected
       }),
       { 
         headers: {
