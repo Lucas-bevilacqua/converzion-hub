@@ -1,275 +1,205 @@
-import React, { useState } from "react"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
-import { MessageSquare, QrCode, Settings, LogOut, Trash2 } from "lucide-react"
+import { useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { supabase } from "@/integrations/supabase/client"
-import { useToast } from "@/components/ui/use-toast"
+import { Button } from "@/components/ui/button"
+import { Dialog } from "@/components/ui/dialog"
 import { QRCodeDialog } from "./QRCodeDialog"
-import { InstancePromptDialog } from "./InstancePromptDialog"
-import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog"
-import { FollowUpSection } from "./FollowUpSection"
+import { useToast } from "@/hooks/use-toast"
+import { Loader2, QrCode, Power, Trash2 } from "lucide-react"
+import { useInstanceMutations } from "./InstanceMutations"
+import { useInstanceQueries } from "./useInstanceQueries"
 
-interface InstanceSlotCardProps {
-  isUsed: boolean
-  instance?: any
-  onClick?: () => void
-  onDisconnect?: () => void
-  onConfigurePrompt?: () => void
+interface Instance {
+  id: string
+  name: string
+  phone_number: string | null
+  status: string
+  connection_status?: string | null
 }
 
-export function InstanceSlotCard({ 
-  isUsed, 
-  instance, 
-  onClick, 
-  onDisconnect,
-  onConfigurePrompt 
-}: InstanceSlotCardProps) {
-  const { toast } = useToast()
-  const [showQRCode, setShowQRCode] = useState(false)
-  const [showPromptDialog, setShowPromptDialog] = useState(false)
-  const [showFollowUpDialog, setShowFollowUpDialog] = useState(false)
-  const [qrCodeData, setQrCodeData] = useState<string | null>(null)
+interface InstanceSlotCardProps {
+  instance: Instance | null
+  onDelete?: () => void
+}
 
-  const { data: stateData, error: stateError } = useQuery({
-    queryKey: ['instanceState', instance?.id],
+export function InstanceSlotCard({ instance, onDelete }: InstanceSlotCardProps) {
+  const [showQRCode, setShowQRCode] = useState(false)
+  const { toast } = useToast()
+  const { deleteInstance } = useInstanceMutations()
+  const { checkInstanceState } = useInstanceQueries()
+
+  const { data: stateData, isLoading: isLoadingState } = useQuery({
+    queryKey: ['instance-state', instance?.id],
     queryFn: async () => {
       if (!instance?.id) return null
-      
       console.log('Verificando estado do número:', instance.id)
-      try {
-        const { data: { session } } = await supabase.auth.getSession()
-        if (!session) {
-          console.log('Nenhuma sessão ativa encontrada')
-          return { state: 'disconnected' }
-        }
+      
+      const { data, error } = await supabase.functions.invoke('check-instance-state', {
+        body: { instanceId: instance.id }
+      })
 
-        const { data, error } = await supabase.functions.invoke('check-instance-state', {
-          body: { 
-            instanceId: instance.id,
-            instanceName: instance.name
-          }
-        })
-        
-        if (error) {
-          console.error('Erro ao verificar estado do número:', error)
-          throw error
-        }
-
-        console.log('Estado recebido da API:', data)
-        return data
-      } catch (error) {
-        console.error('Erro na verificação de estado:', error)
-        return { 
-          state: instance?.connection_status || 'disconnected',
-          error: true
-        }
+      if (error) {
+        console.error('Erro ao verificar estado:', error)
+        throw error
       }
+
+      console.log('Estado recebido da API:', data)
+      return data
     },
     enabled: !!instance?.id,
-    refetchInterval: 5000,
-    retry: 2,
-    retryDelay: 1000
+    refetchInterval: 5000
   })
 
-  React.useEffect(() => {
-    if (stateError) {
-      console.error('Erro ao verificar estado:', stateError)
-      toast({
-        title: "Erro de Conexão",
-        description: "Não foi possível verificar o estado do número. Tentando novamente...",
-        variant: "destructive",
-      })
-    }
-  }, [stateError])
-
-  const handleDelete = async () => {
-    if (!instance?.id) return
-    
-    try {
-      console.log('Deletando configurações da instância:', instance.id)
-      
-      const { error: configError } = await supabase
-        .from('instance_configurations')
-        .delete()
-        .eq('instance_id', instance.id)
-
-      if (configError) {
-        console.error('Erro ao deletar configurações:', configError)
-        throw configError
-      }
-
-      console.log('Configurações deletadas, agora deletando a instância')
-      
-      const { error: instanceError } = await supabase
-        .from('evolution_instances')
-        .delete()
-        .eq('id', instance.id)
-
-      if (instanceError) throw instanceError
-
-      toast({
-        title: "Sucesso",
-        description: "Número excluído com sucesso",
-      })
-
-      window.location.reload()
-    } catch (error) {
-      console.error('Erro ao excluir número:', error)
-      toast({
-        title: "Erro",
-        description: "Falha ao excluir número. Tente novamente.",
-        variant: "destructive",
-      })
-    }
-  }
-
-  // Atualizada a lógica de verificação de conexão
-  const isConnected = stateData?.instance?.instance?.state === 'open' || 
-                     stateData?.state === 'connected' || 
-                     instance?.connection_status === 'connected' ||
-                     instance?.status === 'connected'
+  const isConnected = (stateData?.instance?.instance?.state === 'open' && instance?.status === 'connected') || 
+                     (stateData?.state === 'connected' && instance?.status === 'connected')
 
   console.log('Status atual da conexão:', {
     stateData,
     isConnected,
     instanceStatus: instance?.connection_status,
-    instanceState: instance?.status
+    instanceState: instance?.status,
+    apiState: stateData?.state,
+    instanceState: stateData?.instance?.instance?.state
   })
 
   const handleConnect = async () => {
-    if (!instance?.id) return
-    
     try {
-      console.log('Conectando número:', instance.id)
-      const { data, error } = await supabase.functions.invoke('connect-evolution-instance', {
-        body: { instanceId: instance.id }
+      const { data, error } = await supabase.functions.invoke('connect-instance', {
+        body: { instanceId: instance?.id }
       })
 
-      if (error) {
-        console.error('Erro ao conectar número:', error)
-        toast({
-          title: "Erro",
-          description: "Falha ao conectar número. Tente novamente.",
-          variant: "destructive",
-        })
-        return
+      if (error) throw error
+
+      if (!data.success) {
+        throw new Error(data.error || 'Erro ao conectar instância')
       }
 
-      if (data?.qrCode) {
-        console.log('QR Code recebido:', data.qrCode)
-        setQrCodeData(data.qrCode)
-        setShowQRCode(true)
-      }
+      toast({
+        title: "Sucesso",
+        description: "QR Code gerado com sucesso. Escaneie para conectar.",
+      })
+
+      setShowQRCode(true)
     } catch (error) {
       console.error('Erro ao conectar:', error)
       toast({
         title: "Erro",
-        description: "Ocorreu um erro inesperado. Tente novamente.",
+        description: error instanceof Error ? error.message : "Erro ao conectar instância",
         variant: "destructive",
       })
     }
   }
 
-  if (!isUsed) {
-    return (
-      <Card className="flex items-center justify-center p-6 cursor-pointer hover:bg-accent/50 transition-colors" onClick={onClick}>
-        <CardContent className="flex flex-col items-center gap-2 p-0">
-          <div className="p-2 bg-primary/10 rounded-lg">
-            <MessageSquare className="h-5 w-5 text-primary" />
-          </div>
-          <p className="text-sm font-medium">Adicionar Número</p>
-        </CardContent>
-      </Card>
-    )
+  const handleDisconnect = async () => {
+    try {
+      const { data, error } = await supabase.functions.invoke('disconnect-instance', {
+        body: { instanceId: instance?.id }
+      })
+
+      if (error) throw error
+
+      if (!data.success) {
+        throw new Error(data.error || 'Erro ao desconectar instância')
+      }
+
+      toast({
+        title: "Sucesso",
+        description: "Instância desconectada com sucesso.",
+      })
+    } catch (error) {
+      console.error('Erro ao desconectar:', error)
+      toast({
+        title: "Erro",
+        description: error instanceof Error ? error.message : "Erro ao desconectar instância",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleDelete = async () => {
+    if (!instance?.id) return
+
+    try {
+      await deleteInstance.mutateAsync(instance.id)
+      
+      toast({
+        title: "Sucesso",
+        description: "Instância excluída com sucesso.",
+      })
+
+      if (onDelete) {
+        onDelete()
+      }
+    } catch (error) {
+      console.error('Erro ao excluir:', error)
+      toast({
+        title: "Erro",
+        description: "Erro ao excluir instância",
+        variant: "destructive",
+      })
+    }
   }
 
   return (
     <>
-      <Card className="p-6">
-        <CardContent className="space-y-4 p-0">
+      <div className="relative p-6 rounded-lg border bg-card text-card-foreground shadow-sm">
+        <div className="flex flex-col gap-4">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-primary/10 rounded-lg">
-                <MessageSquare className="h-5 w-5 text-primary" />
-              </div>
-              <div>
-                <p className="font-medium">{instance.name}</p>
-                <p className="text-sm text-muted-foreground">{instance.phone_number}</p>
-                <p className="text-sm text-muted-foreground">
-                  Status: {isConnected ? 'Conectado' : 'Desconectado'}
-                  {stateData?.error && ' (Verificando...)'}
-                </p>
-              </div>
+            <div className="space-y-1">
+              <h3 className="font-medium leading-none">
+                {instance?.name || "Nova Instância"}
+              </h3>
+              <p className="text-sm text-muted-foreground">
+                {instance?.phone_number || "Número não conectado"}
+              </p>
             </div>
-            <div className="flex gap-2">
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setShowFollowUpDialog(true)}
-                title="Configurar Follow-up"
-              >
-                <Settings className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={handleDelete}
-                title="Excluir Número"
-                className="text-destructive hover:text-destructive"
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
+            <div className="flex items-center gap-2">
+              {isLoadingState ? (
+                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+              ) : (
+                <div className={`h-2 w-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`} />
+              )}
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            {isConnected ? (
-              <Button
-                variant="destructive"
-                className="w-full gap-2"
-                onClick={onDisconnect}
-              >
-                <LogOut className="h-4 w-4" />
-                Desconectar
-              </Button>
-            ) : (
-              <Button
-                variant="outline"
-                className="w-full gap-2"
-                onClick={handleConnect}
-              >
-                <QrCode className="h-4 w-4" />
-                Conectar
-              </Button>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant={isConnected ? "destructive" : "default"}
+              size="sm"
+              onClick={isConnected ? handleDisconnect : handleConnect}
+              disabled={isLoadingState}
+            >
+              <Power className="h-4 w-4 mr-2" />
+              {isConnected ? "Desconectar" : "Conectar"}
+            </Button>
 
-      {!isConnected && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowQRCode(true)}
+              disabled={!isConnected}
+            >
+              <QrCode className="h-4 w-4 mr-2" />
+              QR Code
+            </Button>
+
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleDelete}
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              Excluir
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      <Dialog open={showQRCode} onOpenChange={setShowQRCode}>
         <QRCodeDialog
-          open={showQRCode}
-          onOpenChange={setShowQRCode}
-          qrCode={qrCodeData}
+          instanceId={instance?.id}
+          onClose={() => setShowQRCode(false)}
         />
-      )}
-
-      <InstancePromptDialog
-        open={showPromptDialog}
-        onOpenChange={setShowPromptDialog}
-        instanceId={instance?.id}
-        currentPrompt={instance?.system_prompt}
-      />
-
-      <Dialog open={showFollowUpDialog} onOpenChange={setShowFollowUpDialog}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-          <DialogTitle>Configurações de Follow-up</DialogTitle>
-          <DialogDescription>
-            Configure as mensagens e regras de follow-up para este número.
-          </DialogDescription>
-          <FollowUpSection instanceId={instance?.id} />
-        </DialogContent>
       </Dialog>
     </>
   )
