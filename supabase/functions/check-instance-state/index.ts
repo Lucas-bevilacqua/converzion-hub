@@ -76,7 +76,8 @@ serve(async (req) => {
 
     console.log('Resposta da Evolution API:', {
       status: response.status,
-      ok: response.ok
+      ok: response.ok,
+      statusText: response.statusText
     })
 
     if (!response.ok) {
@@ -105,7 +106,8 @@ serve(async (req) => {
 
         console.log('Resultado da atualização para desconectado:', {
           data: updateData,
-          error: updateError
+          error: updateError,
+          timestamp: new Date().toISOString()
         })
 
         if (updateError) {
@@ -118,7 +120,8 @@ serve(async (req) => {
             state: 'disconnected',
             connected: false,
             instance: null,
-            updateResult: updateData
+            updateResult: updateData,
+            timestamp: new Date().toISOString()
           }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         )
@@ -137,7 +140,8 @@ serve(async (req) => {
     console.log('Estado da conexão:', { 
       state,
       isConnected,
-      rawResponse: data
+      rawResponse: data,
+      timestamp: new Date().toISOString()
     })
 
     // Atualizar estado da instância no banco
@@ -148,6 +152,7 @@ serve(async (req) => {
       timestamp: new Date().toISOString()
     })
 
+    // Forçar atualização do status
     const { data: updateData, error: updateError } = await supabase
       .from('evolution_instances')
       .update({ 
@@ -161,7 +166,9 @@ serve(async (req) => {
 
     console.log('Resultado da atualização:', {
       data: updateData,
-      error: updateError
+      error: updateError,
+      timestamp: new Date().toISOString(),
+      newStatus: isConnected ? 'connected' : 'disconnected'
     })
 
     if (updateError) {
@@ -169,12 +176,28 @@ serve(async (req) => {
       throw updateError
     }
 
+    // Verificar se o status foi realmente atualizado
+    const { data: verifyData, error: verifyError } = await supabase
+      .from('evolution_instances')
+      .select('*')
+      .eq('id', instanceId)
+      .single()
+
+    console.log('Verificação pós-atualização:', {
+      data: verifyData,
+      error: verifyError,
+      expectedStatus: isConnected ? 'connected' : 'disconnected',
+      timestamp: new Date().toISOString()
+    })
+
     return new Response(
       JSON.stringify({
         state: isConnected ? 'connected' : 'disconnected',
         connected: isConnected,
         instance: data,
-        updateResult: updateData
+        updateResult: updateData,
+        verificationResult: verifyData,
+        timestamp: new Date().toISOString()
       }),
       { 
         headers: {
@@ -189,7 +212,8 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({ 
         error: 'Falha ao verificar estado da instância',
-        details: error.message
+        details: error.message,
+        timestamp: new Date().toISOString()
       }),
       { 
         status: 500,
