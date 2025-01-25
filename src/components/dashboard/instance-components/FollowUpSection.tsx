@@ -135,7 +135,8 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
       console.log('✅ [DEBUG] Follow-up data retrieved:', data);
       return data as FollowUpData | null;
     },
-    enabled: !!instanceId
+    enabled: !!instanceId,
+    refetchInterval: 5000 // Adicionar refetch a cada 5 segundos para manter o status atualizado
   });
 
   const { data: followUpMessages = [], isLoading: isLoadingMessages } = useQuery({
@@ -415,10 +416,14 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
   });
 
   const isInstanceConnected = (instance?: { connection_status?: string | null }) => {
-    // Considera tanto o status 'connected' quanto 'open' da Evolution API
-    if (!instance?.connection_status) return false;
-    return instance.connection_status.toLowerCase() === 'connected' || 
-           instance.connection_status.toLowerCase() === 'open';
+    if (!instance?.connection_status) {
+      console.log('❌ [DEBUG] No connection status found:', instance);
+      return false;
+    }
+    const status = instance.connection_status.toLowerCase();
+    const isConnected = status === 'connected' || status === 'open';
+    console.log('🔄 [DEBUG] Connection status:', status, 'Is connected:', isConnected);
+    return isConnected;
   }
 
   // Modified effect to only update when follow-up status changes
@@ -454,6 +459,7 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
     }
 
     const isDisconnected = !isInstanceConnected(followUp.instance)
+    console.log('🔄 [DEBUG] Instance connection status:', followUp.instance?.connection_status, 'Is disconnected:', isDisconnected);
     
     if (!followUp.settings?.is_active) {
       return (
