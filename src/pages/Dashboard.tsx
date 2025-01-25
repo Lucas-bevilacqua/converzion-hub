@@ -66,23 +66,20 @@ export default function Dashboard() {
   if (isLoadingSubscription) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin" />
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     )
   }
 
-  // Verifica se tem acesso (trial ou assinatura ativa)
   const hasAccess = subscription?.status === 'trial' || subscription?.status === 'active'
   console.log('Access check - Status:', subscription?.status, 'Has access:', hasAccess)
 
   const renderContent = () => {
-    // Se não tem acesso, mostra apenas o card de assinatura
     if (!hasAccess) {
       console.log('No access, showing subscription card only')
       return <SubscriptionCard />
     }
 
-    // Se tem acesso (trial ou assinatura ativa), mostra o conteúdo baseado na seção ativa
     console.log('Has access, showing content for section:', activeSection)
     switch (activeSection) {
       case "overview":
@@ -111,22 +108,31 @@ export default function Dashboard() {
 
   return (
     <SidebarProvider defaultOpen={!isMobile}>
-      <div className="min-h-screen flex w-full bg-background">
+      <div className="min-h-screen flex w-full bg-gradient-to-br from-background to-background/95">
         <DashboardSidebar 
           onSectionChange={setActiveSection} 
           activeSection={activeSection} 
         />
         <main className="flex-1 overflow-auto">
           <div className="p-4 md:p-8">
-            <div className="flex items-center gap-4 mb-6">
-              {isMobile && (
-                <SidebarTrigger>
-                  <Menu className="h-6 w-6" />
-                </SidebarTrigger>
-              )}
+            <div className="flex items-center justify-between gap-4 mb-6">
+              <div className="flex items-center gap-3">
+                {isMobile && (
+                  <SidebarTrigger>
+                    <Menu className="h-6 w-6 text-foreground/80 hover:text-foreground transition-colors" />
+                  </SidebarTrigger>
+                )}
+                <h1 className="text-2xl font-semibold text-foreground/90">
+                  {activeSection === "overview" && "Visão Geral"}
+                  {activeSection === "instances" && "Instâncias"}
+                  {activeSection === "subscription" && "Assinatura"}
+                </h1>
+              </div>
             </div>
             <div className="max-w-6xl mx-auto">
-              {renderContent()}
+              <div className="rounded-lg bg-white/50 backdrop-blur-sm shadow-sm border border-border/50">
+                {renderContent()}
+              </div>
             </div>
           </div>
         </main>

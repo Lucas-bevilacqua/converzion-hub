@@ -7,8 +7,8 @@ import {
   Sidebar,
   SidebarContent,
   SidebarGroup,
-  SidebarGroupContent,
   SidebarGroupLabel,
+  SidebarGroupContent,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
@@ -64,10 +64,14 @@ export function DashboardSidebar({ onSectionChange, activeSection }: DashboardSi
   ]
 
   return (
-    <Sidebar variant={isMobile ? "floating" : "sidebar"} collapsible="offcanvas">
+    <Sidebar 
+      variant={isMobile ? "floating" : "sidebar"} 
+      collapsible="offcanvas"
+      className="bg-white/50 backdrop-blur-sm border-r border-border/50"
+    >
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel>Menu</SidebarGroupLabel>
+          <SidebarGroupLabel className="text-foreground/70">Menu</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {menuItems.map((item) => (
@@ -75,6 +79,7 @@ export function DashboardSidebar({ onSectionChange, activeSection }: DashboardSi
                   <SidebarMenuButton 
                     onClick={() => onSectionChange(item.id)}
                     data-active={activeSection === item.id}
+                    className="hover:bg-primary/10 data-[active=true]:bg-primary/15 data-[active=true]:text-primary"
                   >
                     <item.icon className="h-4 w-4" />
                     <span>{item.title}</span>
@@ -82,7 +87,10 @@ export function DashboardSidebar({ onSectionChange, activeSection }: DashboardSi
                 </SidebarMenuItem>
               ))}
               <SidebarMenuItem>
-                <SidebarMenuButton onClick={handleSignOut}>
+                <SidebarMenuButton 
+                  onClick={handleSignOut}
+                  className="hover:bg-destructive/10 hover:text-destructive"
+                >
                   <LogOut className="h-4 w-4" />
                   <span>Sair</span>
                 </SidebarMenuButton>
