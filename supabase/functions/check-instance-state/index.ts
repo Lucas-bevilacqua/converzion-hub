@@ -94,6 +94,14 @@ serve(async (req) => {
     })
 
     try {
+      console.log('Tentando atualizar estado no banco:', {
+        instanceId,
+        userId: instance.user_id,
+        state,
+        isConnected,
+        timestamp: new Date().toISOString()
+      })
+
       // Atualizar estado da instância no banco usando o service role
       const { data: updateData, error: updateError } = await supabase
         .from('evolution_instances')
@@ -103,6 +111,7 @@ serve(async (req) => {
           updated_at: new Date().toISOString()
         })
         .eq('id', instanceId)
+        .eq('user_id', instance.user_id)
         .select()
 
       if (updateError) {
