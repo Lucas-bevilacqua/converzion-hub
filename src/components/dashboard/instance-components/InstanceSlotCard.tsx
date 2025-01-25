@@ -80,7 +80,7 @@ export function InstanceSlotCard({ instance, isUsed, onClick, onDisconnect }: In
     retry: true,
     retryDelay: 1000,
     staleTime: 0,
-    cacheTime: 0
+    gcTime: 0
   })
 
   // Updated connection status logic to properly handle the 'open' state
