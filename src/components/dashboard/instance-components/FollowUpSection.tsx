@@ -415,6 +415,120 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
     )
   }
 
+  const saveMutation = useMutation({
+    mutationFn: async (data: FormData) => {
+      console.log('🔄 [DEBUG] Saving follow-up data:', data);
+      
+      if (!followUp?.id) {
+        // Create new follow-up
+        const { data: newFollowUp, error: createError } = await supabase
+          .from('follow_ups')
+          .insert([{
+            instance_id: instanceId,
+            type: data.type,
+            settings: {
+              is_active: data.is_active,
+              stop_on_reply: data.stop_on_reply,
+              stop_on_keyword: data.stop_on_keyword,
+              system_prompt: data.system_prompt
+            }
+          }])
+          .select()
+          .single();
+
+        if (createError) {
+          console.error('❌ [ERROR] Error creating follow-up:', createError);
+          throw createError;
+        }
+
+        // Create messages for manual follow-up
+        if (data.type === 'manual' && data.manual_messages.length > 0) {
+          const { error: messagesError } = await supabase
+            .from('follow_up_messages')
+            .insert(
+              data.manual_messages.map(msg => ({
+                follow_up_id: newFollowUp.id,
+                message: msg.message,
+                delay_minutes: msg.delay_minutes
+              }))
+            );
+
+          if (messagesError) {
+            console.error('❌ [ERROR] Error creating follow-up messages:', messagesError);
+            throw messagesError;
+          }
+        }
+      } else {
+        // Update existing follow-up
+        const { error: updateError } = await supabase
+          .from('follow_ups')
+          .update({
+            type: data.type,
+            settings: {
+              is_active: data.is_active,
+              stop_on_reply: data.stop_on_reply,
+              stop_on_keyword: data.stop_on_keyword,
+              system_prompt: data.system_prompt
+            }
+          })
+          .eq('id', followUp.id);
+
+        if (updateError) {
+          console.error('❌ [ERROR] Error updating follow-up:', updateError);
+          throw updateError;
+        }
+
+        // Update messages for manual follow-up
+        if (data.type === 'manual') {
+          // First delete existing messages
+          const { error: deleteError } = await supabase
+            .from('follow_up_messages')
+            .delete()
+            .eq('follow_up_id', followUp.id);
+
+          if (deleteError) {
+            console.error('❌ [ERROR] Error deleting existing messages:', deleteError);
+            throw deleteError;
+          }
+
+          // Then insert new messages
+          if (data.manual_messages.length > 0) {
+            const { error: messagesError } = await supabase
+              .from('follow_up_messages')
+              .insert(
+                data.manual_messages.map(msg => ({
+                  follow_up_id: followUp.id,
+                  message: msg.message,
+                  delay_minutes: msg.delay_minutes
+                }))
+              );
+
+            if (messagesError) {
+              console.error('❌ [ERROR] Error creating new messages:', messagesError);
+              throw messagesError;
+            }
+          }
+        }
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['follow-up'] })
+      queryClient.invalidateQueries({ queryKey: ['follow-up-messages'] })
+      toast({
+        title: "Sucesso",
+        description: "Follow-up salvo com sucesso.",
+      })
+    },
+    onError: (error) => {
+      console.error('❌ [ERROR] Error saving follow-up:', error)
+      toast({
+        title: "Erro",
+        description: "Não foi possível salvar o follow-up.",
+        variant: "destructive",
+      })
+    }
+  });
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
