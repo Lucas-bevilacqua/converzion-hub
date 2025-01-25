@@ -48,19 +48,22 @@ export function InstanceSlotCard({ instance, isUsed, onClick, onDisconnect }: In
           
           console.log('Atualizando estado no banco:', {
             instanceId: instance.id,
+            userId: user?.id,
             state,
             isConnected,
             timestamp: new Date().toISOString()
           })
           
-          const { error: updateError } = await supabase
+          const { data: updateData, error: updateError } = await supabase
             .from('evolution_instances')
             .update({ 
               connection_status: isConnected ? 'connected' : 'disconnected',
               status: isConnected ? 'connected' : 'disconnected',
-              updated_at: new Date().toISOString()
+              updated_at: new Date().toISOString(),
+              user_id: user?.id // Garantir que o user_id está presente
             })
             .eq('id', instance.id)
+            .select()
 
           if (updateError) {
             console.error('Erro ao atualizar estado da instância:', updateError)
@@ -72,7 +75,7 @@ export function InstanceSlotCard({ instance, isUsed, onClick, onDisconnect }: In
             throw updateError
           }
 
-          console.log('Estado atualizado com sucesso no banco')
+          console.log('Estado atualizado com sucesso no banco:', updateData)
         }
 
         return data
@@ -90,11 +93,10 @@ export function InstanceSlotCard({ instance, isUsed, onClick, onDisconnect }: In
     refetchInterval: 2000,
     retry: true,
     retryDelay: 1000,
-    staleTime: 0,
-    gcTime: 0
+    gcTime: 0,
+    staleTime: 0
   })
 
-  // Updated connection status logic to properly handle the 'open' state
   const isConnected = instance?.connection_status === 'connected' || 
                      stateData?.state === 'connected' || 
                      stateData?.instance?.instance?.state === 'open'
