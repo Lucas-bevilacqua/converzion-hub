@@ -2,7 +2,7 @@ name: Scheduled Follow-up Processing
 
 on:
   schedule:
-    - cron: '*/10 * * * *'  # Runs every 10 minutes
+    - cron: '* * * * *'  # Runs every minute
   workflow_dispatch:        # Allows manual triggering
 
 jobs:
