@@ -67,9 +67,9 @@ export function DashboardSidebar({ onSectionChange, activeSection }: DashboardSi
     <Sidebar 
       variant={isMobile ? "floating" : "sidebar"} 
       collapsible="offcanvas"
-      className="bg-white/50 backdrop-blur-sm border-r border-border/50"
+      className="bg-white/95 backdrop-blur-sm border-r border-border/50 data-[state=open]:shadow-lg"
     >
-      <SidebarContent>
+      <SidebarContent className="bg-white/95 backdrop-blur-sm min-h-full">
         <SidebarGroup>
           <SidebarGroupLabel className="text-foreground/70">Menu</SidebarGroupLabel>
           <SidebarGroupContent>
