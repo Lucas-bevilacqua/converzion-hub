@@ -419,7 +419,7 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="space-y-1">
           <h3 className="text-lg font-medium">Configurações de Follow-up</h3>
           <p className="text-sm text-muted-foreground">
@@ -475,10 +475,10 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
 
       <FollowUpStatus />
 
-      <Tabs defaultValue="settings">
-        <TabsList>
-          <TabsTrigger value="settings">Configurações</TabsTrigger>
-          <TabsTrigger value="contacts" className="flex items-center gap-2">
+      <Tabs defaultValue="settings" className="w-full">
+        <TabsList className="w-full sm:w-auto">
+          <TabsTrigger value="settings" className="flex-1 sm:flex-none">Configurações</TabsTrigger>
+          <TabsTrigger value="contacts" className="flex items-center gap-2 flex-1 sm:flex-none">
             <Users className="h-4 w-4" />
             Contatos
           </TabsTrigger>
@@ -492,7 +492,7 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
                 value={formData.type}
                 onValueChange={(value: FollowUpType) => setFormData(prev => ({ ...prev, type: value }))}
               >
-                <SelectTrigger>
+                <SelectTrigger className="w-full sm:w-[200px]">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -522,7 +522,7 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
 
             {formData.type === 'manual' && (
               <div className="space-y-4">
-                <div className="flex justify-between items-center">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                   <Label>Sequência de Mensagens</Label>
                   <Button 
                     variant="outline" 
@@ -565,6 +565,7 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
                         )
                       }))}
                       placeholder="Digite a mensagem que será enviada"
+                      className="min-h-[100px]"
                     />
                     <div className="grid gap-2">
                       <Label>Atraso após mensagem anterior (minutos)</Label>
@@ -578,6 +579,7 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
                             i === index ? { ...m, delay_minutes: parseInt(e.target.value) } : m
                           )
                         }))}
+                        className="w-full sm:w-[200px]"
                       />
                     </div>
                   </div>
@@ -585,7 +587,7 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
               </div>
             )}
 
-            <div className="flex justify-end gap-2">
+            <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 mt-6">
               <Button
                 variant="outline"
                 onClick={() => {
