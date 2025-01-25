@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { useToast } from "@/components/ui/use-toast"
-import { Plus, Trash2, Users, Play, AlertCircle } from "lucide-react"
+import { Plus, Trash2, Users, Play, AlertCircle, WifiOff } from "lucide-react"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -286,7 +286,7 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
           followUpId: followUp.id,
           instanceId,
           testPhoneNumber,
-          executeFullSequence: true // Add this flag to indicate we want to execute the full sequence
+          executeFullSequence: true
         }
       })
 
@@ -308,8 +308,8 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
         title: "Sucesso",
         description: "Sequência de follow-up iniciada. As mensagens serão enviadas com os intervalos configurados.",
       })
-      setTestPhoneNumber("") // Clear the phone number after successful test
-      setShowTestDialog(false) // Close the dialog
+      setTestPhoneNumber("")
+      setShowTestDialog(false)
     },
     onError: (error) => {
       console.error('❌ [ERROR] Error testing follow-up:', error)
@@ -395,11 +395,20 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
 
     if (isDisconnected) {
       return (
-        <Alert variant="destructive" className="mb-4">
-          <AlertCircle className="h-4 w-4" />
-          <AlertTitle>Instância Desconectada</AlertTitle>
-          <AlertDescription>
-            Conecte a instância para que os follow-ups possam ser enviados.
+        <Alert variant="destructive" className="mb-4 border-2 border-destructive">
+          <WifiOff className="h-5 w-5" />
+          <AlertTitle className="text-lg font-semibold">WhatsApp Desconectado</AlertTitle>
+          <AlertDescription className="mt-2">
+            <p className="mb-2">O WhatsApp precisa estar conectado para que os follow-ups possam ser enviados.</p>
+            <p className="text-sm opacity-90">Status atual: {followUp.instance?.connection_status}</p>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="mt-2 bg-background/50 hover:bg-background/80"
+              asChild
+            >
+              <a href="#connect">Conectar WhatsApp</a>
+            </Button>
           </AlertDescription>
         </Alert>
       )
@@ -413,124 +422,14 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
           Próxima execução: {displayDate ? format(displayDate, "dd/MM/yyyy, HH:mm:ss") : '-'}
           <br />
           Status: {followUp.status}
+          <br />
+          Contatos elegíveis: {followUp.contact_count || 0}
+          <br />
+          Mensagens configuradas: {followUp.message_count || 0}
         </AlertDescription>
       </Alert>
     )
   }
-
-  const saveMutation = useMutation({
-    mutationFn: async (data: FormData) => {
-      console.log('🔄 [DEBUG] Saving follow-up data:', data);
-      
-      if (!followUp?.id) {
-        // Create new follow-up
-        const { data: newFollowUp, error: createError } = await supabase
-          .from('follow_ups')
-          .insert([{
-            instance_id: instanceId,
-            type: data.type,
-            settings: {
-              is_active: data.is_active,
-              stop_on_reply: data.stop_on_reply,
-              stop_on_keyword: data.stop_on_keyword,
-              system_prompt: data.system_prompt
-            }
-          }])
-          .select()
-          .single();
-
-        if (createError) {
-          console.error('❌ [ERROR] Error creating follow-up:', createError);
-          throw createError;
-        }
-
-        // Create messages for manual follow-up
-        if (data.type === 'manual' && data.manual_messages.length > 0) {
-          const { error: messagesError } = await supabase
-            .from('follow_up_messages')
-            .insert(
-              data.manual_messages.map(msg => ({
-                follow_up_id: newFollowUp.id,
-                message: msg.message,
-                delay_minutes: msg.delay_minutes
-              }))
-            );
-
-          if (messagesError) {
-            console.error('❌ [ERROR] Error creating follow-up messages:', messagesError);
-            throw messagesError;
-          }
-        }
-      } else {
-        // Update existing follow-up
-        const { error: updateError } = await supabase
-          .from('follow_ups')
-          .update({
-            type: data.type,
-            settings: {
-              is_active: data.is_active,
-              stop_on_reply: data.stop_on_reply,
-              stop_on_keyword: data.stop_on_keyword,
-              system_prompt: data.system_prompt
-            }
-          })
-          .eq('id', followUp.id);
-
-        if (updateError) {
-          console.error('❌ [ERROR] Error updating follow-up:', updateError);
-          throw updateError;
-        }
-
-        // Update messages for manual follow-up
-        if (data.type === 'manual') {
-          // First delete existing messages
-          const { error: deleteError } = await supabase
-            .from('follow_up_messages')
-            .delete()
-            .eq('follow_up_id', followUp.id);
-
-          if (deleteError) {
-            console.error('❌ [ERROR] Error deleting existing messages:', deleteError);
-            throw deleteError;
-          }
-
-          // Then insert new messages
-          if (data.manual_messages.length > 0) {
-            const { error: messagesError } = await supabase
-              .from('follow_up_messages')
-              .insert(
-                data.manual_messages.map(msg => ({
-                  follow_up_id: followUp.id,
-                  message: msg.message,
-                  delay_minutes: msg.delay_minutes
-                }))
-              );
-
-            if (messagesError) {
-              console.error('❌ [ERROR] Error creating new messages:', messagesError);
-              throw messagesError;
-            }
-          }
-        }
-      }
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['follow-up'] })
-      queryClient.invalidateQueries({ queryKey: ['follow-up-messages'] })
-      toast({
-        title: "Sucesso",
-        description: "Follow-up salvo com sucesso.",
-      })
-    },
-    onError: (error) => {
-      console.error('❌ [ERROR] Error saving follow-up:', error)
-      toast({
-        title: "Erro",
-        description: "Não foi possível salvar o follow-up.",
-        variant: "destructive",
-      })
-    }
-  });
 
   return (
     <div className="space-y-6">
