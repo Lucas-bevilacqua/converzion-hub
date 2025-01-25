@@ -1,6 +1,4 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Loader2 } from "lucide-react"
-import { supabase } from "@/integrations/supabase/client"
 import { useAuth } from "@/contexts/auth/AuthContext"
 import { useState } from "react"
 import { InstanceSlotCard } from "./instance-components/InstanceSlotCard"
@@ -9,6 +7,7 @@ import { useToast } from "@/components/ui/use-toast"
 import { useInstanceMutations } from "./instance-components/InstanceMutations"
 import type { EvolutionInstance } from "@/integrations/supabase/database-types/evolution-instances"
 import { useQuery } from "@tanstack/react-query"
+import { supabase } from "@/integrations/supabase/client"
 
 export function InstancesCard() {
   const { user } = useAuth()

@@ -19,7 +19,6 @@ interface InstanceSlotCardProps {
 export function InstanceSlotCard({ instance, isUsed, onClick, onDisconnect }: InstanceSlotCardProps) {
   const [showQRCode, setShowQRCode] = useState(false)
   const { toast } = useToast()
-  const { disconnectMutation } = useInstanceMutations()
 
   const { data: stateData, isLoading: isLoadingState } = useQuery({
     queryKey: ['instance-state', instance?.id],
@@ -43,8 +42,10 @@ export function InstanceSlotCard({ instance, isUsed, onClick, onDisconnect }: In
     refetchInterval: 5000
   })
 
-  const isConnected = (stateData?.instance?.instance?.state === 'open' && instance?.status === 'connected') || 
-                     (stateData?.state === 'connected' && instance?.status === 'connected')
+  // Improved connection status logic
+  const isConnected = instance?.connection_status === 'connected' && 
+                     (stateData?.instance?.instance?.state === 'open' || 
+                      stateData?.state === 'connected')
 
   console.log('Status atual da conexão:', {
     stateData,
@@ -83,12 +84,6 @@ export function InstanceSlotCard({ instance, isUsed, onClick, onDisconnect }: In
     }
   }
 
-  const handleDisconnect = async () => {
-    if (onDisconnect) {
-      onDisconnect()
-    }
-  }
-
   return (
     <>
       <div className="relative p-6 rounded-lg border bg-card text-card-foreground shadow-sm">
@@ -117,7 +112,7 @@ export function InstanceSlotCard({ instance, isUsed, onClick, onDisconnect }: In
                 <Button
                   variant={isConnected ? "destructive" : "default"}
                   size="sm"
-                  onClick={isConnected ? handleDisconnect : handleConnect}
+                  onClick={isConnected ? onDisconnect : handleConnect}
                   disabled={isLoadingState}
                 >
                   <Power className="h-4 w-4 mr-2" />
