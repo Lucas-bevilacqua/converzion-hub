@@ -110,13 +110,13 @@ Deno.serve(async (req) => {
 
     if (executeFullSequence) {
       try {
-        // Insert test contact
+        // Insert test contact with correct initial status
         const { error: contactError } = await supabaseClient
           .from('follow_up_contacts')
           .insert({
             follow_up_id: followUpId,
             phone: formattedPhone,
-            status: 'pending',
+            status: 'pending', // Using 'pending' as initial status
             metadata: { 
               is_test: true,
               contact_name: 'Test Contact',
@@ -174,6 +174,21 @@ Deno.serve(async (req) => {
 
         console.log('✅ First message sent successfully')
 
+        // Update contact status to in_progress after first message is sent
+        const { error: updateError } = await supabaseClient
+          .from('follow_up_contacts')
+          .update({
+            status: 'pending', // Keep as pending since we're still sending messages
+            sent_at: new Date().toISOString()
+          })
+          .eq('follow_up_id', followUpId)
+          .eq('phone', formattedPhone)
+
+        if (updateError) {
+          console.error('Error updating contact status:', updateError)
+          throw updateError
+        }
+
         // Schedule remaining messages
         for (let i = 1; i < messages.length; i++) {
           const message = messages[i]
@@ -202,20 +217,6 @@ Deno.serve(async (req) => {
               console.error(`Error sending message ${i + 1}:`, error)
             }
           }, delay)
-        }
-
-        // Update contact status
-        const { error: updateError } = await supabaseClient
-          .from('follow_up_contacts')
-          .update({
-            status: 'in_progress',
-            sent_at: new Date().toISOString()
-          })
-          .eq('follow_up_id', followUpId)
-          .eq('phone', formattedPhone)
-
-        if (updateError) {
-          console.error('Error updating contact status:', updateError)
         }
 
       } catch (error) {
