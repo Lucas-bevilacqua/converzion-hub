@@ -81,16 +81,14 @@ serve(async (req) => {
     const data = await response.json()
     console.log('Resposta da Evolution API:', data)
 
-    // Extrair o estado da resposta da API
-    const rawState = data.state || data?.instance?.instance?.state
-    const instanceState = data?.instance?.instance?.state
-    const isConnected = rawState === 'open' || instanceState === 'open' || 
-                       rawState === 'connected' || instanceState === 'connected'
+    // Extrair o estado diretamente do objeto instance.state
+    const state = data?.instance?.instance?.state || data?.state || 'disconnected'
+    const isConnected = state === 'open' || state === 'connected'
 
     console.log('Estado da conexão:', { 
-      rawState, 
-      instanceState, 
-      isConnected 
+      state,
+      isConnected,
+      rawResponse: data
     })
 
     // Atualizar estado da instância no banco
@@ -108,9 +106,9 @@ serve(async (req) => {
 
     return new Response(
       JSON.stringify({
-        instance: data,
         state: isConnected ? 'connected' : 'disconnected',
-        connected: isConnected
+        connected: isConnected,
+        instance: data
       }),
       { 
         headers: {
