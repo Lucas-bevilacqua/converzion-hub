@@ -9,33 +9,6 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { useToast } from "@/components/ui/use-toast"
 import { Plus, Trash2, Users, Play, AlertCircle, WifiOff } from "lucide-react"
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "@/components/ui/tabs"
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { ContactsTable } from "./ContactsTable"
-import { format } from "date-fns"
 
 interface FollowUpSectionProps {
   instanceId: string
@@ -70,15 +43,6 @@ interface FollowUpData {
   };
   contact_count?: number;
   message_count?: number;
-}
-
-interface FormData {
-  is_active: boolean;
-  type: FollowUpType;
-  stop_on_reply: boolean;
-  stop_on_keyword: string[];
-  manual_messages: ManualMessage[];
-  system_prompt?: string;
 }
 
 const MAX_RETRIES = 3;
