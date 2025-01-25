@@ -19,7 +19,7 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    // Get active follow-ups with pending status and is_active true
+    // Get active follow-ups that are pending or in_progress
     const { data: followUps, error: followUpsError } = await supabase
       .from('follow_ups')
       .select(`
@@ -31,8 +31,8 @@ serve(async (req) => {
           user_id
         )
       `)
-      .eq('status', 'pending')
-      .filter('settings->is_active', 'eq', true)
+      .in('status', ['pending', 'in_progress'])
+      .eq('settings->is_active', true)
 
     if (followUpsError) {
       console.error('❌ Error fetching follow-ups:', followUpsError)
@@ -116,21 +116,23 @@ serve(async (req) => {
           console.log(`✅ Successfully inserted ${contacts.length} new contacts for follow-up ${followUp.id}`)
         }
 
-        // Update follow-up status to in_progress
-        const { error: updateError } = await supabase
-          .from('follow_ups')
-          .update({ 
-            status: 'in_progress',
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', followUp.id)
+        // Update follow-up status to in_progress if it was pending
+        if (followUp.status === 'pending') {
+          const { error: updateError } = await supabase
+            .from('follow_ups')
+            .update({ 
+              status: 'in_progress',
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', followUp.id)
 
-        if (updateError) {
-          console.error(`❌ Error updating follow-up ${followUp.id}:`, updateError)
-          throw updateError
+          if (updateError) {
+            console.error(`❌ Error updating follow-up ${followUp.id}:`, updateError)
+            throw updateError
+          }
+
+          console.log(`✅ Successfully updated follow-up ${followUp.id} status to in_progress`)
         }
-
-        console.log(`✅ Successfully updated follow-up ${followUp.id} status to in_progress`)
 
         return {
           followUpId: followUp.id,
