@@ -43,23 +43,35 @@ export function InstanceSlotCard({ instance, isUsed, onClick, onDisconnect }: In
         const state = data?.state || data?.instance?.instance?.state
         const isConnected = state === 'open' || state === 'connected'
         
+        console.log('Atualizando estado no banco:', {
+          instanceId: instance.id,
+          state,
+          isConnected,
+          timestamp: new Date().toISOString()
+        })
+        
         const { error: updateError } = await supabase
           .from('evolution_instances')
           .update({ 
             connection_status: isConnected ? 'connected' : 'disconnected',
-            status: isConnected ? 'connected' : 'disconnected'
+            status: isConnected ? 'connected' : 'disconnected',
+            updated_at: new Date().toISOString()
           })
           .eq('id', instance.id)
 
         if (updateError) {
           console.error('Erro ao atualizar estado da instância:', updateError)
+        } else {
+          console.log('Estado atualizado com sucesso no banco')
         }
       }
 
       return data
     },
     enabled: !!instance?.id,
-    refetchInterval: 5000
+    refetchInterval: 2000, // Aumentado frequência para 2 segundos
+    retry: true,
+    retryDelay: 1000
   })
 
   // Updated connection status logic to properly handle the 'open' state
@@ -78,6 +90,8 @@ export function InstanceSlotCard({ instance, isUsed, onClick, onDisconnect }: In
 
   const handleConnect = async () => {
     try {
+      console.log('Iniciando conexão para instância:', instance?.id)
+      
       const { data, error } = await supabase.functions.invoke('connect-instance', {
         body: { instanceId: instance?.id }
       })
@@ -87,6 +101,8 @@ export function InstanceSlotCard({ instance, isUsed, onClick, onDisconnect }: In
       if (!data.success) {
         throw new Error(data.error || 'Erro ao conectar instância')
       }
+
+      console.log('QR Code gerado com sucesso:', data)
 
       toast({
         title: "Sucesso",
