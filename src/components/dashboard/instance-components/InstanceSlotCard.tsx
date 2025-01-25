@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Dialog } from "@/components/ui/dialog"
 import { QRCodeDialog } from "./QRCodeDialog"
+import { InstancePromptDialog } from "./InstancePromptDialog"
 import { useToast } from "@/hooks/use-toast"
 import { Loader2, QrCode, Power, Settings } from "lucide-react"
 import type { EvolutionInstance } from "@/integrations/supabase/database-types/evolution-instances"
@@ -17,6 +18,7 @@ interface InstanceSlotCardProps {
 
 export function InstanceSlotCard({ instance, isUsed, onClick, onDisconnect }: InstanceSlotCardProps) {
   const [showQRCode, setShowQRCode] = useState(false)
+  const [showSettings, setShowSettings] = useState(false)
   const { toast } = useToast()
 
   const { data: stateData, isLoading: isLoadingState } = useQuery({
@@ -35,6 +37,25 @@ export function InstanceSlotCard({ instance, isUsed, onClick, onDisconnect }: In
       }
 
       console.log('Estado recebido da API:', data)
+
+      // Update instance status in database
+      if (data?.state || data?.instance?.instance?.state) {
+        const state = data?.state || data?.instance?.instance?.state
+        const isConnected = state === 'open' || state === 'connected'
+        
+        const { error: updateError } = await supabase
+          .from('evolution_instances')
+          .update({ 
+            connection_status: isConnected ? 'connected' : 'disconnected',
+            status: isConnected ? 'connected' : 'disconnected'
+          })
+          .eq('id', instance.id)
+
+        if (updateError) {
+          console.error('Erro ao atualizar estado da instância:', updateError)
+        }
+      }
+
       return data
     },
     enabled: !!instance?.id,
@@ -131,7 +152,7 @@ export function InstanceSlotCard({ instance, isUsed, onClick, onDisconnect }: In
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => window.location.href = `/dashboard/instances/${instance?.id}/settings`}
+                  onClick={() => setShowSettings(true)}
                   disabled={!instance}
                 >
                   <Settings className="h-4 w-4 mr-2" />
@@ -152,13 +173,22 @@ export function InstanceSlotCard({ instance, isUsed, onClick, onDisconnect }: In
       </div>
 
       {instance && (
-        <Dialog open={showQRCode} onOpenChange={setShowQRCode}>
-          <QRCodeDialog
-            open={showQRCode}
-            onOpenChange={setShowQRCode}
-            qrCode={instance.qr_code || null}
+        <>
+          <Dialog open={showQRCode} onOpenChange={setShowQRCode}>
+            <QRCodeDialog
+              open={showQRCode}
+              onOpenChange={setShowQRCode}
+              qrCode={instance.qr_code || null}
+            />
+          </Dialog>
+
+          <InstancePromptDialog
+            open={showSettings}
+            onOpenChange={setShowSettings}
+            instanceId={instance.id}
+            currentPrompt={instance.system_prompt}
           />
-        </Dialog>
+        </>
       )}
     </>
   )
