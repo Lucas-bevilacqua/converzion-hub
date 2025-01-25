@@ -267,6 +267,44 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
     }
   });
 
+  const testMutation = useMutation({
+    mutationFn: async () => {
+      console.log('🔄 [DEBUG] Testing follow-up for instance:', instanceId)
+      
+      if (!followUp?.id) throw new Error("No follow-up to test")
+
+      const { data, error } = await supabase.functions.invoke('test-follow-up-system', {
+        body: { 
+          followUpId: followUp.id,
+          instanceId 
+        }
+      })
+
+      if (error) {
+        console.error('❌ [ERROR] Error testing follow-up:', error)
+        throw error
+      }
+
+      console.log('✅ [DEBUG] Follow-up test response:', data)
+      return data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['follow-up', instanceId] })
+      toast({
+        title: "Sucesso",
+        description: "Follow-up testado com sucesso. Verifique o WhatsApp.",
+      })
+    },
+    onError: (error) => {
+      console.error('❌ [ERROR] Error testing follow-up:', error)
+      toast({
+        title: "Erro",
+        description: "Não foi possível testar o follow-up.",
+        variant: "destructive",
+      })
+    }
+  })
+
   const saveMutation = useMutation({
     mutationFn: async (data: FormData) => {
       console.log('🔄 [DEBUG] Saving follow-up settings:', data);
@@ -458,11 +496,11 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => saveMutation.mutate(formData)}
-            disabled={!followUp?.settings?.is_active}
+            onClick={() => testMutation.mutate()}
+            disabled={!followUp?.settings?.is_active || testMutation.isPending || !isInstanceConnected(followUp?.instance)}
           >
             <Play className="h-4 w-4 mr-2" />
-            Testar
+            {testMutation.isPending ? "Testando..." : "Testar"}
           </Button>
           <AlertDialog>
             <AlertDialogTrigger asChild>
