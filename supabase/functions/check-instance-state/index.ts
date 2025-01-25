@@ -29,7 +29,7 @@ serve(async (req) => {
     const evolutionApiKey = Deno.env.get('EVOLUTION_API_KEY')
     const evolutionApiUrl = Deno.env.get('EVOLUTION_API_URL')
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     
     if (!evolutionApiKey || !evolutionApiUrl) {
       console.error('Configurações da Evolution API ausentes')
@@ -38,7 +38,8 @@ serve(async (req) => {
 
     console.log('Usando URL da Evolution API:', evolutionApiUrl)
 
-    const supabase = createClient(supabaseUrl, supabaseKey)
+    // Criar cliente Supabase com service role key
+    const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
     // Primeiro, buscar a instância para obter o user_id
     const { data: instance, error: instanceError } = await supabase
@@ -92,23 +93,28 @@ serve(async (req) => {
       rawResponse: data
     })
 
-    // Atualizar estado da instância no banco usando o service role
-    const { error: updateError } = await supabase
-      .from('evolution_instances')
-      .update({ 
-        connection_status: isConnected ? 'connected' : 'disconnected',
-        status: isConnected ? 'connected' : 'disconnected',
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', instanceId)
-      .eq('user_id', instance.user_id) // Importante: garantir que estamos atualizando a instância correta
+    try {
+      // Atualizar estado da instância no banco usando o service role
+      const { data: updateData, error: updateError } = await supabase
+        .from('evolution_instances')
+        .update({ 
+          connection_status: isConnected ? 'connected' : 'disconnected',
+          status: isConnected ? 'connected' : 'disconnected',
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', instanceId)
+        .select()
 
-    if (updateError) {
-      console.error('Erro ao atualizar estado da instância:', updateError)
+      if (updateError) {
+        console.error('Erro ao atualizar estado da instância:', updateError)
+        throw updateError
+      }
+
+      console.log('Estado atualizado com sucesso no banco:', updateData)
+    } catch (updateError) {
+      console.error('Erro na atualização:', updateError)
       throw updateError
     }
-
-    console.log('Estado atualizado com sucesso no banco')
 
     return new Response(
       JSON.stringify({
