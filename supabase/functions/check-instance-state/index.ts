@@ -39,7 +39,11 @@ serve(async (req) => {
     console.log('Usando URL da Evolution API:', evolutionApiUrl)
 
     // Criar cliente Supabase com service role key
-    const supabase = createClient(supabaseUrl, supabaseServiceKey)
+    const supabase = createClient(supabaseUrl, supabaseServiceKey, {
+      auth: {
+        persistSession: false
+      }
+    })
 
     // Primeiro, buscar a instância
     const { data: instance, error: instanceError } = await supabase
@@ -80,7 +84,8 @@ serve(async (req) => {
       // Se a instância não existe na Evolution API, marcar como desconectada
       if (response.status === 404) {
         console.log('Instância não encontrada na Evolution API, marcando como desconectada')
-        const { error: updateError } = await supabase
+        
+        const updateResult = await supabase
           .from('evolution_instances')
           .update({ 
             connection_status: 'disconnected',
@@ -88,17 +93,22 @@ serve(async (req) => {
             updated_at: new Date().toISOString()
           })
           .eq('id', instanceId)
+          .select()
+          .single()
 
-        if (updateError) {
-          console.error('Erro ao atualizar status para desconectado:', updateError)
-          throw updateError
+        console.log('Resultado da atualização:', updateResult)
+
+        if (updateResult.error) {
+          console.error('Erro ao atualizar status para desconectado:', updateResult.error)
+          throw updateResult.error
         }
 
         return new Response(
           JSON.stringify({
             state: 'disconnected',
             connected: false,
-            instance: null
+            instance: null,
+            updateResult: updateResult.data
           }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         )
@@ -120,41 +130,38 @@ serve(async (req) => {
       rawResponse: data
     })
 
-    try {
-      console.log('Tentando atualizar estado no banco:', {
-        instanceId,
-        state,
-        isConnected,
-        timestamp: new Date().toISOString()
+    // Atualizar estado da instância no banco
+    console.log('Tentando atualizar estado no banco:', {
+      instanceId,
+      state,
+      isConnected,
+      timestamp: new Date().toISOString()
+    })
+
+    const updateResult = await supabase
+      .from('evolution_instances')
+      .update({ 
+        connection_status: isConnected ? 'connected' : 'disconnected',
+        status: isConnected ? 'connected' : 'disconnected',
+        updated_at: new Date().toISOString()
       })
+      .eq('id', instanceId)
+      .select()
+      .single()
 
-      // Atualizar estado da instância no banco usando o service role
-      const { data: updateData, error: updateError } = await supabase
-        .from('evolution_instances')
-        .update({ 
-          connection_status: isConnected ? 'connected' : 'disconnected',
-          status: isConnected ? 'connected' : 'disconnected',
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', instanceId)
-        .select()
+    console.log('Resultado da atualização:', updateResult)
 
-      if (updateError) {
-        console.error('Erro ao atualizar estado da instância:', updateError)
-        throw updateError
-      }
-
-      console.log('Estado atualizado com sucesso no banco:', updateData)
-    } catch (updateError) {
-      console.error('Erro na atualização:', updateError)
-      throw updateError
+    if (updateResult.error) {
+      console.error('Erro ao atualizar estado da instância:', updateResult.error)
+      throw updateResult.error
     }
 
     return new Response(
       JSON.stringify({
         state: isConnected ? 'connected' : 'disconnected',
         connected: isConnected,
-        instance: data
+        instance: data,
+        updateResult: updateResult.data
       }),
       { 
         headers: {
