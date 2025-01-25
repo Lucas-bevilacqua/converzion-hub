@@ -1,103 +1,124 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { corsHeaders } from '../_shared/cors.ts'
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+interface WebhookRequest {
+  followUpId: string
+  instanceId: string
 }
 
-serve(async (req) => {
+Deno.serve(async (req) => {
+  // Handle CORS
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders })
+    return new Response('ok', { headers: corsHeaders })
   }
 
   try {
-    console.log('🔍 Starting follow-up system test')
-    
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    // Test 1: Check service key in secure_configurations
-    const { data: keyConfig, error: keyError } = await supabaseClient
-      .from('secure_configurations')
-      .select('config_value')
-      .eq('config_key', 'supabase_service_role_key')
+    // Get request body
+    const { followUpId, instanceId } = await req.json() as WebhookRequest
+
+    console.log('🔄 Testing follow-up:', { followUpId, instanceId })
+
+    // Validate input
+    if (!followUpId || !instanceId) {
+      throw new Error('Missing required parameters')
+    }
+
+    // Get follow-up data
+    const { data: followUp, error: followUpError } = await supabaseClient
+      .from('follow_ups')
+      .select('*, instance:evolution_instances(*)')
+      .eq('id', followUpId)
       .single()
 
-    if (keyError) {
-      throw new Error(`Failed to check service key: ${keyError.message}`)
+    if (followUpError) {
+      console.error('Error fetching follow-up:', followUpError)
+      throw followUpError
     }
 
-    // Test 2: Check cron job status
-    const { data: cronJobs, error: cronError } = await supabaseClient.rpc(
-      'test_follow_up_service_key'
-    )
-
-    if (cronError) {
-      throw new Error(`Failed to check cron jobs: ${cronError.message}`)
+    if (!followUp) {
+      throw new Error('Follow-up not found')
     }
 
-    // Test 3: Check recent executions
-    const { data: recentLogs, error: logsError } = await supabaseClient
-      .from('cron_logs')
+    // Get messages
+    const { data: messages, error: messagesError } = await supabaseClient
+      .from('follow_up_messages')
       .select('*')
-      .eq('job_name', 'process-ai-follow-up-every-minute')
-      .order('execution_time', { ascending: false })
-      .limit(5)
+      .eq('follow_up_id', followUpId)
+      .order('delay_minutes', { ascending: true })
 
-    if (logsError) {
-      throw new Error(`Failed to check execution logs: ${logsError.message}`)
+    if (messagesError) {
+      console.error('Error fetching messages:', messagesError)
+      throw messagesError
     }
 
-    // Test 4: Trigger a manual execution
-    const { error: executionError } = await supabaseClient.rpc(
-      'execute_ai_follow_up'
-    )
-
-    if (executionError) {
-      throw new Error(`Failed to execute follow-up: ${executionError.message}`)
+    if (!messages || messages.length === 0) {
+      throw new Error('No messages found for this follow-up')
     }
 
-    const diagnosticResults = {
-      serviceKey: {
-        exists: !!keyConfig?.config_value,
-        timestamp: new Date().toISOString()
+    // Get instance data to send test message
+    const { data: instance, error: instanceError } = await supabaseClient
+      .from('evolution_instances')
+      .select('*')
+      .eq('id', instanceId)
+      .single()
+
+    if (instanceError) {
+      console.error('Error fetching instance:', instanceError)
+      throw instanceError
+    }
+
+    if (!instance) {
+      throw new Error('Instance not found')
+    }
+
+    if (instance.connection_status !== 'connected') {
+      throw new Error('Instance is not connected')
+    }
+
+    // Send test message using Evolution API
+    const evolutionResponse = await fetch(`${Deno.env.get('EVOLUTION_API_URL')}/message/sendText/${instance.id}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': Deno.env.get('EVOLUTION_API_KEY') || '',
       },
-      cronJobStatus: cronJobs,
-      recentExecutions: recentLogs,
-      manualExecutionStatus: 'Success',
-      timestamp: new Date().toISOString()
+      body: JSON.stringify({
+        number: instance.phone_number,
+        text: `[TESTE DE FOLLOW-UP]\n\nMensagens configuradas:\n\n${messages.map((msg, index) => 
+          `${index + 1}. Após ${msg.delay_minutes} minutos:\n${msg.message}`
+        ).join('\n\n')}`,
+      }),
+    })
+
+    if (!evolutionResponse.ok) {
+      const error = await evolutionResponse.text()
+      console.error('Error sending test message:', error)
+      throw new Error('Failed to send test message')
     }
 
-    console.log('✅ Follow-up system test completed:', diagnosticResults)
+    console.log('✅ Test message sent successfully')
 
     return new Response(
-      JSON.stringify(diagnosticResults),
+      JSON.stringify({ success: true }),
       { 
-        headers: { 
-          ...corsHeaders,
-          'Content-Type': 'application/json'
-        }
-      }
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200,
+      },
     )
 
   } catch (error) {
-    console.error('❌ Follow-up system test failed:', error)
-    
+    console.error('Error in test-follow-up-system:', error)
     return new Response(
-      JSON.stringify({
-        error: error.message,
-        timestamp: new Date().toISOString()
-      }),
+      JSON.stringify({ error: error.message }),
       { 
-        status: 500,
-        headers: { 
-          ...corsHeaders,
-          'Content-Type': 'application/json'
-        }
-      }
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 400,
+      },
     )
   }
 })

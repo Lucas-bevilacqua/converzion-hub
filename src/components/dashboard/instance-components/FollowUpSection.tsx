@@ -285,6 +285,10 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
         throw error
       }
 
+      if (!data?.success) {
+        throw new Error(data?.error || 'Unknown error occurred')
+      }
+
       console.log('✅ [DEBUG] Follow-up test response:', data)
       return data
     },
@@ -299,7 +303,7 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
       console.error('❌ [ERROR] Error testing follow-up:', error)
       toast({
         title: "Erro",
-        description: "Não foi possível testar o follow-up.",
+        description: error instanceof Error ? error.message : "Não foi possível testar o follow-up.",
         variant: "destructive",
       })
     }
