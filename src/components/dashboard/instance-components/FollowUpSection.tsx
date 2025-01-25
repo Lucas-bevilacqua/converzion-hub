@@ -272,6 +272,9 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
       console.log('🔄 [DEBUG] Testing follow-up for instance:', instanceId)
       
       if (!followUp?.id) throw new Error("No follow-up to test")
+      if (!followUp.instance?.connection_status?.toLowerCase().includes('connected')) {
+        throw new Error("A instância precisa estar conectada para testar o follow-up")
+      }
 
       const { data, error } = await supabase.functions.invoke('test-follow-up-system', {
         body: { 
@@ -501,7 +504,11 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
             variant="outline"
             size="sm"
             onClick={() => testMutation.mutate()}
-            disabled={!followUp?.settings?.is_active || testMutation.isPending || !isInstanceConnected(followUp?.instance)}
+            disabled={
+              !followUp?.settings?.is_active || 
+              testMutation.isPending || 
+              !isInstanceConnected(followUp?.instance)
+            }
           >
             <Play className="h-4 w-4 mr-2" />
             {testMutation.isPending ? "Testando..." : "Testar"}
