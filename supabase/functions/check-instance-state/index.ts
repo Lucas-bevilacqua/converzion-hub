@@ -13,14 +13,12 @@ serve(async (req) => {
   }
 
   try {
-    const requestData = await req.json()
-    console.log('Received request data:', requestData)
+    // Get instance ID from request
+    const { instanceId } = await req.json()
+    console.log('Received request to check state for instance:', instanceId)
 
-    const { instanceId } = requestData
-
-    // Validate input
     if (!instanceId) {
-      console.error('Missing instanceId in request')
+      console.error('No instance ID provided')
       return new Response(
         JSON.stringify({ error: 'Instance ID is required' }),
         { 
@@ -30,51 +28,20 @@ serve(async (req) => {
       )
     }
 
-    // Get environment variables
-    const evolutionApiUrl = Deno.env.get('EVOLUTION_API_URL')?.replace(/\/$/, '') // Remove trailing slash if present
-    const evolutionApiKey = Deno.env.get('EVOLUTION_API_KEY')
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
-
-    if (!evolutionApiUrl || !evolutionApiKey || !supabaseUrl || !supabaseKey) {
-      console.error('Missing required environment variables:', {
-        hasEvolutionUrl: !!evolutionApiUrl,
-        hasEvolutionKey: !!evolutionApiKey,
-        hasSupabaseUrl: !!supabaseUrl,
-        hasSupabaseKey: !!supabaseKey
-      })
-      return new Response(
-        JSON.stringify({ error: 'Server configuration error' }),
-        { 
-          status: 500,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        }
-      )
-    }
-
-    // Create Supabase client
+    // Initialize Supabase client
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     const supabase = createClient(supabaseUrl, supabaseKey)
 
-    // Get instance name from database
+    // Get instance details from database
     const { data: instance, error: instanceError } = await supabase
       .from('evolution_instances')
-      .select('name')
+      .select('*')
       .eq('id', instanceId)
       .single()
 
-    if (instanceError) {
+    if (instanceError || !instance) {
       console.error('Error fetching instance:', instanceError)
-      return new Response(
-        JSON.stringify({ error: 'Failed to fetch instance details' }),
-        { 
-          status: 500,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        }
-      )
-    }
-
-    if (!instance) {
-      console.error('Instance not found:', instanceId)
       return new Response(
         JSON.stringify({ error: 'Instance not found' }),
         { 
@@ -84,10 +51,27 @@ serve(async (req) => {
       )
     }
 
+    // Get Evolution API configuration
+    const evolutionApiUrl = Deno.env.get('EVOLUTION_API_URL')
+    const evolutionApiKey = Deno.env.get('EVOLUTION_API_KEY')
+
+    if (!evolutionApiUrl || !evolutionApiKey) {
+      console.error('Evolution API configuration missing')
+      return new Response(
+        JSON.stringify({ error: 'Evolution API configuration missing' }),
+        { 
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      )
+    }
+
+    // Clean the base URL by removing trailing slashes
+    const baseUrl = evolutionApiUrl.replace(/\/+$/, '')
     console.log('Checking Evolution API state for:', instance.name)
 
-    // Properly construct the URL ensuring no double slashes
-    const connectionStateUrl = `${evolutionApiUrl}/instance/fetchInstances`
+    // Use the exact endpoint that works with your Evolution API
+    const connectionStateUrl = `${baseUrl}/instance/connectionState/${instance.name}`
     console.log('Making request to Evolution API URL:', connectionStateUrl)
 
     // Check instance state in Evolution API
@@ -95,22 +79,27 @@ serve(async (req) => {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
-        'apikey': evolutionApiKey,
-      },
+        'apikey': evolutionApiKey
+      }
     })
 
     if (!response.ok) {
-      const responseText = await response.text()
       console.error('Evolution API error:', {
         status: response.status,
-        statusText: response.statusText,
-        body: responseText,
-        url: connectionStateUrl
+        statusText: response.statusText
       })
+
+      const errorText = await response.text()
+      console.error('Error response body:', errorText)
+
       return new Response(
         JSON.stringify({ 
           error: 'Failed to check instance state',
-          details: responseText
+          details: {
+            status: response.status,
+            error: response.statusText,
+            response: errorText ? JSON.parse(errorText) : null
+          }
         }),
         { 
           status: response.status,
@@ -119,35 +108,30 @@ serve(async (req) => {
       )
     }
 
-    const instances = await response.json()
-    console.log('Evolution API response:', instances)
-
-    // Find the instance we're looking for
-    const instanceData = instances.find((inst: any) => inst.instanceName === instance.name)
-    const isConnected = instanceData?.state === 'open'
+    const data = await response.json()
+    console.log('Evolution API response:', data)
 
     // Update instance status in database
     const { error: updateError } = await supabase
       .from('evolution_instances')
       .update({ 
-        connection_status: isConnected ? 'connected' : 'disconnected',
+        connection_status: data.state === 'open' ? 'connected' : 'disconnected',
         updated_at: new Date().toISOString()
       })
       .eq('id', instanceId)
 
     if (updateError) {
       console.error('Error updating instance status:', updateError)
-      // Don't throw here, we still want to return the state
     }
 
     return new Response(
       JSON.stringify({
-        instance: instanceData,
-        state: isConnected ? 'connected' : 'disconnected',
-        connected: isConnected
+        instance: data,
+        state: data.state,
+        connected: data.state === 'open'
       }),
       { 
-        headers: { 
+        headers: {
           ...corsHeaders,
           'Content-Type': 'application/json'
         } 
@@ -157,15 +141,13 @@ serve(async (req) => {
   } catch (error) {
     console.error('Error in check-instance-state:', error)
     return new Response(
-      JSON.stringify({
-        error: error.message || 'An unexpected error occurred'
+      JSON.stringify({ 
+        error: 'Failed to check instance state',
+        details: error.message
       }),
       { 
-        status: 500,
-        headers: {
-          ...corsHeaders,
-          'Content-Type': 'application/json'
-        }
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       }
     )
   }
