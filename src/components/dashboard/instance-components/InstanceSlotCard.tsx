@@ -124,7 +124,15 @@ export function InstanceSlotCard({
     }
   }
 
-  const isConnected = stateData?.state === 'connected' || instance?.connection_status === 'connected'
+  const isConnected = stateData?.state === 'connected' || 
+                     stateData?.instance?.instance?.state === 'open' || 
+                     instance?.connection_status === 'connected'
+
+  console.log('Status atual da conexão:', {
+    stateData,
+    isConnected,
+    instanceStatus: instance?.connection_status
+  })
 
   const handleConnect = async () => {
     if (!instance?.id) return
