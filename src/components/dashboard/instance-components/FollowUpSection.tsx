@@ -423,19 +423,16 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
     // Normalize the status to lowercase for consistent comparison
     const status = instance.connection_status.toLowerCase();
     
-    // Check both the direct status and the instance state
+    // Check both the direct status and variations
     const isConnected = status === 'connected' || 
                        status === 'open' || 
                        status.includes('open') ||
-                       status.includes('connected') ||
-                       instance.connection_status === 'open' ||
-                       instance.connection_status === 'connected';
+                       status.includes('connected');
     
     console.log('🔄 [DEBUG] Connection status check:', {
       rawStatus: instance.connection_status,
       normalizedStatus: status,
-      isConnected: isConnected,
-      instance: instance
+      isConnected: isConnected
     });
     
     return isConnected;

@@ -76,7 +76,20 @@ Deno.serve(async (req) => {
       throw new Error('Instance not found')
     }
 
-    if (instance.connection_status !== 'connected') {
+    // Check connection status properly
+    const status = (instance.connection_status || '').toLowerCase()
+    const isConnected = status === 'connected' || 
+                       status === 'open' || 
+                       status.includes('open') ||
+                       status.includes('connected')
+
+    console.log('Connection status check:', {
+      rawStatus: instance.connection_status,
+      normalizedStatus: status,
+      isConnected
+    })
+
+    if (!isConnected) {
       throw new Error('Instance is not connected')
     }
 
@@ -91,7 +104,7 @@ Deno.serve(async (req) => {
       })
 
     // Send test message using Evolution API
-    const evolutionResponse = await fetch(`${Deno.env.get('EVOLUTION_API_URL')}/message/sendText/${instance.id}`, {
+    const evolutionResponse = await fetch(`${Deno.env.get('EVOLUTION_API_URL')}/message/sendText/${instance.name}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
