@@ -41,7 +41,9 @@ serve(async (req) => {
     // Criar cliente Supabase com service role key
     const supabase = createClient(supabaseUrl, supabaseServiceKey, {
       auth: {
-        persistSession: false
+        persistSession: false,
+        autoRefreshToken: false,
+        detectSessionInUrl: false
       }
     })
 
