@@ -110,7 +110,7 @@ Deno.serve(async (req) => {
         execution_time: new Date().toISOString()
       })
 
-    const evolutionApiUrl = Deno.env.get('EVOLUTION_API_URL')
+    const evolutionApiUrl = Deno.env.get('EVOLUTION_API_URL')?.replace(/\/$/, '') // Remove trailing slash if present
     const evolutionApiKey = Deno.env.get('EVOLUTION_API_KEY')
 
     if (!evolutionApiUrl || !evolutionApiKey) {
@@ -123,7 +123,7 @@ Deno.serve(async (req) => {
       messageCount: messages.length
     })
 
-    // Send test message using Evolution API
+    // Send test message using Evolution API - ensure proper URL construction
     const evolutionResponse = await fetch(`${evolutionApiUrl}/message/sendText/${instance.name}`, {
       method: 'POST',
       headers: {
