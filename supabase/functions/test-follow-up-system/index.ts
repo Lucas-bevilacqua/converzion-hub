@@ -86,7 +86,8 @@ Deno.serve(async (req) => {
     console.log('Connection status check:', {
       rawStatus: instance.connection_status,
       normalizedStatus: status,
-      isConnected
+      isConnected,
+      instanceName: instance.name
     })
 
     if (!isConnected) {
@@ -103,12 +104,25 @@ Deno.serve(async (req) => {
         execution_time: new Date().toISOString()
       })
 
+    const evolutionApiUrl = Deno.env.get('EVOLUTION_API_URL')
+    const evolutionApiKey = Deno.env.get('EVOLUTION_API_KEY')
+
+    if (!evolutionApiUrl || !evolutionApiKey) {
+      throw new Error('Evolution API configuration missing')
+    }
+
+    console.log('Sending test message to Evolution API:', {
+      url: `${evolutionApiUrl}/message/sendText/${instance.name}`,
+      phone: instance.phone_number,
+      messageCount: messages.length
+    })
+
     // Send test message using Evolution API
-    const evolutionResponse = await fetch(`${Deno.env.get('EVOLUTION_API_URL')}/message/sendText/${instance.name}`, {
+    const evolutionResponse = await fetch(`${evolutionApiUrl}/message/sendText/${instance.name}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'apikey': Deno.env.get('EVOLUTION_API_KEY') || '',
+        'apikey': evolutionApiKey,
       },
       body: JSON.stringify({
         number: instance.phone_number,
@@ -119,10 +133,17 @@ Deno.serve(async (req) => {
     })
 
     if (!evolutionResponse.ok) {
-      const error = await evolutionResponse.text()
-      console.error('Error sending test message:', error)
+      const errorText = await evolutionResponse.text()
+      console.error('Error sending test message:', {
+        status: evolutionResponse.status,
+        response: errorText,
+        instance: instance.name
+      })
       throw new Error('Failed to send test message')
     }
+
+    const responseData = await evolutionResponse.json()
+    console.log('Evolution API response:', responseData)
 
     // Log successful test
     await supabaseClient
@@ -137,7 +158,10 @@ Deno.serve(async (req) => {
     console.log('✅ Test message sent successfully')
 
     return new Response(
-      JSON.stringify({ success: true }),
+      JSON.stringify({ 
+        success: true,
+        message: 'Test message sent successfully'
+      }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200,
@@ -163,7 +187,10 @@ Deno.serve(async (req) => {
       })
 
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ 
+        error: error.message,
+        details: error instanceof Error ? error.stack : undefined
+      }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 400,
