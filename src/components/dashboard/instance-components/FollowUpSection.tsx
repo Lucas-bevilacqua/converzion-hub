@@ -549,6 +549,7 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
                 onClick={(e) => {
                   e.preventDefault()
                   e.stopPropagation()
+                  setShowTestDialog(true)
                 }}
                 disabled={
                   !followUp?.settings?.is_active || 
