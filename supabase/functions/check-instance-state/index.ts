@@ -31,7 +31,7 @@ serve(async (req) => {
     }
 
     // Get environment variables
-    const evolutionApiUrl = Deno.env.get('EVOLUTION_API_URL')
+    const evolutionApiUrl = Deno.env.get('EVOLUTION_API_URL')?.replace(/\/$/, '') // Remove trailing slash if present
     const evolutionApiKey = Deno.env.get('EVOLUTION_API_KEY')
     const supabaseUrl = Deno.env.get('SUPABASE_URL')
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
@@ -86,8 +86,12 @@ serve(async (req) => {
 
     console.log('Checking Evolution API state for:', instance.name)
 
+    // Properly construct the URL ensuring no double slashes
+    const connectionStateUrl = `${evolutionApiUrl}/instance/connectionState/${instance.name}`.replace(/([^:]\/)\/+/g, "$1")
+    console.log('Making request to Evolution API URL:', connectionStateUrl)
+
     // Check instance state in Evolution API
-    const response = await fetch(`${evolutionApiUrl}/instance/connectionState/${instance.name}`, {
+    const response = await fetch(connectionStateUrl, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -100,7 +104,8 @@ serve(async (req) => {
       console.error('Evolution API error:', {
         status: response.status,
         statusText: response.statusText,
-        body: responseText
+        body: responseText,
+        url: connectionStateUrl
       })
       return new Response(
         JSON.stringify({ 
