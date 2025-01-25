@@ -415,8 +415,10 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
   });
 
   const isInstanceConnected = (instance?: { connection_status?: string | null }) => {
-    if (!instance?.connection_status) return false
-    return instance.connection_status.toLowerCase() === 'connected'
+    // Considera tanto o status 'connected' quanto 'open' da Evolution API
+    if (!instance?.connection_status) return false;
+    return instance.connection_status.toLowerCase() === 'connected' || 
+           instance.connection_status.toLowerCase() === 'open';
   }
 
   // Modified effect to only update when follow-up status changes
