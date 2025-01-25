@@ -20,8 +20,8 @@ export function InstanceConnectionStatus({ instance, stateData, isLoading }: Ins
 
   return (
     <Badge 
-      variant={isConnected ? "success" : "secondary"}
-      className="h-5 px-1.5"
+      variant="secondary"
+      className={`h-5 px-1.5 ${isConnected ? 'bg-green-100 text-green-800 hover:bg-green-200' : 'bg-gray-100 text-gray-800 hover:bg-gray-200'}`}
     >
       {isConnected ? "Conectado" : "Desconectado"}
     </Badge>
