@@ -98,16 +98,6 @@ Deno.serve(async (req) => {
       throw new Error('Instance is not connected')
     }
 
-    // Log test execution
-    await supabaseClient
-      .from('cron_logs')
-      .insert({
-        job_name: 'test-follow-up',
-        status: 'started',
-        details: `Testing follow-up ${followUpId} for instance ${instanceId}`,
-        execution_time: new Date().toISOString()
-      })
-
     const evolutionApiUrl = Deno.env.get('EVOLUTION_API_URL')?.replace(/\/$/, '')
     const evolutionApiKey = Deno.env.get('EVOLUTION_API_KEY')
 
@@ -116,22 +106,28 @@ Deno.serve(async (req) => {
     }
 
     if (executeFullSequence) {
-      // Insert test contact into follow_up_contacts
+      // Insert test contact into follow_up_contacts with test flag
       const { error: contactError } = await supabaseClient
         .from('follow_up_contacts')
         .insert({
           follow_up_id: followUpId,
           phone: testPhoneNumber.replace(/[^0-9]/g, ''),
           status: 'pending',
-          metadata: { is_test: true }
+          metadata: { 
+            is_test: true,
+            contact_name: 'Test Contact',
+            last_message_time: new Date().toISOString()
+          }
         })
 
       if (contactError) {
         throw new Error(`Failed to create test contact: ${contactError.message}`)
       }
 
+      console.log('✅ Test contact created successfully')
+
       // Send initial confirmation
-      await fetch(`${evolutionApiUrl}/message/sendText/${instance.name}`, {
+      const response = await fetch(`${evolutionApiUrl}/message/sendText/${instance.name}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -144,6 +140,48 @@ Deno.serve(async (req) => {
           ).join('\n')}`,
         }),
       })
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        throw new Error(`Failed to send test message: ${errorText}`)
+      }
+
+      console.log('✅ Initial confirmation sent successfully')
+
+      // Trigger immediate processing for this contact
+      const processingResponse = await fetch(`${evolutionApiUrl}/message/sendText/${instance.name}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': evolutionApiKey,
+        },
+        body: JSON.stringify({
+          number: testPhoneNumber.replace(/[^0-9]/g, ''),
+          text: messages[0].message
+        }),
+      })
+
+      if (!processingResponse.ok) {
+        const errorText = await processingResponse.text()
+        throw new Error(`Failed to send first message: ${errorText}`)
+      }
+
+      console.log('✅ First message sent successfully')
+
+      // Update contact status
+      const { error: updateError } = await supabaseClient
+        .from('follow_up_contacts')
+        .update({
+          status: 'in_progress',
+          sent_at: new Date().toISOString()
+        })
+        .eq('follow_up_id', followUpId)
+        .eq('phone', testPhoneNumber.replace(/[^0-9]/g, ''))
+
+      if (updateError) {
+        console.error('Error updating contact status:', updateError)
+      }
+
     } else {
       // Send preview message only
       await fetch(`${evolutionApiUrl}/message/sendText/${instance.name}`, {
@@ -161,17 +199,7 @@ Deno.serve(async (req) => {
       })
     }
 
-    // Log successful test
-    await supabaseClient
-      .from('cron_logs')
-      .insert({
-        job_name: 'test-follow-up',
-        status: 'completed',
-        details: `Successfully tested follow-up ${followUpId}`,
-        execution_time: new Date().toISOString()
-      })
-
-    console.log('✅ Test message sent successfully')
+    console.log('✅ Test sequence initiated successfully')
 
     return new Response(
       JSON.stringify({ 
@@ -186,20 +214,6 @@ Deno.serve(async (req) => {
 
   } catch (error) {
     console.error('Error in test-follow-up-system:', error)
-
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    )
-
-    await supabaseClient
-      .from('cron_logs')
-      .insert({
-        job_name: 'test-follow-up',
-        status: 'error',
-        details: `Error testing follow-up: ${error.message}`,
-        execution_time: new Date().toISOString()
-      })
 
     return new Response(
       JSON.stringify({ 
