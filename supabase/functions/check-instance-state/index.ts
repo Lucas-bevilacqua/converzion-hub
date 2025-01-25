@@ -16,7 +16,7 @@ serve(async (req) => {
     const requestData = await req.json()
     console.log('Received request data:', requestData)
 
-    const { instanceId, instanceName } = requestData
+    const { instanceId } = requestData
 
     // Validate input
     if (!instanceId) {
@@ -55,44 +55,39 @@ serve(async (req) => {
     // Create Supabase client
     const supabase = createClient(supabaseUrl, supabaseKey)
 
-    // Get instance name from database if not provided
-    let finalInstanceName = instanceName
-    if (!finalInstanceName) {
-      const { data: instance, error: instanceError } = await supabase
-        .from('evolution_instances')
-        .select('name')
-        .eq('id', instanceId)
-        .single()
+    // Get instance name from database
+    const { data: instance, error: instanceError } = await supabase
+      .from('evolution_instances')
+      .select('name')
+      .eq('id', instanceId)
+      .single()
 
-      if (instanceError) {
-        console.error('Error fetching instance:', instanceError)
-        return new Response(
-          JSON.stringify({ error: 'Failed to fetch instance details' }),
-          { 
-            status: 500,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-          }
-        )
-      }
-
-      if (!instance) {
-        console.error('Instance not found:', instanceId)
-        return new Response(
-          JSON.stringify({ error: 'Instance not found' }),
-          { 
-            status: 404,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-          }
-        )
-      }
-
-      finalInstanceName = instance.name
+    if (instanceError) {
+      console.error('Error fetching instance:', instanceError)
+      return new Response(
+        JSON.stringify({ error: 'Failed to fetch instance details' }),
+        { 
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      )
     }
 
-    console.log('Checking Evolution API state for:', finalInstanceName)
+    if (!instance) {
+      console.error('Instance not found:', instanceId)
+      return new Response(
+        JSON.stringify({ error: 'Instance not found' }),
+        { 
+          status: 404,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      )
+    }
+
+    console.log('Checking Evolution API state for:', instance.name)
 
     // Check instance state in Evolution API
-    const response = await fetch(`${evolutionApiUrl}/instance/connectionState/${finalInstanceName}`, {
+    const response = await fetch(`${evolutionApiUrl}/instance/connectionState/${instance.name}`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
