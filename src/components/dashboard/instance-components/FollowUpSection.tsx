@@ -107,6 +107,7 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
   const { user } = useAuth()
   const { toast } = useToast()
   const queryClient = useQueryClient()
+  const [displayDate, setDisplayDate] = useState<Date | null>(null)
 
   const { data: followUp, isLoading } = useQuery({
     queryKey: ['follow-up', instanceId],
@@ -373,6 +374,32 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
     return instance.connection_status.toLowerCase() === 'connected'
   }
 
+  // Add effect to update display date every second
+  useEffect(() => {
+    if (!followUp) return;
+
+    const updateDisplayDate = () => {
+      const now = new Date()
+      const nextExecution = followUp.scheduled_for ? new Date(followUp.scheduled_for) : null
+      
+      if (nextExecution && nextExecution < now && followUp.settings?.is_active) {
+        // Get the first message delay as fallback
+        const firstMessageDelay = followUpMessages[0]?.delay_minutes || 1
+        setDisplayDate(new Date(now.getTime() + (firstMessageDelay * 60 * 1000)))
+      } else {
+        setDisplayDate(nextExecution)
+      }
+    }
+
+    // Update immediately
+    updateDisplayDate()
+
+    // Then update every second
+    const interval = setInterval(updateDisplayDate, 1000)
+
+    return () => clearInterval(interval)
+  }, [followUp, followUpMessages])
+
   const FollowUpStatus = () => {
     if (!followUp) {
       console.log('❌ No follow-up data available')
@@ -380,17 +407,7 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
     }
 
     const isDisconnected = !isInstanceConnected(followUp.instance)
-    const nextExecution = followUp.scheduled_for ? new Date(followUp.scheduled_for) : null
-    const now = new Date()
     
-    // If the scheduled time is in the past, calculate next execution based on delay
-    let displayDate = nextExecution
-    if (nextExecution && nextExecution < now && followUp.settings?.is_active) {
-      // Get the first message delay as fallback
-      const firstMessageDelay = followUpMessages[0]?.delay_minutes || 1
-      displayDate = new Date(now.getTime() + (firstMessageDelay * 60 * 1000))
-    }
-
     if (!followUp.settings?.is_active) {
       return (
         <Alert className="mb-4">
