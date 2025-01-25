@@ -87,7 +87,7 @@ serve(async (req) => {
     console.log('Checking Evolution API state for:', instance.name)
 
     // Properly construct the URL ensuring no double slashes
-    const connectionStateUrl = `${evolutionApiUrl}/instance/connectionState/${instance.name}`.replace(/([^:]\/)\/+/g, "$1")
+    const connectionStateUrl = `${evolutionApiUrl}/instance/fetchInstances`
     console.log('Making request to Evolution API URL:', connectionStateUrl)
 
     // Check instance state in Evolution API
@@ -119,14 +119,18 @@ serve(async (req) => {
       )
     }
 
-    const data = await response.json()
-    console.log('Evolution API response:', data)
+    const instances = await response.json()
+    console.log('Evolution API response:', instances)
+
+    // Find the instance we're looking for
+    const instanceData = instances.find((inst: any) => inst.instanceName === instance.name)
+    const isConnected = instanceData?.state === 'open'
 
     // Update instance status in database
     const { error: updateError } = await supabase
       .from('evolution_instances')
       .update({ 
-        connection_status: data.state === 'open' ? 'connected' : 'disconnected',
+        connection_status: isConnected ? 'connected' : 'disconnected',
         updated_at: new Date().toISOString()
       })
       .eq('id', instanceId)
@@ -138,9 +142,9 @@ serve(async (req) => {
 
     return new Response(
       JSON.stringify({
-        instance: data,
-        state: data.state,
-        connected: data.state === 'open'
+        instance: instanceData,
+        state: isConnected ? 'connected' : 'disconnected',
+        connected: isConnected
       }),
       { 
         headers: { 
