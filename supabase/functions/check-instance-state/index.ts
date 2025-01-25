@@ -74,6 +74,11 @@ serve(async (req) => {
       }
     })
 
+    console.log('Resposta da Evolution API:', {
+      status: response.status,
+      ok: response.ok
+    })
+
     if (!response.ok) {
       console.error('Erro na Evolution API:', {
         status: response.status,
@@ -87,7 +92,7 @@ serve(async (req) => {
       if (response.status === 404) {
         console.log('Instância não encontrada na Evolution API, marcando como desconectada')
         
-        const updateResult = await supabase
+        const { data: updateData, error: updateError } = await supabase
           .from('evolution_instances')
           .update({ 
             connection_status: 'disconnected',
@@ -98,11 +103,14 @@ serve(async (req) => {
           .select()
           .single()
 
-        console.log('Resultado da atualização:', updateResult)
+        console.log('Resultado da atualização para desconectado:', {
+          data: updateData,
+          error: updateError
+        })
 
-        if (updateResult.error) {
-          console.error('Erro ao atualizar status para desconectado:', updateResult.error)
-          throw updateResult.error
+        if (updateError) {
+          console.error('Erro ao atualizar status para desconectado:', updateError)
+          throw updateError
         }
 
         return new Response(
@@ -110,7 +118,7 @@ serve(async (req) => {
             state: 'disconnected',
             connected: false,
             instance: null,
-            updateResult: updateResult.data
+            updateResult: updateData
           }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         )
@@ -140,7 +148,7 @@ serve(async (req) => {
       timestamp: new Date().toISOString()
     })
 
-    const updateResult = await supabase
+    const { data: updateData, error: updateError } = await supabase
       .from('evolution_instances')
       .update({ 
         connection_status: isConnected ? 'connected' : 'disconnected',
@@ -151,11 +159,14 @@ serve(async (req) => {
       .select()
       .single()
 
-    console.log('Resultado da atualização:', updateResult)
+    console.log('Resultado da atualização:', {
+      data: updateData,
+      error: updateError
+    })
 
-    if (updateResult.error) {
-      console.error('Erro ao atualizar estado da instância:', updateResult.error)
-      throw updateResult.error
+    if (updateError) {
+      console.error('Erro ao atualizar estado da instância:', updateError)
+      throw updateError
     }
 
     return new Response(
@@ -163,7 +174,7 @@ serve(async (req) => {
         state: isConnected ? 'connected' : 'disconnected',
         connected: isConnected,
         instance: data,
-        updateResult: updateResult.data
+        updateResult: updateData
       }),
       { 
         headers: {
