@@ -116,16 +116,18 @@ export default function Dashboard() {
           onSectionChange={setActiveSection} 
           activeSection={activeSection} 
         />
-        <main className="flex-1 p-8">
-          <div className="flex items-center gap-4 mb-6">
-            {isMobile && (
-              <SidebarTrigger>
-                <Menu className="h-6 w-6" />
-              </SidebarTrigger>
-            )}
-          </div>
-          <div className="max-w-6xl mx-auto">
-            {renderContent()}
+        <main className="flex-1 overflow-auto">
+          <div className="p-4 md:p-8">
+            <div className="flex items-center gap-4 mb-6">
+              {isMobile && (
+                <SidebarTrigger>
+                  <Menu className="h-6 w-6" />
+                </SidebarTrigger>
+              )}
+            </div>
+            <div className="max-w-6xl mx-auto">
+              {renderContent()}
+            </div>
           </div>
         </main>
       </div>
