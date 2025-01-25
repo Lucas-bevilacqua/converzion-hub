@@ -11,7 +11,6 @@ interface InstanceState {
   connected: boolean
   instance: any
   updateResult?: any
-  verificationResult?: any
   timestamp: string
 }
 
@@ -29,13 +28,6 @@ async function checkEvolutionApiState(instanceName: string, evolutionApiKey: str
     }
   })
 
-  console.log('Resposta da Evolution API:', {
-    status: response.status,
-    ok: response.ok,
-    statusText: response.statusText,
-    timestamp: new Date().toISOString()
-  })
-
   if (!response.ok) {
     throw new Error(`Evolution API error: ${response.status} ${response.statusText}`)
   }
@@ -49,6 +41,12 @@ async function updateInstanceStatus(
   status: string,
   timestamp = new Date().toISOString()
 ): Promise<any> {
+  console.log('Atualizando status da instância:', {
+    instanceId,
+    status,
+    timestamp
+  })
+
   const { data, error } = await supabase
     .from('evolution_instances')
     .update({ 
@@ -60,7 +58,12 @@ async function updateInstanceStatus(
     .select()
     .single()
 
-  if (error) throw error
+  if (error) {
+    console.error('Erro ao atualizar status:', error)
+    throw error
+  }
+
+  console.log('Status atualizado com sucesso:', data)
   return data
 }
 
@@ -135,7 +138,6 @@ serve(async (req) => {
       })
 
       const updateData = await updateInstanceStatus(supabase, instanceId, newStatus)
-      console.log('Status atualizado com sucesso:', updateData)
 
       const response: InstanceState = {
         state: newStatus,
@@ -158,7 +160,6 @@ serve(async (req) => {
     } catch (error) {
       console.error('Erro ao verificar estado na Evolution API:', error)
       
-      // Se houver erro na API, marcar como desconectado
       const updateData = await updateInstanceStatus(supabase, instanceId, 'disconnected')
       console.log('Instância marcada como desconectada:', updateData)
 

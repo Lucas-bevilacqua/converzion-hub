@@ -8,7 +8,7 @@ import { InstancePromptDialog } from "./InstancePromptDialog"
 import { useToast } from "@/hooks/use-toast"
 import type { EvolutionInstance } from "@/integrations/supabase/database-types/evolution-instances"
 import { useAuth } from "@/contexts/auth/AuthContext"
-import { InstanceStatus } from "./InstanceStatus"
+import { InstanceConnectionStatus } from "./InstanceConnectionStatus"
 import { InstanceActions } from "./InstanceActions"
 
 interface InstanceSlotCardProps {
@@ -37,8 +37,6 @@ export function InstanceSlotCard({
         return null
       }
       
-      console.log('Verificando estado do número:', instance.id)
-      
       try {
         const { data: instanceData, error: instanceError } = await supabase
           .from('evolution_instances')
@@ -52,8 +50,8 @@ export function InstanceSlotCard({
           return null
         }
 
-        console.log('Instância encontrada:', instanceData)
-
+        console.log('Verificando estado para instância:', instance.name)
+        
         const { data, error } = await supabase.functions.invoke('check-instance-state', {
           body: { instanceId: instance.id }
         })
@@ -83,19 +81,6 @@ export function InstanceSlotCard({
     staleTime: 0
   })
 
-  const isConnected = instance?.connection_status === 'connected' || 
-                     stateData?.state === 'connected' || 
-                     stateData?.instance?.instance?.state === 'open'
-
-  console.log('Status atual da conexão:', {
-    stateData,
-    isConnected,
-    instanceStatus: instance?.connection_status,
-    instanceState: instance?.status,
-    apiState: stateData?.state,
-    apiInstanceState: stateData?.instance?.instance?.state
-  })
-
   const handleConnect = async () => {
     if (!user) {
       toast({
@@ -114,10 +99,6 @@ export function InstanceSlotCard({
       })
 
       if (error) throw error
-
-      if (!data.success) {
-        throw new Error(data.error || 'Erro ao conectar instância')
-      }
 
       console.log('QR Code gerado com sucesso:', data)
 
@@ -150,16 +131,19 @@ export function InstanceSlotCard({
                 {instance?.phone_number || "Número não conectado"}
               </p>
             </div>
-            <InstanceStatus 
-              isConnected={isConnected} 
-              isLoading={isLoadingState} 
-            />
+            {instance && (
+              <InstanceConnectionStatus 
+                instance={instance}
+                stateData={stateData}
+                isLoading={isLoadingState}
+              />
+            )}
           </div>
 
           {isUsed ? (
             <InstanceActions
               instance={instance!}
-              isConnected={isConnected}
+              isConnected={instance?.connection_status === 'connected'}
               isLoading={isLoadingState}
               onConnect={handleConnect}
               onDisconnect={onDisconnect}
