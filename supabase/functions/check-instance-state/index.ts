@@ -41,7 +41,7 @@ serve(async (req) => {
     // Criar cliente Supabase com service role key
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
-    // Primeiro, buscar a instância para obter o user_id
+    // Primeiro, buscar a instância
     const { data: instance, error: instanceError } = await supabase
       .from('evolution_instances')
       .select('*')
@@ -77,6 +77,33 @@ serve(async (req) => {
       const errorText = await response.text()
       console.error('Resposta de erro:', errorText)
 
+      // Se a instância não existe na Evolution API, marcar como desconectada
+      if (response.status === 404) {
+        console.log('Instância não encontrada na Evolution API, marcando como desconectada')
+        const { error: updateError } = await supabase
+          .from('evolution_instances')
+          .update({ 
+            connection_status: 'disconnected',
+            status: 'disconnected',
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', instanceId)
+
+        if (updateError) {
+          console.error('Erro ao atualizar status para desconectado:', updateError)
+          throw updateError
+        }
+
+        return new Response(
+          JSON.stringify({
+            state: 'disconnected',
+            connected: false,
+            instance: null
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+
       throw new Error(`Erro na Evolution API: ${response.status} ${response.statusText}`)
     }
 
@@ -96,7 +123,6 @@ serve(async (req) => {
     try {
       console.log('Tentando atualizar estado no banco:', {
         instanceId,
-        userId: instance.user_id,
         state,
         isConnected,
         timestamp: new Date().toISOString()
@@ -111,7 +137,6 @@ serve(async (req) => {
           updated_at: new Date().toISOString()
         })
         .eq('id', instanceId)
-        .eq('user_id', instance.user_id)
         .select()
 
       if (updateError) {
