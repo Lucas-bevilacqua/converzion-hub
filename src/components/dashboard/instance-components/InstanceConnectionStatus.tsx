@@ -17,7 +17,17 @@ export function InstanceConnectionStatus({
     return <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
   }
 
-  const isConnected = instance?.connection_status === 'connected'
+  const isConnected = 
+    instance?.connection_status === 'connected' ||
+    stateData?.state === 'connected' ||
+    stateData?.instance?.instance?.state === 'open';
+
+  console.log('Status da conexão:', {
+    instanceStatus: instance?.connection_status,
+    stateDataState: stateData?.state,
+    evolutionState: stateData?.instance?.instance?.state,
+    isConnected
+  });
 
   return (
     <Badge 
