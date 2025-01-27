@@ -90,36 +90,50 @@ serve(async (req) => {
         
         // Filter and format valid contacts
         const validContacts = contacts?.filter(contact => {
+          // Get the raw phone number and log it
           const rawPhone = contact.telefoneclientes?.trim()
+          console.log(`📱 Processing phone number:`, {
+            raw: rawPhone,
+            contactName: contact.nomeclientes || 'Unknown'
+          })
+          
           if (!rawPhone) {
-            console.log(`⚠️ Skipping contact - Invalid phone:`, contact)
+            console.log(`⚠️ Skipping contact - Empty phone number`)
             return false
           }
-          // Remove any non-digit characters
+
+          // Remove any non-digit characters and log the cleaned number
           const cleanPhone = rawPhone.replace(/\D/g, '')
-          // Check if it's a valid number after cleaning
-          if (!cleanPhone.match(/^\d{10,13}$/)) {
-            console.log(`⚠️ Skipping contact - Invalid phone format:`, cleanPhone)
+          console.log(`🧹 Cleaned phone number: ${cleanPhone}`)
+          
+          // Check if it's a valid number after cleaning (10-11 digits without country code)
+          if (!cleanPhone.match(/^\d{10,11}$/)) {
+            console.log(`⚠️ Skipping contact - Invalid phone format: ${cleanPhone}`)
             return false
           }
+
           return true
         }).map(contact => {
-          // Format phone number: remove any non-digits and ensure it starts with country code
+          // Get the raw phone and clean it
           let phone = contact.telefoneclientes.replace(/\D/g, '')
-          // If number starts with 0, remove it
-          if (phone.startsWith('0')) {
+          
+          // If number has 11 digits and starts with 0, remove it
+          if (phone.length === 11 && phone.startsWith('0')) {
             phone = phone.substring(1)
           }
-          // If number doesn't start with 55, add it
+          
+          // Make sure it has the country code
           if (!phone.startsWith('55')) {
             phone = `55${phone}`
           }
+          
           // Log the phone number transformation
           console.log(`📱 Phone transformation:`, {
             original: contact.telefoneclientes,
             cleaned: phone,
             contactName: contact.nomeclientes || 'Unknown'
           })
+          
           return {
             ...contact,
             telefoneclientes: phone
@@ -134,7 +148,7 @@ serve(async (req) => {
           // Prepare contacts for insertion with proper phone format
           const contactsToInsert = validContacts.map(contact => ({
             follow_up_id: followUp.id,
-            phone: contact.telefoneclientes, // This is now properly formatted
+            phone: contact.telefoneclientes,
             status: 'pending',
             metadata: {
               contact_name: contact.nomeclientes || 'Unknown',
