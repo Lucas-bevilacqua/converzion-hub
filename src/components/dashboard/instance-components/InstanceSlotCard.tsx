@@ -61,6 +61,37 @@ export function InstanceSlotCard({
           throw error
         }
 
+        // Atualizar o status no banco de dados
+        if (data?.state === 'connected' || data?.instance?.instance?.state === 'open') {
+          const { error: updateError } = await supabase
+            .from('evolution_instances')
+            .update({ 
+              connection_status: 'connected',
+              status: 'connected'
+            })
+            .eq('id', instance.id)
+
+          if (updateError) {
+            console.error('Erro ao atualizar status no banco:', updateError)
+          } else {
+            console.log('Status atualizado no banco para connected')
+          }
+        } else if (data?.state === 'disconnected') {
+          const { error: updateError } = await supabase
+            .from('evolution_instances')
+            .update({ 
+              connection_status: 'disconnected',
+              status: 'disconnected'
+            })
+            .eq('id', instance.id)
+
+          if (updateError) {
+            console.error('Erro ao atualizar status no banco:', updateError)
+          } else {
+            console.log('Status atualizado no banco para disconnected')
+          }
+        }
+
         console.log('Estado recebido da API:', data)
         return data
       } catch (error) {
