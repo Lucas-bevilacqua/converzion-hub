@@ -33,7 +33,7 @@ serve(async (req) => {
     // Get active follow-ups that are pending or in_progress
     const dbStartTime = Date.now()
     const { data: followUps, error: followUpsError } = await supabase
-      .from('follow_ups')  // Usando a tabela correta 'follow_ups'
+      .from('follow_ups')
       .select(`
         *,
         instance:evolution_instances (
@@ -85,9 +85,21 @@ serve(async (req) => {
           throw contactsError
         }
 
+        // Log the raw contacts data for debugging
+        console.log(`🔍 Raw contacts data for follow-up ${followUp.id}:`, contacts)
         console.log(`✅ Found ${contacts?.length || 0} eligible contacts for follow-up ${followUp.id}`)
         
+        // Log the query parameters for debugging
+        console.log(`🔍 Query parameters:`, {
+          instance_id: followUp.instance_id,
+          follow_up_id: followUp.id,
+          hours_threshold: 24
+        })
+
         if (contacts && contacts.length > 0) {
+          // Log contact insertion attempt
+          console.log(`🔄 Attempting to insert ${contacts.length} contacts for follow-up ${followUp.id}`)
+          
           const { error: insertError } = await supabase
             .from('follow_up_contacts')
             .insert(contacts.map(contact => ({
@@ -101,7 +113,12 @@ serve(async (req) => {
               }
             })))
 
-          if (insertError) throw insertError
+          if (insertError) {
+            console.error(`❌ Error inserting contacts for follow-up ${followUp.id}:`, insertError)
+            throw insertError
+          }
+
+          console.log(`✅ Successfully inserted ${contacts.length} contacts for follow-up ${followUp.id}`)
 
           // Chamar a função process-follow-up para cada follow-up com contatos
           console.log(`🔄 Calling process-follow-up for follow-up ${followUp.id}`)
@@ -127,6 +144,8 @@ serve(async (req) => {
           }
 
           console.log(`✅ Successfully processed follow-up ${followUp.id}`)
+        } else {
+          console.log(`ℹ️ No eligible contacts found for follow-up ${followUp.id}`)
         }
 
         // Update follow-up status if needed
