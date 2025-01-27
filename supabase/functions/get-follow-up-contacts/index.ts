@@ -87,26 +87,39 @@ serve(async (req) => {
 
         // Log the raw contacts data for debugging
         console.log(`🔍 Raw contacts data for follow-up ${followUp.id}:`, contacts)
-        console.log(`✅ Found ${contacts?.length || 0} eligible contacts for follow-up ${followUp.id}`)
         
-        // Log the query parameters for debugging
-        console.log(`🔍 Query parameters:`, {
-          instance_id: followUp.instance_id,
-          follow_up_id: followUp.id,
-          hours_threshold: 24
-        })
-
         // Filter and format valid contacts
         const validContacts = contacts?.filter(contact => {
-          const phone = contact.telefoneclientes?.trim()
-          // Ensure phone exists and has valid format
-          return phone && phone.match(/^\d+$/)
+          const rawPhone = contact.telefoneclientes?.trim()
+          if (!rawPhone) {
+            console.log(`⚠️ Skipping contact - Invalid phone:`, contact)
+            return false
+          }
+          // Remove any non-digit characters
+          const cleanPhone = rawPhone.replace(/\D/g, '')
+          // Check if it's a valid number after cleaning
+          if (!cleanPhone.match(/^\d{10,13}$/)) {
+            console.log(`⚠️ Skipping contact - Invalid phone format:`, cleanPhone)
+            return false
+          }
+          return true
         }).map(contact => {
           // Format phone number: remove any non-digits and ensure it starts with country code
           let phone = contact.telefoneclientes.replace(/\D/g, '')
+          // If number starts with 0, remove it
+          if (phone.startsWith('0')) {
+            phone = phone.substring(1)
+          }
+          // If number doesn't start with 55, add it
           if (!phone.startsWith('55')) {
             phone = `55${phone}`
           }
+          // Log the phone number transformation
+          console.log(`📱 Phone transformation:`, {
+            original: contact.telefoneclientes,
+            cleaned: phone,
+            contactName: contact.nomeclientes || 'Unknown'
+          })
           return {
             ...contact,
             telefoneclientes: phone
@@ -114,25 +127,29 @@ serve(async (req) => {
         }) || []
 
         console.log(`✅ Filtered and formatted ${validContacts.length} valid contacts`)
-        validContacts.forEach(contact => {
-          console.log(`📱 Formatted phone number: ${contact.telefoneclientes}`)
-        })
 
         if (validContacts.length > 0) {
           console.log(`🔄 Attempting to insert ${validContacts.length} contacts for follow-up ${followUp.id}`)
           
+          // Prepare contacts for insertion with proper phone format
+          const contactsToInsert = validContacts.map(contact => ({
+            follow_up_id: followUp.id,
+            phone: contact.telefoneclientes, // This is now properly formatted
+            status: 'pending',
+            metadata: {
+              contact_name: contact.nomeclientes || 'Unknown',
+              last_message_time: contact.last_message_time,
+              instance_id: followUp.instance_id,
+              original_phone: contact.telefoneclientes // Keep original for reference
+            }
+          }))
+
+          // Log what we're about to insert
+          console.log(`📝 Contacts to insert:`, contactsToInsert)
+
           const { error: insertError } = await supabase
             .from('follow_up_contacts')
-            .insert(validContacts.map(contact => ({
-              follow_up_id: followUp.id,
-              phone: contact.telefoneclientes,
-              status: 'pending',
-              metadata: {
-                contact_name: contact.nomeclientes || 'Unknown',
-                last_message_time: contact.last_message_time,
-                instance_id: followUp.instance_id
-              }
-            })))
+            .insert(contactsToInsert)
 
           if (insertError) {
             console.error(`❌ Error inserting contacts for follow-up ${followUp.id}:`, insertError)
