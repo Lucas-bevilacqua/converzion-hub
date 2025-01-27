@@ -5,6 +5,11 @@ on:
     - cron: '* * * * *'  # Runs every minute
   workflow_dispatch:      # Allows manual triggering
 
+# Add concurrency to prevent parallel runs
+concurrency:
+  group: follow-up-processing
+  cancel-in-progress: true
+
 jobs:
   process-follow-ups:
     name: Process Follow-ups
