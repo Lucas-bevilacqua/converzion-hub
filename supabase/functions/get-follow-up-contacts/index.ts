@@ -22,14 +22,8 @@ function formatPhoneNumber(phone: string | null): string | null {
   // Remove todos os caracteres não numéricos
   let cleaned = phone.replace(/\D/g, '')
   
-  // Log do número limpo
+  console.log(`🔍 Número original: ${phone}`)
   console.log(`🧹 Número limpo: ${cleaned}`)
-
-  // Verifica se tem o tamanho correto (10 ou 11 dígitos sem código do país)
-  if (cleaned.length < 10 || cleaned.length > 11) {
-    console.log(`⚠️ Número com tamanho inválido: ${cleaned.length} dígitos`)
-    return null
-  }
 
   // Se começar com 0, remove
   if (cleaned.startsWith('0')) {
@@ -43,6 +37,13 @@ function formatPhoneNumber(phone: string | null): string | null {
     console.log(`🔄 Adicionado código do país: ${cleaned}`)
   }
 
+  // Verifica se tem o tamanho correto após formatação
+  if (cleaned.length < 12 || cleaned.length > 13) {
+    console.log(`⚠️ Número com tamanho inválido após formatação: ${cleaned.length} dígitos`)
+    return null
+  }
+
+  console.log(`✅ Número formatado com sucesso: ${cleaned}`)
   return cleaned
 }
 
