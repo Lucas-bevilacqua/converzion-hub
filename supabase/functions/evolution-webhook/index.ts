@@ -39,7 +39,10 @@ serve(async (req) => {
     }
 
     const instanceName = payload.instance
+    // Extrai o número do telefone do remoteJid (formato: número@s.whatsapp.net)
     const phoneNumber = payload.data.key.remoteJid.split('@')[0]
+    console.log('📱 Extracted phone number:', phoneNumber)
+    
     const messageId = payload.data.key.id
     const messageContent = payload.data.message.conversation || payload.data.message.text || ''
 
