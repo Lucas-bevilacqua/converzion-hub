@@ -81,6 +81,11 @@ export function InstanceSlotCard({
     staleTime: 0
   })
 
+  const isConnected = 
+    instance?.connection_status === 'connected' ||
+    stateData?.state === 'connected' ||
+    stateData?.instance?.instance?.state === 'open'
+
   const handleConnect = async () => {
     if (!user) {
       toast({
@@ -143,7 +148,7 @@ export function InstanceSlotCard({
           {isUsed ? (
             <InstanceActions
               instance={instance!}
-              isConnected={instance?.connection_status === 'connected'}
+              isConnected={isConnected}
               isLoading={isLoadingState}
               onConnect={handleConnect}
               onDisconnect={onDisconnect}
