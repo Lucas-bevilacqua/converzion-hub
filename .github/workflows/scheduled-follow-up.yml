@@ -1,11 +1,10 @@
-name: Scheduled Follow-up Processing
+name: Follow-up Processing
 
 on:
   schedule:
     - cron: '*/5 * * * *'  # Runs every 5 minutes
-  workflow_dispatch:      # Allows manual triggering
+  workflow_dispatch:        # Allows manual triggering
 
-# Prevent parallel runs
 concurrency:
   group: follow-up-processing
   cancel-in-progress: true
@@ -30,7 +29,7 @@ jobs:
             exit 1
           fi
           
-          response=$(curl -X POST \
+          curl -X POST \
             'https://vodexhppkasbulogmcqb.supabase.co/functions/v1/get-follow-up-contacts' \
             -H "Authorization: Bearer ${SUPABASE_KEY}" \
             -H "Content-Type: application/json" \
@@ -38,23 +37,9 @@ jobs:
             --data-raw "{\"scheduled\":true, \"source\":\"github-action\", \"timestamp\":\"${timestamp}\"}" \
             --fail \
             --show-error \
-            --silent)
+            || {
+              echo "❌ Error processing follow-ups"
+              exit 1
+            }
           
-          status=$?
-          
-          if [ $status -eq 0 ]; then
-            echo "✅ Follow-up processing completed successfully"
-            echo "Response: ${response}"
-          else
-            echo "❌ Error processing follow-ups (Status: ${status})"
-            echo "Error response: ${response}"
-            exit 1
-          fi
-          
-          echo "Completed follow-up processing at $(date '+%Y-%m-%d %H:%M:%S')"
-      
-      - name: Handle Failure
-        if: failure()
-        run: |
-          echo "❌ Follow-up processing job failed at $(date '+%Y-%m-%d %H:%M:%S')"
-          echo "Please check the logs above for more details"
+          echo "✅ Follow-up processing completed at $(date '+%Y-%m-%d %H:%M:%S')"
