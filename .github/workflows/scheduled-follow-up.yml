@@ -2,10 +2,10 @@ name: Scheduled Follow-up Processing
 
 on:
   schedule:
-    - cron: '* * * * *'  # Runs every minute
+    - cron: '*/5 * * * *'  # Runs every 5 minutes
   workflow_dispatch:      # Allows manual triggering
 
-# Add concurrency to prevent parallel runs
+# Prevent parallel runs
 concurrency:
   group: follow-up-processing
   cancel-in-progress: true
