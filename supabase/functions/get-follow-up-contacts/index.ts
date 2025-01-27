@@ -33,7 +33,7 @@ serve(async (req) => {
     // Get active follow-ups that are pending or in_progress
     const dbStartTime = Date.now()
     const { data: followUps, error: followUpsError } = await supabase
-      .from('follow_ups')
+      .from('follow_ups')  // Usando a tabela correta 'follow_ups'
       .select(`
         *,
         instance:evolution_instances (
