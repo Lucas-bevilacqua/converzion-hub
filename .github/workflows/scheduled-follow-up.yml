@@ -3,13 +3,13 @@ name: Scheduled Follow-up Processing
 on:
   schedule:
     - cron: '* * * * *'  # Runs every minute
-  workflow_dispatch:        # Allows manual triggering too
+  workflow_dispatch:      # Allows manual triggering
 
 jobs:
   process-follow-ups:
     name: Process Follow-ups
     runs-on: ubuntu-latest
-    timeout-minutes: 5      # Prevent long-running jobs
+    timeout-minutes: 5
     
     steps:
       - name: Process Follow-ups
@@ -17,39 +17,39 @@ jobs:
         env:
           SUPABASE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: |
+          timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+          echo "Starting follow-up processing at ${timestamp}"
+          
           if [ -z "$SUPABASE_KEY" ]; then
-            echo "❌ Error: SUPABASE_SERVICE_ROLE_KEY is not set"
-            echo "Please add the SUPABASE_SERVICE_ROLE_KEY secret in your repository settings"
+            echo "::error::SUPABASE_SERVICE_ROLE_KEY is not set"
             exit 1
           fi
           
-          echo "Starting follow-up processing at $(date)"
-          
-          # Make the HTTP request and capture response
-          RESPONSE=$(curl -X POST \
+          response=$(curl -X POST \
             'https://vodexhppkasbulogmcqb.supabase.co/functions/v1/get-follow-up-contacts' \
             -H "Authorization: Bearer ${SUPABASE_KEY}" \
             -H "Content-Type: application/json" \
             -H "apikey: ${SUPABASE_KEY}" \
-            --data-raw '{"scheduled":true, "source": "github-action"}' \
+            --data-raw "{\"scheduled\":true, \"source\":\"github-action\", \"timestamp\":\"${timestamp}\"}" \
             --fail \
             --show-error \
             --silent)
           
-          # Check curl exit code
-          if [ $? -eq 0 ]; then
+          status=$?
+          
+          if [ $status -eq 0 ]; then
             echo "✅ Follow-up processing completed successfully"
-            echo "Response: ${RESPONSE}"
+            echo "Response: ${response}"
           else
-            echo "❌ Error processing follow-ups"
-            echo "Error response: ${RESPONSE}"
+            echo "❌ Error processing follow-ups (Status: ${status})"
+            echo "Error response: ${response}"
             exit 1
           fi
           
-          echo "Completed follow-up processing at $(date)"
+          echo "Completed follow-up processing at $(date '+%Y-%m-%d %H:%M:%S')"
       
       - name: Handle Failure
         if: failure()
         run: |
-          echo "❌ Follow-up processing job failed"
+          echo "❌ Follow-up processing job failed at $(date '+%Y-%m-%d %H:%M:%S')"
           echo "Please check the logs above for more details"
