@@ -18,11 +18,14 @@ export function InstancesCard() {
     phone_number: "",
   })
 
+  console.log('InstancesCard - Initializing with user:', user?.id)
+
   const { createMutation, disconnectMutation } = useInstanceMutations()
 
-  const { data: subscription } = useQuery({
+  const { data: subscription, isLoading: isLoadingSubscription } = useQuery({
     queryKey: ['subscription', user?.id],
     queryFn: async () => {
+      console.log('Fetching subscription for user:', user?.id)
       const { data, error } = await supabase
         .from('subscriptions')
         .select('*')
@@ -33,14 +36,16 @@ export function InstancesCard() {
         console.error('Error fetching subscription:', error)
         throw error
       }
+      console.log('Subscription data:', data)
       return data
     },
     enabled: !!user?.id
   })
 
-  const { data: instances = [], refetch: refetchInstances } = useQuery({
+  const { data: instances = [], refetch: refetchInstances, isLoading: isLoadingInstances } = useQuery({
     queryKey: ['instances', user?.id],
     queryFn: async () => {
+      console.log('Fetching instances for user:', user?.id)
       try {
         const { data, error } = await supabase
           .from('evolution_instances')
@@ -51,6 +56,7 @@ export function InstancesCard() {
           console.error('Error fetching instances:', error)
           throw error
         }
+        console.log('Instances data:', data)
         return data as EvolutionInstance[]
       } catch (error) {
         console.error('Error in instances query:', error)
@@ -66,21 +72,26 @@ export function InstancesCard() {
   })
 
   const handleNewInstance = () => {
-    console.log('Abrindo formulário de nova instância')
+    console.log('Opening new instance form')
     setShowNewInstanceForm(true)
   }
 
   const handleInstanceFormChange = (field: string, value: string) => {
+    console.log('Form field changed:', field, value)
     setNewInstance(prev => ({ ...prev, [field]: value }))
   }
 
   const handleAddInstance = async () => {
-    if (!user) return
+    if (!user) {
+      console.error('No user found when trying to add instance')
+      return
+    }
 
     try {
-      console.log('Criando nova instância:', newInstance)
+      console.log('Creating new instance:', newInstance)
       await createMutation.mutateAsync(newInstance)
       
+      console.log('Instance created successfully, refreshing instances')
       await refetchInstances()
       setShowNewInstanceForm(false)
       setNewInstance({ name: "", phone_number: "" })
@@ -90,7 +101,7 @@ export function InstancesCard() {
         description: "Número adicionado com sucesso.",
       })
     } catch (error) {
-      console.error('Erro ao criar instância:', error)
+      console.error('Error creating instance:', error)
       toast({
         title: "Erro",
         description: "Falha ao adicionar número. Tente novamente.",
@@ -101,7 +112,7 @@ export function InstancesCard() {
 
   const handleDisconnectInstance = async (instanceId: string) => {
     try {
-      console.log('Desconectando instância:', instanceId)
+      console.log('Disconnecting instance:', instanceId)
       await disconnectMutation.mutateAsync(instanceId)
 
       toast({
@@ -109,9 +120,10 @@ export function InstancesCard() {
         description: "Número desconectado com sucesso.",
       })
 
+      console.log('Instance disconnected successfully, refreshing instances')
       refetchInstances()
     } catch (error) {
-      console.error('Erro ao desconectar instância:', error)
+      console.error('Error disconnecting instance:', error)
       const errorMessage = error instanceof Error ? error.message : "Falha ao desconectar número. Tente novamente."
       toast({
         title: "Erro",
@@ -124,13 +136,21 @@ export function InstancesCard() {
   const instanceLimit = subscription?.plan_id?.includes('professional') ? 3 : 1
   const availableSlots = Array(instanceLimit).fill(null)
   
-  console.log('Estado atual das instâncias:', {
-    limite: instanceLimit,
-    usadas: instances.length,
-    disponíveis: instanceLimit - instances.length,
-    conectadas: instances.filter(i => i.connection_status === 'connected').length,
-    subscription
+  console.log('Current instances state:', {
+    limit: instanceLimit,
+    used: instances.length,
+    available: instanceLimit - instances.length,
+    connected: instances.filter(i => i.connection_status === 'connected').length,
+    subscription,
+    loading: {
+      subscription: isLoadingSubscription,
+      instances: isLoadingInstances
+    }
   })
+
+  if (isLoadingSubscription || isLoadingInstances) {
+    console.log('Loading state - Subscription:', isLoadingSubscription, 'Instances:', isLoadingInstances)
+  }
 
   return (
     <Card>
@@ -146,6 +166,7 @@ export function InstancesCard() {
             onChange={handleInstanceFormChange}
             onAdd={handleAddInstance}
             onCancel={() => {
+              console.log('Canceling new instance form')
               setShowNewInstanceForm(false)
               setNewInstance({ name: "", phone_number: "" })
             }}
