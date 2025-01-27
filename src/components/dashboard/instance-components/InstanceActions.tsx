@@ -25,14 +25,16 @@ export function InstanceActions({
         {isConnected ? "Desconectar" : "Conectar"}
       </Button>
 
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={onQRCode}
-      >
-        <QrCode className="h-4 w-4 mr-2" />
-        QR Code
-      </Button>
+      {!isConnected && (
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={onQRCode}
+        >
+          <QrCode className="h-4 w-4 mr-2" />
+          QR Code
+        </Button>
+      )}
 
       <Button
         variant="outline"
