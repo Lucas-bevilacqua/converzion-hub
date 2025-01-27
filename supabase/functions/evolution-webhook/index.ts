@@ -39,9 +39,14 @@ serve(async (req) => {
     }
 
     const instanceName = payload.instance
-    // Extrai o número do telefone do remoteJid (formato: número@s.whatsapp.net)
-    const phoneNumber = payload.data.key.remoteJid.split('@')[0]
-    console.log('📱 Extracted phone number:', phoneNumber)
+    // Extrai e formata o número do telefone do remoteJid (formato: 555496758327@s.whatsapp.net)
+    const rawPhoneNumber = payload.data.key.remoteJid.split('@')[0]
+    // Remove o código do país (55) se existir e adiciona o prefixo +55
+    const phoneNumber = rawPhoneNumber.startsWith('55') 
+      ? `+${rawPhoneNumber}` 
+      : `+55${rawPhoneNumber}`
+    console.log('📱 Extracted phone number:', rawPhoneNumber)
+    console.log('📱 Formatted phone number:', phoneNumber)
     
     const messageId = payload.data.key.id
     const messageContent = payload.data.message.conversation || payload.data.message.text || ''
