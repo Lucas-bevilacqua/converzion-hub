@@ -96,14 +96,29 @@ serve(async (req) => {
           hours_threshold: 24
         })
 
-        // Filter out contacts with null phone numbers or names
-        const validContacts = contacts?.filter(contact => 
-          contact.telefoneclientes && 
-          contact.telefoneclientes.trim() !== ''
-        ) || []
+        // Filter and format valid contacts
+        const validContacts = contacts?.filter(contact => {
+          const phone = contact.telefoneclientes?.trim()
+          // Ensure phone exists and has valid format
+          return phone && phone.match(/^\d+$/)
+        }).map(contact => {
+          // Format phone number: remove any non-digits and ensure it starts with country code
+          let phone = contact.telefoneclientes.replace(/\D/g, '')
+          if (!phone.startsWith('55')) {
+            phone = `55${phone}`
+          }
+          return {
+            ...contact,
+            telefoneclientes: phone
+          }
+        }) || []
+
+        console.log(`✅ Filtered and formatted ${validContacts.length} valid contacts`)
+        validContacts.forEach(contact => {
+          console.log(`📱 Formatted phone number: ${contact.telefoneclientes}`)
+        })
 
         if (validContacts.length > 0) {
-          // Log contact insertion attempt
           console.log(`🔄 Attempting to insert ${validContacts.length} contacts for follow-up ${followUp.id}`)
           
           const { error: insertError } = await supabase
