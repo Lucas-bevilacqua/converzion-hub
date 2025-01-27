@@ -13,13 +13,14 @@ serve(async (req) => {
 
   try {
     console.log('🔄 Starting follow-up contacts processing')
+    const startTime = Date.now()
 
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    // Get active follow-ups that are pending or in_progress
+    // Get active follow-ups that are pending or in_progress using a single query
     const { data: followUps, error: followUpsError } = await supabase
       .from('follow_ups')
       .select(`
@@ -39,34 +40,22 @@ serve(async (req) => {
       throw followUpsError
     }
 
-    console.log('✅ Found follow-ups:', followUps)
+    console.log(`✅ Found ${followUps?.length || 0} follow-ups to process`)
 
-    // Debug log to check settings
-    followUps?.forEach(followUp => {
-      console.log('📝 Follow-up details:', {
-        id: followUp.id,
-        instance_id: followUp.instance_id,
-        status: followUp.status,
-        settings: followUp.settings,
-        instance_status: followUp.instance?.connection_status
-      })
-    })
-
-    // Filter out follow-ups where instance is not connected
+    // Filter connected instances
     const activeFollowUps = followUps?.filter(followUp => {
       const isConnected = followUp.instance?.connection_status?.toLowerCase() === 'connected'
-      console.log(`🔌 Instance ${followUp.instance_id} connection status:`, {
-        status: followUp.instance?.connection_status,
-        isConnected
-      })
+      console.log(`🔌 Instance ${followUp.instance_id} status: ${followUp.instance?.connection_status}`)
       return isConnected
     }) || []
 
-    console.log('✅ Active follow-ups after filtering:', activeFollowUps)
+    console.log(`✅ ${activeFollowUps.length} follow-ups have connected instances`)
 
-    // Process each follow-up
+    // Process each follow-up in parallel for better performance
     const results = await Promise.all(activeFollowUps.map(async (followUp) => {
       try {
+        const processingStart = Date.now()
+        
         // Get follow-up messages
         const { data: messages, error: messagesError } = await supabase
           .from('follow_up_messages')
@@ -74,49 +63,23 @@ serve(async (req) => {
           .eq('follow_up_id', followUp.id)
           .order('delay_minutes', { ascending: true })
 
-        if (messagesError) {
-          console.error(`❌ Error fetching messages for follow-up ${followUp.id}:`, messagesError)
-          throw messagesError
-        }
+        if (messagesError) throw messagesError
 
-        console.log(`✅ Found ${messages.length} messages for follow-up ${followUp.id}`)
+        // Optimize contact fetching by using a single efficient query
+        const { data: contacts, error: contactsError } = await supabase.rpc(
+          'get_eligible_follow_up_contacts',
+          { 
+            p_instance_id: followUp.instance_id,
+            p_follow_up_id: followUp.id,
+            p_hours_threshold: 24
+          }
+        )
 
-        // Get existing contacts to avoid duplicates
-        const { data: existingContacts, error: contactsError } = await supabase
-          .from('follow_up_contacts')
-          .select('phone')
-          .eq('follow_up_id', followUp.id)
+        if (contactsError) throw contactsError
 
-        if (contactsError) {
-          console.error(`❌ Error fetching existing contacts for follow-up ${followUp.id}:`, contactsError)
-          throw contactsError
-        }
+        console.log(`✅ Found ${contacts?.length || 0} eligible contacts for follow-up ${followUp.id}`)
 
-        const existingPhones = existingContacts?.map(c => c.phone) || []
-        console.log(`✅ Found ${existingContacts.length} existing contacts for follow-up ${followUp.id}`)
-
-        // Get potential contacts from users_clientes with last message within 24 hours
-        let query = supabase
-          .from('users_clientes')
-          .select('*')
-          .eq('nomedaempresa', followUp.instance_id)
-          .gt('last_message_time', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
-
-        // Only add the not-in filter if there are existing contacts
-        if (existingPhones.length > 0) {
-          query = query.not('telefoneclientes', 'in', `(${existingPhones.join(',')})`)
-        }
-
-        const { data: contacts, error: usersError } = await query
-
-        if (usersError) {
-          console.error(`❌ Error fetching users for follow-up ${followUp.id}:`, usersError)
-          throw usersError
-        }
-
-        console.log(`✅ Found ${contacts?.length} new contacts for follow-up ${followUp.id}`)
-
-        // Create follow-up contacts
+        // Batch insert new contacts if any found
         if (contacts && contacts.length > 0) {
           const { error: insertError } = await supabase
             .from('follow_up_contacts')
@@ -131,15 +94,10 @@ serve(async (req) => {
               }
             })))
 
-          if (insertError) {
-            console.error(`❌ Error inserting contacts for follow-up ${followUp.id}:`, insertError)
-            throw insertError
-          }
-
-          console.log(`✅ Successfully inserted ${contacts.length} new contacts for follow-up ${followUp.id}`)
+          if (insertError) throw insertError
         }
 
-        // Update follow-up status to in_progress if it was pending
+        // Update follow-up status if needed
         if (followUp.status === 'pending') {
           const { error: updateError } = await supabase
             .from('follow_ups')
@@ -149,20 +107,18 @@ serve(async (req) => {
             })
             .eq('id', followUp.id)
 
-          if (updateError) {
-            console.error(`❌ Error updating follow-up ${followUp.id}:`, updateError)
-            throw updateError
-          }
-
-          console.log(`✅ Successfully updated follow-up ${followUp.id} status to in_progress`)
+          if (updateError) throw updateError
         }
+
+        const processingTime = Date.now() - processingStart
+        console.log(`✅ Processed follow-up ${followUp.id} in ${processingTime}ms`)
 
         return {
           followUpId: followUp.id,
           status: 'success',
-          messages: messages.length,
+          messages: messages?.length || 0,
           newContacts: contacts?.length || 0,
-          existingContacts: existingContacts.length
+          processingTime
         }
       } catch (error) {
         console.error(`❌ Error processing follow-up ${followUp.id}:`, error)
@@ -174,10 +130,14 @@ serve(async (req) => {
       }
     }))
 
+    const totalTime = Date.now() - startTime
+    console.log(`✅ Completed processing in ${totalTime}ms`)
+
     return new Response(
       JSON.stringify({
         success: true,
         data: results,
+        processingTime: totalTime,
         timestamp: new Date().toISOString()
       }),
       { 
