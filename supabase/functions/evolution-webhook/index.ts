@@ -39,31 +39,9 @@ serve(async (req) => {
     }
 
     const instanceName = payload.instance
-    
-    // Extrai o número do telefone do remoteJid
-    const remoteJid = payload.data.key.remoteJid
-    console.log('📱 Original remoteJid:', remoteJid)
-
-    // Se for mensagem de grupo, ignora
-    if (remoteJid.includes('@g.us')) {
-      console.log('⚠️ Group message, skipping')
-      return new Response(
-        JSON.stringify({ success: true, skipped: true }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
-    }
-
-    // Remove @s.whatsapp.net e qualquer outro caractere não numérico
-    const rawPhoneNumber = remoteJid.split('@')[0]
-    console.log('📱 Raw phone number:', rawPhoneNumber)
-    
-    // Remove qualquer caractere não numérico
-    const digitsOnly = rawPhoneNumber.replace(/\D/g, '')
-    console.log('📱 Digits only:', digitsOnly)
-    
-    // Remove o código do país (55) se existir
-    const phoneNumber = digitsOnly.startsWith('55') ? digitsOnly.substring(2) : digitsOnly
-    console.log('📱 Final phone number:', phoneNumber)
+    // Extrai o número do telefone do remoteJid (formato: número@s.whatsapp.net)
+    const phoneNumber = payload.data.key.remoteJid.split('@')[0]
+    console.log('📱 Extracted phone number:', phoneNumber)
     
     const messageId = payload.data.key.id
     const messageContent = payload.data.message.conversation || payload.data.message.text || ''
@@ -100,8 +78,6 @@ serve(async (req) => {
       throw instanceError
     }
 
-    console.log('✅ Found instance:', instance.id)
-
     // Atualiza o último tempo de mensagem do cliente
     const { error: clientError } = await supabaseClient
       .from('Users_clientes')
@@ -118,8 +94,6 @@ serve(async (req) => {
       throw clientError
     }
 
-    console.log('✅ Updated client last message time')
-
     // Salva a mensagem do usuário
     const { error: saveError } = await supabaseClient
       .from('chat_messages')
@@ -135,8 +109,6 @@ serve(async (req) => {
       console.error('❌ Error saving message:', saveError)
       throw saveError
     }
-
-    console.log('✅ Saved user message')
 
     // Processa com LangChain e envia resposta automaticamente
     console.log('🤖 Processing message with LangChain...')

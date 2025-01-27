@@ -99,7 +99,7 @@ serve(async (req) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4',
+        model: 'gpt-4o-mini',
         messages: messages,
         temperature: 0.7,
       }),
@@ -147,8 +147,7 @@ serve(async (req) => {
         instance_id: instanceId,
         user_id: instance.user_id,
         sender_type: 'assistant',
-        content: aiResponse,
-        whatsapp_message_id: evolutionData.key?.id
+        content: aiResponse
       })
 
     if (saveResponseError) {
