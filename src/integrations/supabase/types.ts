@@ -766,6 +766,18 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: undefined
       }
+      get_eligible_follow_up_contacts: {
+        Args: {
+          p_instance_id: string
+          p_follow_up_id: string
+          p_hours_threshold?: number
+        }
+        Returns: {
+          telefoneclientes: string
+          nomeclientes: string
+          last_message_time: string
+        }[]
+      }
       get_persistent_service_key: {
         Args: Record<PropertyKey, never>
         Returns: string
