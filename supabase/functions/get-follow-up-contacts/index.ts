@@ -96,18 +96,24 @@ serve(async (req) => {
           hours_threshold: 24
         })
 
-        if (contacts && contacts.length > 0) {
+        // Filter out contacts with null phone numbers or names
+        const validContacts = contacts?.filter(contact => 
+          contact.telefoneclientes && 
+          contact.telefoneclientes.trim() !== ''
+        ) || []
+
+        if (validContacts.length > 0) {
           // Log contact insertion attempt
-          console.log(`🔄 Attempting to insert ${contacts.length} contacts for follow-up ${followUp.id}`)
+          console.log(`🔄 Attempting to insert ${validContacts.length} contacts for follow-up ${followUp.id}`)
           
           const { error: insertError } = await supabase
             .from('follow_up_contacts')
-            .insert(contacts.map(contact => ({
+            .insert(validContacts.map(contact => ({
               follow_up_id: followUp.id,
               phone: contact.telefoneclientes,
               status: 'pending',
               metadata: {
-                contact_name: contact.nomeclientes,
+                contact_name: contact.nomeclientes || 'Unknown',
                 last_message_time: contact.last_message_time,
                 instance_id: followUp.instance_id
               }
@@ -118,9 +124,9 @@ serve(async (req) => {
             throw insertError
           }
 
-          console.log(`✅ Successfully inserted ${contacts.length} contacts for follow-up ${followUp.id}`)
+          console.log(`✅ Successfully inserted ${validContacts.length} contacts for follow-up ${followUp.id}`)
 
-          // Chamar a função process-follow-up para cada follow-up com contatos
+          // Call process-follow-up for each follow-up with contacts
           console.log(`🔄 Calling process-follow-up for follow-up ${followUp.id}`)
           const processResponse = await fetch(
             'https://vodexhppkasbulogmcqb.supabase.co/functions/v1/process-follow-up',
@@ -145,7 +151,7 @@ serve(async (req) => {
 
           console.log(`✅ Successfully processed follow-up ${followUp.id}`)
         } else {
-          console.log(`ℹ️ No eligible contacts found for follow-up ${followUp.id}`)
+          console.log(`ℹ️ No valid contacts found for follow-up ${followUp.id}`)
         }
 
         // Update follow-up status if needed
@@ -167,7 +173,7 @@ serve(async (req) => {
         return {
           followUpId: followUp.id,
           status: 'success',
-          contacts: contacts?.length || 0,
+          contacts: validContacts.length,
           processingTime: followUpProcessingTime
         }
       } catch (error) {
