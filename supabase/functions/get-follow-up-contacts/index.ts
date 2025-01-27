@@ -148,7 +148,7 @@ serve(async (req) => {
           // Prepare contacts for insertion with proper phone format
           const contactsToInsert = validContacts.map(contact => ({
             follow_up_id: followUp.id,
-            phone: contact.telefoneclientes,
+            phone: contact.telefoneclientes, // Agora usando o número do contato, não da instância
             status: 'pending',
             metadata: {
               contact_name: contact.nomeclientes || 'Unknown',
