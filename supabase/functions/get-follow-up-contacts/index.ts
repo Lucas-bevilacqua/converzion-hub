@@ -13,6 +13,39 @@ interface TimingMetrics {
   totalTime?: number;
 }
 
+function formatPhoneNumber(phone: string | null): string | null {
+  if (!phone) {
+    console.log('⚠️ Número de telefone vazio ou nulo')
+    return null
+  }
+
+  // Remove todos os caracteres não numéricos
+  let cleaned = phone.replace(/\D/g, '')
+  
+  // Log do número limpo
+  console.log(`🧹 Número limpo: ${cleaned}`)
+
+  // Verifica se tem o tamanho correto (10 ou 11 dígitos sem código do país)
+  if (cleaned.length < 10 || cleaned.length > 11) {
+    console.log(`⚠️ Número com tamanho inválido: ${cleaned.length} dígitos`)
+    return null
+  }
+
+  // Se começar com 0, remove
+  if (cleaned.startsWith('0')) {
+    cleaned = cleaned.substring(1)
+    console.log(`🔄 Removido 0 inicial: ${cleaned}`)
+  }
+
+  // Adiciona código do país se não tiver
+  if (!cleaned.startsWith('55')) {
+    cleaned = `55${cleaned}`
+    console.log(`🔄 Adicionado código do país: ${cleaned}`)
+  }
+
+  return cleaned
+}
+
 serve(async (req) => {
   const metrics: TimingMetrics = {
     startTime: Date.now()
@@ -23,7 +56,7 @@ serve(async (req) => {
   }
 
   try {
-    console.log('🔄 Starting follow-up contacts processing')
+    console.log('🔄 Iniciando processamento de follow-up contacts')
 
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
@@ -47,13 +80,13 @@ serve(async (req) => {
       .eq('settings->is_active', true)
 
     if (followUpsError) {
-      console.error('❌ Error fetching follow-ups:', followUpsError)
+      console.error('❌ Erro ao buscar follow-ups:', followUpsError)
       throw followUpsError
     }
 
     metrics.dbFetchTime = Date.now() - dbStartTime
-    console.log(`✅ Database fetch completed in ${metrics.dbFetchTime}ms`)
-    console.log(`✅ Found ${followUps?.length || 0} follow-ups to process`)
+    console.log(`✅ Busca no banco completada em ${metrics.dbFetchTime}ms`)
+    console.log(`✅ Encontrados ${followUps?.length || 0} follow-ups para processar`)
 
     // Filter connected instances
     const activeFollowUps = followUps?.filter(followUp => {
@@ -62,7 +95,7 @@ serve(async (req) => {
       return isConnected
     }) || []
 
-    console.log(`✅ ${activeFollowUps.length} follow-ups have connected instances`)
+    console.log(`✅ ${activeFollowUps.length} follow-ups têm instâncias conectadas`)
 
     const processingStartTime = Date.now()
     
@@ -81,99 +114,67 @@ serve(async (req) => {
         )
 
         if (contactsError) {
-          console.error(`❌ Error fetching contacts for follow-up ${followUp.id}:`, contactsError)
+          console.error(`❌ Erro ao buscar contatos para follow-up ${followUp.id}:`, contactsError)
           throw contactsError
         }
 
-        // Log the raw contacts data for debugging
-        console.log(`🔍 Raw contacts data for follow-up ${followUp.id}:`, contacts)
+        // Log dos contatos brutos para debug
+        console.log(`🔍 Dados brutos dos contatos para follow-up ${followUp.id}:`, contacts)
         
-        // Filter and format valid contacts
-        const validContacts = contacts?.filter(contact => {
-          // Get the raw phone number and log it
-          const rawPhone = contact.telefoneclientes?.trim()
-          console.log(`📱 Processing phone number:`, {
-            raw: rawPhone,
-            contactName: contact.nomeclientes || 'Unknown'
+        // Filtra e formata contatos válidos
+        const validContacts = (contacts || [])
+          .filter(contact => {
+            // Verifica se tem os dados necessários
+            if (!contact?.telefoneclientes || !contact?.last_message_time) {
+              console.log('⚠️ Contato inválido - Faltam dados obrigatórios:', contact)
+              return false
+            }
+
+            const formattedPhone = formatPhoneNumber(contact.telefoneclientes)
+            if (!formattedPhone) {
+              console.log(`⚠️ Contato ignorado - Número inválido: ${contact.telefoneclientes}`)
+              return false
+            }
+
+            // Atualiza o número formatado no contato
+            contact.telefoneclientes = formattedPhone
+            return true
           })
-          
-          if (!rawPhone) {
-            console.log(`⚠️ Skipping contact - Empty phone number`)
-            return false
-          }
 
-          // Remove any non-digit characters and log the cleaned number
-          const cleanPhone = rawPhone.replace(/\D/g, '')
-          console.log(`🧹 Cleaned phone number: ${cleanPhone}`)
-          
-          // Check if it's a valid number after cleaning (10-11 digits without country code)
-          if (!cleanPhone.match(/^\d{10,11}$/)) {
-            console.log(`⚠️ Skipping contact - Invalid phone format: ${cleanPhone}`)
-            return false
-          }
-
-          return true
-        }).map(contact => {
-          // Get the raw phone and clean it
-          let phone = contact.telefoneclientes.replace(/\D/g, '')
-          
-          // If number has 11 digits and starts with 0, remove it
-          if (phone.length === 11 && phone.startsWith('0')) {
-            phone = phone.substring(1)
-          }
-          
-          // Make sure it has the country code
-          if (!phone.startsWith('55')) {
-            phone = `55${phone}`
-          }
-          
-          // Log the phone number transformation
-          console.log(`📱 Phone transformation:`, {
-            original: contact.telefoneclientes,
-            cleaned: phone,
-            contactName: contact.nomeclientes || 'Unknown'
-          })
-          
-          return {
-            ...contact,
-            telefoneclientes: phone
-          }
-        }) || []
-
-        console.log(`✅ Filtered and formatted ${validContacts.length} valid contacts`)
+        console.log(`✅ Filtrados e formatados ${validContacts.length} contatos válidos`)
 
         if (validContacts.length > 0) {
-          console.log(`🔄 Attempting to insert ${validContacts.length} contacts for follow-up ${followUp.id}`)
+          console.log(`🔄 Tentando inserir ${validContacts.length} contatos para follow-up ${followUp.id}`)
           
-          // Prepare contacts for insertion with proper phone format
+          // Prepara contatos para inserção
           const contactsToInsert = validContacts.map(contact => ({
             follow_up_id: followUp.id,
-            phone: contact.telefoneclientes, // Agora usando o número do contato, não da instância
+            phone: contact.telefoneclientes,
             status: 'pending',
             metadata: {
               contact_name: contact.nomeclientes || 'Unknown',
               last_message_time: contact.last_message_time,
               instance_id: followUp.instance_id,
-              original_phone: contact.telefoneclientes // Keep original for reference
+              original_phone: contact.telefoneclientes
             }
           }))
 
-          // Log what we're about to insert
-          console.log(`📝 Contacts to insert:`, contactsToInsert)
+          // Log do que será inserido
+          console.log(`📝 Contatos a serem inseridos:`, contactsToInsert)
 
           const { error: insertError } = await supabase
             .from('follow_up_contacts')
             .insert(contactsToInsert)
 
           if (insertError) {
-            console.error(`❌ Error inserting contacts for follow-up ${followUp.id}:`, insertError)
+            console.error(`❌ Erro ao inserir contatos para follow-up ${followUp.id}:`, insertError)
             throw insertError
           }
 
-          console.log(`✅ Successfully inserted ${validContacts.length} contacts for follow-up ${followUp.id}`)
+          console.log(`✅ Inseridos com sucesso ${validContacts.length} contatos para follow-up ${followUp.id}`)
 
-          // Call process-follow-up for each follow-up with contacts
-          console.log(`🔄 Calling process-follow-up for follow-up ${followUp.id}`)
+          // Chama process-follow-up para cada follow-up com contatos
+          console.log(`🔄 Chamando process-follow-up para follow-up ${followUp.id}`)
           const processResponse = await fetch(
             'https://vodexhppkasbulogmcqb.supabase.co/functions/v1/process-follow-up',
             {
@@ -191,16 +192,16 @@ serve(async (req) => {
 
           if (!processResponse.ok) {
             const errorText = await processResponse.text()
-            console.error(`❌ Error processing follow-up ${followUp.id}:`, errorText)
+            console.error(`❌ Erro ao processar follow-up ${followUp.id}:`, errorText)
             throw new Error(`Failed to process follow-up: ${errorText}`)
           }
 
-          console.log(`✅ Successfully processed follow-up ${followUp.id}`)
+          console.log(`✅ Follow-up ${followUp.id} processado com sucesso`)
         } else {
-          console.log(`ℹ️ No valid contacts found for follow-up ${followUp.id}`)
+          console.log(`ℹ️ Nenhum contato válido encontrado para follow-up ${followUp.id}`)
         }
 
-        // Update follow-up status if needed
+        // Atualiza status do follow-up se necessário
         if (followUp.status === 'pending') {
           const { error: updateError } = await supabase
             .from('follow_ups')
@@ -214,7 +215,7 @@ serve(async (req) => {
         }
 
         const followUpProcessingTime = Date.now() - followUpStartTime
-        console.log(`✅ Processed follow-up ${followUp.id} in ${followUpProcessingTime}ms`)
+        console.log(`✅ Follow-up ${followUp.id} processado em ${followUpProcessingTime}ms`)
 
         return {
           followUpId: followUp.id,
@@ -223,7 +224,7 @@ serve(async (req) => {
           processingTime: followUpProcessingTime
         }
       } catch (error) {
-        console.error(`❌ Error processing follow-up ${followUp.id}:`, error)
+        console.error(`❌ Erro ao processar follow-up ${followUp.id}:`, error)
         return {
           followUpId: followUp.id,
           status: 'error',
@@ -236,7 +237,7 @@ serve(async (req) => {
     metrics.processingTime = Date.now() - processingStartTime
     metrics.totalTime = Date.now() - metrics.startTime
 
-    console.log('📊 Performance Metrics:', {
+    console.log('📊 Métricas de Performance:', {
       dbFetchTime: `${metrics.dbFetchTime}ms`,
       processingTime: `${metrics.processingTime}ms`,
       totalTime: `${metrics.totalTime}ms`,
@@ -263,7 +264,7 @@ serve(async (req) => {
     )
 
   } catch (error) {
-    console.error('❌ Error in follow-up contacts processing:', error)
+    console.error('❌ Erro no processamento de follow-up contacts:', error)
     return new Response(
       JSON.stringify({
         success: false,
