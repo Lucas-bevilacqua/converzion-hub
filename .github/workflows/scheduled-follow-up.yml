@@ -1,9 +1,7 @@
 name: Scheduled Follow-up Processing
 
 on:
-  schedule:
-    - cron: '* * * * *'  # Runs every minute
-  workflow_dispatch:        # Allows manual triggering
+  workflow_dispatch:        # Allows manual triggering only
 
 jobs:
   process-follow-ups:
