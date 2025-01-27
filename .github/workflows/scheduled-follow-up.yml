@@ -5,6 +5,11 @@ on:
     - cron: '* * * * *'  # Runs every minute
   workflow_dispatch:        # Allows manual triggering
 
+# Add permissions block
+permissions:
+  actions: write    # Required for cleanup job
+  contents: read    # Required for checkout
+
 concurrency:
   group: follow-up-processing
   cancel-in-progress: true
