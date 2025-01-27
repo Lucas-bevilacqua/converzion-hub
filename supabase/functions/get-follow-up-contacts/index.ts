@@ -102,6 +102,31 @@ serve(async (req) => {
             })))
 
           if (insertError) throw insertError
+
+          // Chamar a função process-follow-up para cada follow-up com contatos
+          console.log(`🔄 Calling process-follow-up for follow-up ${followUp.id}`)
+          const processResponse = await fetch(
+            'https://vodexhppkasbulogmcqb.supabase.co/functions/v1/process-follow-up',
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+              },
+              body: JSON.stringify({
+                followUpId: followUp.id,
+                scheduled: true
+              })
+            }
+          )
+
+          if (!processResponse.ok) {
+            const errorText = await processResponse.text()
+            console.error(`❌ Error processing follow-up ${followUp.id}:`, errorText)
+            throw new Error(`Failed to process follow-up: ${errorText}`)
+          }
+
+          console.log(`✅ Successfully processed follow-up ${followUp.id}`)
         }
 
         // Update follow-up status if needed
