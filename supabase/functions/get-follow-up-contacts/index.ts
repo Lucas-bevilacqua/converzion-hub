@@ -6,21 +6,32 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+interface TimingMetrics {
+  startTime: number;
+  dbFetchTime?: number;
+  processingTime?: number;
+  totalTime?: number;
+}
+
 serve(async (req) => {
+  const metrics: TimingMetrics = {
+    startTime: Date.now()
+  }
+
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
   }
 
   try {
     console.log('🔄 Starting follow-up contacts processing')
-    const startTime = Date.now()
 
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    // Get active follow-ups that are pending or in_progress using a single query
+    // Get active follow-ups that are pending or in_progress
+    const dbStartTime = Date.now()
     const { data: followUps, error: followUpsError } = await supabase
       .from('follow_ups')
       .select(`
@@ -40,6 +51,8 @@ serve(async (req) => {
       throw followUpsError
     }
 
+    metrics.dbFetchTime = Date.now() - dbStartTime
+    console.log(`✅ Database fetch completed in ${metrics.dbFetchTime}ms`)
     console.log(`✅ Found ${followUps?.length || 0} follow-ups to process`)
 
     // Filter connected instances
@@ -51,21 +64,13 @@ serve(async (req) => {
 
     console.log(`✅ ${activeFollowUps.length} follow-ups have connected instances`)
 
+    const processingStartTime = Date.now()
+    
     // Process each follow-up in parallel for better performance
     const results = await Promise.all(activeFollowUps.map(async (followUp) => {
+      const followUpStartTime = Date.now()
       try {
-        const processingStart = Date.now()
-        
-        // Get follow-up messages
-        const { data: messages, error: messagesError } = await supabase
-          .from('follow_up_messages')
-          .select('*')
-          .eq('follow_up_id', followUp.id)
-          .order('delay_minutes', { ascending: true })
-
-        if (messagesError) throw messagesError
-
-        // Optimize contact fetching by using a single efficient query
+        // Get eligible contacts using the optimized stored procedure
         const { data: contacts, error: contactsError } = await supabase.rpc(
           'get_eligible_follow_up_contacts',
           { 
@@ -75,11 +80,13 @@ serve(async (req) => {
           }
         )
 
-        if (contactsError) throw contactsError
+        if (contactsError) {
+          console.error(`❌ Error fetching contacts for follow-up ${followUp.id}:`, contactsError)
+          throw contactsError
+        }
 
         console.log(`✅ Found ${contacts?.length || 0} eligible contacts for follow-up ${followUp.id}`)
-
-        // Batch insert new contacts if any found
+        
         if (contacts && contacts.length > 0) {
           const { error: insertError } = await supabase
             .from('follow_up_contacts')
@@ -110,35 +117,46 @@ serve(async (req) => {
           if (updateError) throw updateError
         }
 
-        const processingTime = Date.now() - processingStart
-        console.log(`✅ Processed follow-up ${followUp.id} in ${processingTime}ms`)
+        const followUpProcessingTime = Date.now() - followUpStartTime
+        console.log(`✅ Processed follow-up ${followUp.id} in ${followUpProcessingTime}ms`)
 
         return {
           followUpId: followUp.id,
           status: 'success',
-          messages: messages?.length || 0,
-          newContacts: contacts?.length || 0,
-          processingTime
+          contacts: contacts?.length || 0,
+          processingTime: followUpProcessingTime
         }
       } catch (error) {
         console.error(`❌ Error processing follow-up ${followUp.id}:`, error)
         return {
           followUpId: followUp.id,
           status: 'error',
-          error: error.message
+          error: error.message,
+          processingTime: Date.now() - followUpStartTime
         }
       }
     }))
 
-    const totalTime = Date.now() - startTime
-    console.log(`✅ Completed processing in ${totalTime}ms`)
+    metrics.processingTime = Date.now() - processingStartTime
+    metrics.totalTime = Date.now() - metrics.startTime
+
+    console.log('📊 Performance Metrics:', {
+      dbFetchTime: `${metrics.dbFetchTime}ms`,
+      processingTime: `${metrics.processingTime}ms`,
+      totalTime: `${metrics.totalTime}ms`,
+      followUpsProcessed: results.length
+    })
 
     return new Response(
       JSON.stringify({
         success: true,
         data: results,
-        processingTime: totalTime,
-        timestamp: new Date().toISOString()
+        metrics: {
+          dbFetchTime: metrics.dbFetchTime,
+          processingTime: metrics.processingTime,
+          totalTime: metrics.totalTime,
+          timestamp: new Date().toISOString()
+        }
       }),
       { 
         headers: {
@@ -154,7 +172,10 @@ serve(async (req) => {
       JSON.stringify({
         success: false,
         error: error.message,
-        timestamp: new Date().toISOString()
+        metrics: {
+          totalTime: Date.now() - metrics.startTime,
+          timestamp: new Date().toISOString()
+        }
       }),
       { 
         status: 500,
