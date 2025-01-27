@@ -92,25 +92,32 @@ serve(async (req) => {
           throw contactsError
         }
 
+        const existingPhones = existingContacts?.map(c => c.phone) || []
         console.log(`✅ Found ${existingContacts.length} existing contacts for follow-up ${followUp.id}`)
 
         // Get potential contacts from users_clientes with last message within 24 hours
-        const { data: contacts, error: usersError } = await supabase
+        let query = supabase
           .from('users_clientes')
           .select('*')
           .eq('nomedaempresa', followUp.instance_id)
           .gt('last_message_time', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
-          .not('telefoneclientes', 'in', existingContacts.map(c => c.phone))
+
+        // Only add the not-in filter if there are existing contacts
+        if (existingPhones.length > 0) {
+          query = query.not('telefoneclientes', 'in', `(${existingPhones.join(',')})`)
+        }
+
+        const { data: contacts, error: usersError } = await query
 
         if (usersError) {
           console.error(`❌ Error fetching users for follow-up ${followUp.id}:`, usersError)
           throw usersError
         }
 
-        console.log(`✅ Found ${contacts.length} new contacts for follow-up ${followUp.id}`)
+        console.log(`✅ Found ${contacts?.length} new contacts for follow-up ${followUp.id}`)
 
         // Create follow-up contacts
-        if (contacts.length > 0) {
+        if (contacts && contacts.length > 0) {
           const { error: insertError } = await supabase
             .from('follow_up_contacts')
             .insert(contacts.map(contact => ({
@@ -154,7 +161,7 @@ serve(async (req) => {
           followUpId: followUp.id,
           status: 'success',
           messages: messages.length,
-          newContacts: contacts.length,
+          newContacts: contacts?.length || 0,
           existingContacts: existingContacts.length
         }
       } catch (error) {
