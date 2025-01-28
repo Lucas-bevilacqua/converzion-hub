@@ -40,8 +40,15 @@ serve(async (req) => {
 
     const instanceName = payload.instance
     // Extrai o número do telefone do remoteJid (formato: número@s.whatsapp.net)
-    const phoneNumber = payload.data.key.remoteJid.split('@')[0]
-    console.log('📱 Extracted phone number:', phoneNumber)
+    const rawPhoneNumber = payload.data.key.remoteJid.split('@')[0]
+    // Remove qualquer prefixo do WhatsApp (como "55" para Brasil)
+    const phoneNumber = rawPhoneNumber.replace(/^55/, '')
+    
+    console.log('📱 Processing message from:', {
+      rawPhoneNumber,
+      cleanedNumber: phoneNumber,
+      remoteJid: payload.data.key.remoteJid
+    })
     
     const messageId = payload.data.key.id
     const messageContent = payload.data.message.conversation || payload.data.message.text || ''
@@ -78,15 +85,20 @@ serve(async (req) => {
       throw instanceError
     }
 
+    console.log('📝 Saving contact:', {
+      phoneNumber,
+      instanceId: instance.id
+    })
+
     // Atualiza o último tempo de mensagem do cliente
     const { error: clientError } = await supabaseClient
-      .from('Users_clientes')
+      .from('users_clientes')
       .upsert({
-        TelefoneClientes: phoneNumber,
-        NomeDaEmpresa: instance.id,
+        telefoneclientes: phoneNumber,
+        nomedaempresa: instance.id,
         last_message_time: new Date().toISOString()
       }, {
-        onConflict: 'TelefoneClientes'
+        onConflict: 'telefoneclientes'
       })
 
     if (clientError) {
