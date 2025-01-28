@@ -41,13 +41,32 @@ serve(async (req) => {
     const instanceName = payload.instance
     // Extrai o número do telefone do remoteJid (formato: número@s.whatsapp.net)
     const rawPhoneNumber = payload.data.key.remoteJid.split('@')[0]
-    // Remove qualquer prefixo do WhatsApp (como "55" para Brasil)
-    const phoneNumber = rawPhoneNumber.replace(/^55/, '')
+    
+    // Função auxiliar para limpar o número
+    const cleanPhoneNumber = (number: string) => {
+      // Remove qualquer caractere que não seja número
+      const numbersOnly = number.replace(/\D/g, '')
+      // Se começar com 55 duplicado (ex: 555496...), remove um deles
+      if (numbersOnly.startsWith('5554')) {
+        return numbersOnly.substring(2)
+      }
+      // Se começar apenas com 55 do Brasil, remove-o
+      if (numbersOnly.startsWith('55')) {
+        return numbersOnly.substring(2)
+      }
+      return numbersOnly
+    }
+
+    const phoneNumber = cleanPhoneNumber(rawPhoneNumber)
     
     console.log('📱 Processing message from:', {
       rawPhoneNumber,
       cleanedNumber: phoneNumber,
-      remoteJid: payload.data.key.remoteJid
+      remoteJid: payload.data.key.remoteJid,
+      processingSteps: {
+        numbersOnly: rawPhoneNumber.replace(/\D/g, ''),
+        finalNumber: phoneNumber
+      }
     })
     
     const messageId = payload.data.key.id
@@ -87,7 +106,8 @@ serve(async (req) => {
 
     console.log('📝 Saving contact:', {
       phoneNumber,
-      instanceId: instance.id
+      instanceId: instance.id,
+      tableName: 'users_clientes'
     })
 
     // Atualiza o último tempo de mensagem do cliente
