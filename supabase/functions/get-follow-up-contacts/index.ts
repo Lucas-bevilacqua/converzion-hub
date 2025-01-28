@@ -1,10 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
+import { corsHeaders } from '../_shared/cors.ts'
 
 interface TimingMetrics {
   startTime: number;
@@ -13,31 +9,56 @@ interface TimingMetrics {
   totalTime?: number;
 }
 
-function formatPhoneNumber(phone: string | null): string | null {
+function decodeHexPhone(phone: string): string {
+  // Remove any non-hex characters
+  const hexOnly = phone.replace(/[^0-9A-F]/g, '');
+  
+  // Convert hex to buffer
+  const bytes = new Uint8Array(hexOnly.length / 2);
+  for (let i = 0; i < hexOnly.length; i += 2) {
+    bytes[i/2] = parseInt(hexOnly.substr(i, 2), 16);
+  }
+  
+  // Convert buffer to string
+  try {
+    return new TextDecoder().decode(bytes);
+  } catch (e) {
+    console.log('⚠️ Error decoding hex phone:', e);
+    return phone;
+  }
+}
+
+function cleanPhoneNumber(phone: string | null): string | null {
   if (!phone) {
     console.log('⚠️ Empty or null phone number')
     return null
   }
 
+  console.log(`🔍 Original number:`, phone)
+  
+  // If number starts with 3E, 3F, etc it's likely hex encoded
+  if (/^[3][E-F]/.test(phone)) {
+    phone = decodeHexPhone(phone)
+    console.log(`🔄 Decoded hex number:`, phone)
+  }
+
   // Remove all non-numeric characters
   let cleaned = phone.replace(/\D/g, '')
-  
-  console.log(`🔍 Original number: ${phone}`)
-  console.log(`🧹 Cleaned number: ${cleaned}`)
+  console.log(`🧹 Cleaned number:`, cleaned)
 
   // If starts with 0, remove it
   if (cleaned.startsWith('0')) {
     cleaned = cleaned.substring(1)
-    console.log(`🔄 Removed initial 0: ${cleaned}`)
+    console.log(`🔄 Removed initial 0:`, cleaned)
   }
 
   // Add country code if doesn't have it
   if (!cleaned.startsWith('55')) {
     cleaned = `55${cleaned}`
-    console.log(`🔄 Added country code: ${cleaned}`)
+    console.log(`🔄 Added country code:`, cleaned)
   }
 
-  // Check if has correct length after formatting
+  // Basic validation
   if (cleaned.length < 12 || cleaned.length > 13) {
     console.log(`⚠️ Invalid number length after formatting: ${cleaned.length} digits`)
     return null
@@ -50,7 +71,7 @@ function formatPhoneNumber(phone: string | null): string | null {
     return null
   }
 
-  console.log(`✅ Number formatted successfully: ${cleaned}`)
+  console.log(`✅ Number formatted successfully:`, cleaned)
   return cleaned
 }
 
@@ -136,7 +157,7 @@ serve(async (req) => {
               return false
             }
 
-            const formattedPhone = formatPhoneNumber(contact.telefoneclientes)
+            const formattedPhone = cleanPhoneNumber(contact.telefoneclientes)
             if (!formattedPhone) {
               console.log(`⚠️ Contact ignored - Invalid number: ${contact.telefoneclientes}`)
               return false
