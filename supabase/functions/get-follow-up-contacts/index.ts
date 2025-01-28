@@ -10,21 +10,25 @@ interface TimingMetrics {
 }
 
 function decodeHexPhone(phone: string): string {
-  // Remove any non-hex characters
-  const hexOnly = phone.replace(/[^0-9A-F]/g, '');
-  
-  // Convert hex to buffer
-  const bytes = new Uint8Array(hexOnly.length / 2);
-  for (let i = 0; i < hexOnly.length; i += 2) {
-    bytes[i/2] = parseInt(hexOnly.substr(i, 2), 16);
-  }
-  
-  // Convert buffer to string
   try {
-    return new TextDecoder().decode(bytes);
+    // Remove 3E or 3F prefix if present
+    const cleanHex = phone.replace(/^(3E|3F|3[E-F])/, '');
+    
+    // Convert pairs of hex chars to bytes
+    let result = '';
+    for (let i = 0; i < cleanHex.length; i += 2) {
+      const byte = parseInt(cleanHex.substr(i, 2), 16);
+      // Only add if it's a valid number character
+      if (byte >= 48 && byte <= 57) { // ASCII codes for 0-9
+        result += String.fromCharCode(byte);
+      }
+    }
+    
+    console.log('🔄 Decoded number:', result);
+    return result;
   } catch (e) {
-    console.log('⚠️ Error decoding hex phone:', e);
-    return phone;
+    console.error('❌ Error decoding hex phone:', e);
+    return '';
   }
 }
 
@@ -36,14 +40,17 @@ function cleanPhoneNumber(phone: string | null): string | null {
 
   console.log(`🔍 Original number:`, phone)
   
-  // If number starts with 3E, 3F, etc it's likely hex encoded
-  if (/^[3][E-F]/.test(phone)) {
-    phone = decodeHexPhone(phone)
-    console.log(`🔄 Decoded hex number:`, phone)
+  let cleaned = '';
+  
+  // If number starts with 3E or 3F, it's hex encoded
+  if (/^3[E-F]/.test(phone)) {
+    cleaned = decodeHexPhone(phone);
+    console.log(`🔄 Decoded hex number:`, cleaned);
+  } else {
+    // Remove all non-numeric characters
+    cleaned = phone.replace(/\D/g, '');
   }
-
-  // Remove all non-numeric characters
-  let cleaned = phone.replace(/\D/g, '')
+  
   console.log(`🧹 Cleaned number:`, cleaned)
 
   // If starts with 0, remove it
@@ -58,8 +65,8 @@ function cleanPhoneNumber(phone: string | null): string | null {
     console.log(`🔄 Added country code:`, cleaned)
   }
 
-  // Basic validation
-  if (cleaned.length < 12 || cleaned.length > 13) {
+  // Basic validation - should be 12 or 13 digits for Brazilian numbers
+  if (cleaned.length < 10 || cleaned.length > 13) {
     console.log(`⚠️ Invalid number length after formatting: ${cleaned.length} digits`)
     return null
   }
@@ -202,28 +209,19 @@ serve(async (req) => {
 
           // Call process-follow-up for each follow-up with contacts
           console.log(`🔄 Calling process-follow-up for follow-up ${followUp.id}`)
-          const processResponse = await fetch(
-            'https://vodexhppkasbulogmcqb.supabase.co/functions/v1/process-follow-up',
-            {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
-              },
-              body: JSON.stringify({
-                followUpId: followUp.id,
-                scheduled: true
-              })
+          const processResponse = await supabase.functions.invoke('process-follow-up', {
+            body: {
+              followUpId: followUp.id,
+              scheduled: true
             }
-          )
+          })
 
-          if (!processResponse.ok) {
-            const errorText = await processResponse.text()
-            console.error(`❌ Error processing follow-up ${followUp.id}:`, errorText)
-            throw new Error(`Failed to process follow-up: ${errorText}`)
+          if (!processResponse.error) {
+            console.log(`✅ Follow-up ${followUp.id} processed successfully`)
+          } else {
+            console.error(`❌ Error processing follow-up ${followUp.id}:`, processResponse.error)
+            throw new Error(`Failed to process follow-up: ${processResponse.error.message}`)
           }
-
-          console.log(`✅ Follow-up ${followUp.id} processed successfully`)
         } else {
           console.log(`ℹ️ No valid contacts found for follow-up ${followUp.id}`)
         }
