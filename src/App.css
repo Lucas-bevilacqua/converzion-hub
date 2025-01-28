@@ -11,11 +11,13 @@
   will-change: filter;
   transition: filter 300ms;
 }
+
 .logo:hover {
-  filter: drop-shadow(0 0 2em #646cffaa);
+  filter: drop-shadow(0 0 2em rgba(155, 135, 245, 0.6));
 }
+
 .logo.react:hover {
-  filter: drop-shadow(0 0 2em #61dafbaa);
+  filter: drop-shadow(0 0 2em rgba(155, 135, 245, 0.6));
 }
 
 @keyframes logo-spin {
@@ -38,5 +40,22 @@
 }
 
 .read-the-docs {
-  color: #888;
+  @apply text-primary-300;
+}
+
+/* Modern Tech Utilities */
+.tech-card {
+  @apply bg-gradient-to-br from-primary-500/10 to-primary-600/5 backdrop-blur-sm border border-primary-500/20 rounded-xl shadow-lg hover:shadow-primary-500/10 transition-all duration-300;
+}
+
+.tech-button {
+  @apply bg-gradient-to-r from-primary-500 to-primary-600 text-white font-medium px-6 py-2 rounded-lg hover:from-primary-600 hover:to-primary-700 transition-all duration-300 shadow-lg hover:shadow-primary-500/25;
+}
+
+.tech-input {
+  @apply bg-primary-500/5 border border-primary-500/20 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500/30 transition-all duration-300;
+}
+
+.glass-panel {
+  @apply backdrop-blur-md bg-white/5 border border-white/10 rounded-xl shadow-xl;
 }
