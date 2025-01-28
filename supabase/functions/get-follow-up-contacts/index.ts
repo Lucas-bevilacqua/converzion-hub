@@ -14,7 +14,7 @@ function decodeHexPhone(phone: string): string {
     // Remove 3E or 3F prefix if present
     const cleanHex = phone.replace(/^(3E|3F|3[E-F])/, '');
     
-    // Convert pairs of hex chars to bytes
+    // Convert pairs of hex chars to bytes and extract numbers
     let result = '';
     for (let i = 0; i < cleanHex.length; i += 2) {
       const byte = parseInt(cleanHex.substr(i, 2), 16);
@@ -65,7 +65,7 @@ function cleanPhoneNumber(phone: string | null): string | null {
     console.log(`🔄 Added country code:`, cleaned)
   }
 
-  // Basic validation - should be 12 or 13 digits for Brazilian numbers
+  // Basic validation - should be 10-13 digits for Brazilian numbers
   if (cleaned.length < 10 || cleaned.length > 13) {
     console.log(`⚠️ Invalid number length after formatting: ${cleaned.length} digits`)
     return null
@@ -152,13 +152,11 @@ serve(async (req) => {
           throw contactsError
         }
 
-        // Log raw contacts for debug
         console.log(`🔍 Raw contact data for follow-up ${followUp.id}:`, contacts)
         
         // Filter and format valid contacts
         const validContacts = (contacts || [])
           .filter(contact => {
-            // Check if has required data
             if (!contact?.telefoneclientes || !contact?.last_message_time) {
               console.log('⚠️ Invalid contact - Missing required data:', contact)
               return false
@@ -170,7 +168,6 @@ serve(async (req) => {
               return false
             }
 
-            // Update formatted number in contact
             contact.telefoneclientes = formattedPhone
             return true
           })
@@ -180,7 +177,6 @@ serve(async (req) => {
         if (validContacts.length > 0) {
           console.log(`🔄 Trying to insert ${validContacts.length} contacts for follow-up ${followUp.id}`)
           
-          // Prepare contacts for insertion
           const contactsToInsert = validContacts.map(contact => ({
             follow_up_id: followUp.id,
             phone: contact.telefoneclientes,
@@ -193,7 +189,6 @@ serve(async (req) => {
             }
           }))
 
-          // Log what will be inserted
           console.log(`📝 Contacts to be inserted:`, contactsToInsert)
 
           const { error: insertError } = await supabase
