@@ -41,6 +41,31 @@ import {
   TabsTrigger,
 } from "@/components/ui/tabs"
 
+// Função de limpeza de número de telefone
+function cleanPhoneNumber(phoneNumber: string): string {
+  console.log('📱 Número original:', phoneNumber)
+  
+  // Remove o @s.whatsapp.net ou @c.us do final
+  const rawNumber = phoneNumber.split('@')[0]
+  console.log('📱 Número após remover @:', rawNumber)
+  
+  // Remove qualquer parte após : (alguns números vêm com :1 ou :2)
+  const numberBeforeColon = rawNumber.split(':')[0]
+  console.log('📱 Número após remover :', numberBeforeColon)
+  
+  // Remove caracteres não numéricos
+  let cleanNumber = numberBeforeColon.replace(/\D/g, '')
+  console.log('📱 Número após remover não-numéricos:', cleanNumber)
+
+  // Se começar com 55 e tiver mais de 12 dígitos, remove o primeiro 55
+  if (cleanNumber.startsWith('55') && cleanNumber.length > 12) {
+    cleanNumber = cleanNumber.substring(2)
+    console.log('📱 Número após remover 55 inicial:', cleanNumber)
+  }
+
+  return cleanNumber
+}
+
 interface FollowUpSectionProps {
   instanceId: string
 }
@@ -287,11 +312,15 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
         throw new Error("Digite o número que receberá o teste")
       }
 
+      // Limpa o número antes de enviar
+      const cleanedPhoneNumber = cleanPhoneNumber(testPhoneNumber)
+      console.log('📱 Número limpo para teste:', cleanedPhoneNumber)
+
       const { data, error } = await supabase.functions.invoke('test-follow-up-system', {
         body: { 
           followUpId: followUp.id,
           instanceId,
-          testPhoneNumber,
+          testPhoneNumber: cleanedPhoneNumber,
           executeFullSequence: true
         }
       })
