@@ -91,20 +91,15 @@ serve(async (req) => {
     messages.push({ role: 'user', content: message })
     console.log('🤖 Prepared messages for OpenAI, count:', messages.length)
 
-    const openAiKey = Deno.env.get('OPENAI_API_KEY')
-    if (!openAiKey) {
-      throw new Error('OPENAI_API_KEY is not configured')
-    }
-
     console.log('🔄 Sending request to OpenAI...')
     const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${openAiKey}`,
+        'Authorization': `Bearer ${Deno.env.get('OPENAI_API_KEY')}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4o-mini',
+        model: 'gpt-4',
         messages: messages,
         temperature: 0.7,
       }),
@@ -120,37 +115,14 @@ serve(async (req) => {
     const aiResponse = data.choices[0].message.content
     console.log('✅ Received AI response:', aiResponse.substring(0, 100) + '...')
 
-    console.log('💾 Saving AI response...')
-    const { error: saveResponseError } = await supabaseClient
-      .from('chat_messages')
-      .insert({
-        instance_id: instanceId,
-        user_id: instance.user_id,
-        sender_type: 'assistant',
-        content: aiResponse
-      })
-
-    if (saveResponseError) {
-      console.error('❌ Error saving AI response:', saveResponseError)
-      throw saveResponseError
-    }
-    console.log('✅ AI response saved successfully')
-
     console.log('📤 Sending message through Evolution API...')
-    const evolutionApiUrl = Deno.env.get('EVOLUTION_API_URL')?.replace(/\/$/, '')
-    const evolutionApiKey = Deno.env.get('EVOLUTION_API_KEY')
-
-    if (!evolutionApiUrl || !evolutionApiKey) {
-      throw new Error('Evolution API configuration missing')
-    }
-
     const evolutionResponse = await fetch(
-      `${evolutionApiUrl}/message/sendText/${instance.name}`,
+      `${Deno.env.get('EVOLUTION_API_URL')}/message/sendText/${instance.name}`,
       {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'apikey': evolutionApiKey,
+          'apikey': Deno.env.get('EVOLUTION_API_KEY') || '',
         },
         body: JSON.stringify({
           number: phoneNumber,
@@ -167,6 +139,23 @@ serve(async (req) => {
 
     const evolutionData = await evolutionResponse.json()
     console.log('✅ Evolution API response:', evolutionData)
+
+    console.log('💾 Saving AI response...')
+    const { error: saveResponseError } = await supabaseClient
+      .from('chat_messages')
+      .insert({
+        instance_id: instanceId,
+        user_id: instance.user_id,
+        sender_type: 'assistant',
+        content: aiResponse,
+        whatsapp_message_id: evolutionData.key?.id
+      })
+
+    if (saveResponseError) {
+      console.error('❌ Error saving AI response:', saveResponseError)
+      throw saveResponseError
+    }
+    console.log('✅ AI response saved successfully')
 
     console.log('🎉 Function completed successfully')
     return new Response(
@@ -185,7 +174,7 @@ serve(async (req) => {
         error: error.message 
       }),
       { 
-        status: 500,
+        status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
       }
     )

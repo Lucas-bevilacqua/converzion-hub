@@ -40,28 +40,30 @@ serve(async (req) => {
 
     const instanceName = payload.instance
     
-    // Extrai o número do telefone corretamente do remoteJid
-    let phoneNumber = payload.data.key.remoteJid
-    
-    // Log do número original para debug
-    console.log('📱 Original remoteJid:', phoneNumber)
-    
-    // Remove o sufixo @s.whatsapp.net ou @g.us
-    phoneNumber = phoneNumber.split('@')[0]
-    
-    // Se for um grupo (contém -), pega o número que enviou
-    if (phoneNumber.includes('-')) {
-      phoneNumber = payload.data.key.participant.split('@')[0]
-      console.log('📱 Group message, using participant number:', phoneNumber)
+    // Extrai o número do telefone do remoteJid
+    const remoteJid = payload.data.key.remoteJid
+    console.log('📱 Original remoteJid:', remoteJid)
+
+    // Se for mensagem de grupo, ignora
+    if (remoteJid.includes('@g.us')) {
+      console.log('⚠️ Group message, skipping')
+      return new Response(
+        JSON.stringify({ success: true, skipped: true }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
     }
+
+    // Remove @s.whatsapp.net e qualquer outro caractere não numérico
+    const rawPhoneNumber = remoteJid.split('@')[0]
+    console.log('📱 Raw phone number:', rawPhoneNumber)
     
-    // Remove o prefixo 55 se existir e o número for maior que 11 dígitos
-    if (phoneNumber.startsWith('55') && phoneNumber.length > 11) {
-      phoneNumber = phoneNumber.substring(2)
-      console.log('📱 Removed country code, new number:', phoneNumber)
-    }
+    // Remove qualquer caractere não numérico
+    const digitsOnly = rawPhoneNumber.replace(/\D/g, '')
+    console.log('📱 Digits only:', digitsOnly)
     
-    console.log('📱 Final processed phone number:', phoneNumber)
+    // Remove o código do país (55) se existir
+    const phoneNumber = digitsOnly.startsWith('55') ? digitsOnly.substring(2) : digitsOnly
+    console.log('📱 Final phone number:', phoneNumber)
     
     const messageId = payload.data.key.id
     const messageContent = payload.data.message.conversation || payload.data.message.text || ''
@@ -98,7 +100,7 @@ serve(async (req) => {
       throw instanceError
     }
 
-    console.log('📝 Saving contact with number:', phoneNumber, 'for instance:', instance.id)
+    console.log('✅ Found instance:', instance.id)
 
     // Atualiza o último tempo de mensagem do cliente
     const { error: clientError } = await supabaseClient
@@ -116,7 +118,7 @@ serve(async (req) => {
       throw clientError
     }
 
-    console.log('✅ Contact saved successfully')
+    console.log('✅ Updated client last message time')
 
     // Salva a mensagem do usuário
     const { error: saveError } = await supabaseClient
@@ -134,7 +136,7 @@ serve(async (req) => {
       throw saveError
     }
 
-    console.log('✅ Message saved successfully')
+    console.log('✅ Saved user message')
 
     // Processa com LangChain e envia resposta automaticamente
     console.log('🤖 Processing message with LangChain...')
