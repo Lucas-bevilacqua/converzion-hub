@@ -29,136 +29,168 @@ serve(async (req) => {
 
   try {
     console.log('🔄 [DEBUG] Starting follow-up processing')
+    const { followUpId } = await req.json()
+    
+    if (!followUpId) {
+      console.error('❌ [ERROR] No followUpId provided')
+      throw new Error('followUpId is required')
+    }
+
+    console.log(`🔄 [DEBUG] Processing follow-up ID: ${followUpId}`)
     
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    // Fetch active follow-ups with retry
-    const { data: followUps, error: followUpsError } = await retryOperation(async () => {
-      console.log('🔍 [DEBUG] Fetching active follow-ups')
+    // Fetch follow-up data with instance details
+    const { data: followUp, error: followUpError } = await retryOperation(async () => {
+      console.log(`🔍 [DEBUG] Fetching follow-up data for ID: ${followUpId}`)
       return await supabaseClient
-        .from('instance_follow_ups')
+        .from('follow_ups')
         .select(`
           *,
-          instance:evolution_instances(
+          instance:evolution_instances (
             id,
             name,
-            user_id,
             connection_status,
             phone_number
           )
         `)
-        .eq('is_active', true)
-        .gt('next_execution_time', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()) 
-        .lt('next_execution_time', new Date().toISOString())
-        .lt('execution_count', 'max_attempts')
-    });
+        .eq('id', followUpId)
+        .single()
+    })
 
-    if (followUpsError) {
-      console.error('❌ [ERROR] Failed to fetch active follow-ups:', followUpsError)
-      throw new Error(`Failed to fetch active follow-ups: ${followUpsError.message}`)
+    if (followUpError) {
+      console.error('❌ [ERROR] Failed to fetch follow-up:', followUpError)
+      throw new Error(`Failed to fetch follow-up: ${followUpError.message}`)
     }
 
-    console.log(`✅ [DEBUG] Found ${followUps?.length || 0} active follow-ups`)
+    if (!followUp) {
+      console.error('❌ [ERROR] Follow-up not found')
+      throw new Error('Follow-up not found')
+    }
 
-    const processedFollowUps = [];
-    const errors = [];
+    console.log(`✅ [DEBUG] Found follow-up:`, followUp)
 
-    // Process each follow-up with retry
-    for (const followUp of (followUps || [])) {
+    // Verify instance connection
+    if (!followUp.instance?.connection_status || 
+        followUp.instance.connection_status.toLowerCase() !== 'connected') {
+      console.error(`❌ [ERROR] Instance ${followUp.instance?.name} not connected`)
+      throw new Error(`Instance ${followUp.instance?.name} not connected`)
+    }
+
+    // Get contacts for this follow-up
+    const { data: contacts, error: contactsError } = await retryOperation(async () => {
+      console.log(`🔍 [DEBUG] Fetching contacts for follow-up ${followUpId}`)
+      return await supabaseClient
+        .from('follow_up_contacts')
+        .select('*')
+        .eq('follow_up_id', followUpId)
+        .eq('status', 'pending')
+    })
+
+    if (contactsError) {
+      console.error('❌ [ERROR] Failed to fetch contacts:', contactsError)
+      throw new Error(`Failed to fetch contacts: ${contactsError.message}`)
+    }
+
+    console.log(`✅ [DEBUG] Found ${contacts?.length || 0} contacts to process`)
+
+    // Get follow-up messages
+    const { data: messages, error: messagesError } = await retryOperation(async () => {
+      console.log(`🔍 [DEBUG] Fetching messages for follow-up ${followUpId}`)
+      return await supabaseClient
+        .from('follow_up_messages')
+        .select('*')
+        .eq('follow_up_id', followUpId)
+        .order('delay_minutes', { ascending: true })
+    })
+
+    if (messagesError) {
+      console.error('❌ [ERROR] Failed to fetch messages:', messagesError)
+      throw new Error(`Failed to fetch messages: ${messagesError.message}`)
+    }
+
+    if (!messages?.length) {
+      console.error('❌ [ERROR] No messages configured for follow-up')
+      throw new Error('No messages configured for follow-up')
+    }
+
+    console.log(`✅ [DEBUG] Found ${messages.length} messages to send`)
+
+    // Process each contact
+    const results = []
+    for (const contact of (contacts || [])) {
       try {
-        if (!followUp.instance?.connection_status || 
-            followUp.instance.connection_status.toLowerCase() !== 'connected') {
-          console.log(`⚠️ [DEBUG] Instance ${followUp.instance?.name} not connected, skipping`)
-          continue;
-        }
+        console.log(`🔄 [DEBUG] Processing contact:`, contact)
 
-        // Verificar se atingiu o número máximo de tentativas
-        if (followUp.execution_count >= followUp.max_attempts) {
-          console.log(`⚠️ [DEBUG] Instance ${followUp.instance.name} reached max attempts (${followUp.max_attempts}), skipping`)
-          continue;
-        }
-
-        console.log(`🔄 [DEBUG] Processing follow-up for instance ${followUp.instance.name}`)
-        console.log(`📱 [DEBUG] Phone number: ${followUp.instance.phone_number}`)
-        console.log(`⏰ [DEBUG] Next execution time: ${followUp.next_execution_time}`)
-        console.log(`📊 [DEBUG] Execution count: ${followUp.execution_count}/${followUp.max_attempts}`)
-        console.log(`⏰ [DEBUG] Current last_execution_time: ${followUp.last_execution_time}`)
-
-        const endpoint = followUp.follow_up_type === 'ai_generated' 
-          ? 'process-ai-follow-up'
-          : 'process-follow-up';
-
-        const result = await retryOperation(async () => {
-          console.log(`🔄 [DEBUG] Processing via ${endpoint}`)
-          const response = await supabaseClient.functions.invoke(endpoint, {
-            body: { 
-              followUp: {
-                ...followUp,
-                instance_id: followUp.instance_id,
-                instanceName: followUp.instance.name,
-                userId: followUp.instance.user_id
-              }
-            }
-          });
-
-          if (response.error) throw response.error;
-          return response.data;
-        });
-
-        // Update follow-up execution count and time
-        const currentTime = new Date().toISOString();
-        console.log(`⏰ [DEBUG] Updating last_execution_time to: ${currentTime}`);
+        // Send message through Evolution API
+        const evolutionApiUrl = (Deno.env.get('EVOLUTION_API_URL') || '').replace(/\/+$/, '')
+        const evolutionApiEndpoint = `${evolutionApiUrl}/message/sendText/${followUp.instance.name}`
         
-        const { error: updateError } = await supabaseClient
-          .from('instance_follow_ups')
-          .update({
-            execution_count: (followUp.execution_count || 0) + 1,
-            last_execution_time: currentTime,
-            next_execution_time: new Date(Date.now() + (followUp.delay_minutes * 60 * 1000)).toISOString()
+        console.log(`📤 [DEBUG] Sending to Evolution API:`, {
+          endpoint: evolutionApiEndpoint,
+          phone: contact.phone,
+          message: messages[0].message
+        })
+
+        const response = await fetch(evolutionApiEndpoint, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': Deno.env.get('EVOLUTION_API_KEY') || '',
+          },
+          body: JSON.stringify({
+            number: contact.phone,
+            text: messages[0].message
           })
-          .eq('id', followUp.id);
+        })
+
+        if (!response.ok) {
+          throw new Error(`Evolution API error: ${await response.text()}`)
+        }
+
+        // Update contact status
+        const { error: updateError } = await supabaseClient
+          .from('follow_up_contacts')
+          .update({ 
+            status: 'sent',
+            sent_at: new Date().toISOString()
+          })
+          .eq('id', contact.id)
 
         if (updateError) {
-          console.error(`❌ [ERROR] Failed to update follow-up ${followUp.id}:`, updateError)
-          throw updateError;
+          throw new Error(`Failed to update contact status: ${updateError.message}`)
         }
 
-        console.log(`✅ [DEBUG] Successfully updated follow-up times for ${followUp.id}`);
-
-        processedFollowUps.push({
-          followUpId: followUp.id,
-          status: 'success',
-          result,
-          last_execution_time: currentTime
-        });
+        results.push({
+          contactId: contact.id,
+          status: 'success'
+        })
 
       } catch (error) {
-        console.error(`❌ [ERROR] Failed to process follow-up ${followUp.id}:`, error)
-        errors.push({
-          followUpId: followUp.id,
+        console.error(`❌ [ERROR] Failed to process contact ${contact.id}:`, error)
+        results.push({
+          contactId: contact.id,
           status: 'error',
           error: error.message
-        });
+        })
       }
     }
 
-    // Return results with appropriate status code
+    // Return results
     return new Response(
       JSON.stringify({
-        success: errors.length === 0,
-        processed: processedFollowUps.length,
-        results: [...processedFollowUps, ...errors],
-        timestamp: new Date().toISOString()
+        success: true,
+        processed: results.length,
+        results
       }),
       { 
         headers: { 
           ...corsHeaders,
           'Content-Type': 'application/json'
-        },
-        status: errors.length === 0 ? 200 : 207 // 207 Multi-Status if some operations failed
+        }
       }
     )
 
@@ -168,8 +200,7 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({
         success: false,
-        error: error.message,
-        timestamp: new Date().toISOString()
+        error: error.message
       }),
       { 
         status: 500,
