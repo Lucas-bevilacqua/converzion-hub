@@ -75,13 +75,14 @@ serve(async (req) => {
           continue
         }
 
-        // Get eligible contacts
+        // Get eligible contacts that haven't been processed yet
         const { data: contacts, error: contactsError } = await retryOperation(async () => {
           return await supabaseClient
             .from('follow_up_contacts')
             .select('*')
             .eq('follow_up_id', followUp.id)
             .eq('status', 'pending')
+            .is('sent_at', null) // Only get contacts that haven't been sent messages
         })
 
         if (contactsError) {
@@ -94,6 +95,18 @@ serve(async (req) => {
         for (const contact of contacts || []) {
           try {
             console.log(`🔄 [DEBUG] Processing contact:`, contact)
+
+            // Check if contact has already replied or has been processed
+            const { data: contactStatus } = await supabaseClient
+              .from('follow_up_contacts')
+              .select('reply_at, sent_at')
+              .eq('id', contact.id)
+              .single()
+
+            if (contactStatus?.reply_at || contactStatus?.sent_at) {
+              console.log(`⚠️ [DEBUG] Contact ${contact.id} has already been processed or replied, skipping`)
+              continue
+            }
 
             // Generate AI message
             const openAiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -152,7 +165,7 @@ serve(async (req) => {
               throw new Error(`Evolution API error: ${await response.text()}`)
             }
 
-            // Update contact status
+            // Update contact status with sent_at timestamp
             const { error: updateError } = await supabaseClient
               .from('follow_up_contacts')
               .update({ 
@@ -165,11 +178,11 @@ serve(async (req) => {
               throw new Error(`Failed to update contact status: ${updateError.message}`)
             }
 
-            // Wait for configured delay before next message
+            // Add delay before next message if configured
             const delayMinutes = followUp.settings?.delay_minutes || 60
             if (delayMinutes > 0) {
               console.log(`⏳ [DEBUG] Waiting ${delayMinutes} minutes before next message`)
-              await new Promise(resolve => setTimeout(resolve, delayMinutes * 60 * 1000))
+              await sleep(delayMinutes * 60 * 1000)
             }
 
             results.push({
@@ -190,7 +203,14 @@ serve(async (req) => {
         }
 
         // Update follow-up status if all contacts processed
-        if (contacts?.length === 0) {
+        const { data: pendingContacts } = await supabaseClient
+          .from('follow_up_contacts')
+          .select('id')
+          .eq('follow_up_id', followUp.id)
+          .eq('status', 'pending')
+          .is('sent_at', null)
+
+        if (!pendingContacts?.length) {
           const { error: updateError } = await supabaseClient
             .from('follow_ups')
             .update({ 
