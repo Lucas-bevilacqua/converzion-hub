@@ -44,28 +44,40 @@ serve(async (req) => {
     
     // Função auxiliar para limpar o número
     const cleanPhoneNumber = (number: string) => {
+      console.log('🔍 Cleaning phone number:', {
+        input: number,
+        step1: number.replace(/\D/g, ''),
+      })
+
       // Remove qualquer caractere que não seja número
-      const numbersOnly = number.replace(/\D/g, '')
-      // Se começar com 55 duplicado (ex: 555496...), remove um deles
-      if (numbersOnly.startsWith('5554')) {
-        return numbersOnly.substring(2)
+      let cleaned = number.replace(/\D/g, '')
+      
+      console.log('🔍 After removing non-digits:', cleaned)
+
+      // Se começar com 55 duplicado (ex: 555496...), remove o primeiro 55
+      if (cleaned.startsWith('5554')) {
+        cleaned = cleaned.substring(2)
+        console.log('🔍 Number started with 5554, after removing first 55:', cleaned)
       }
-      // Se começar apenas com 55 do Brasil, remove-o
-      if (numbersOnly.startsWith('55')) {
-        return numbersOnly.substring(2)
+      // Se começar com 55 do Brasil e não for um caso de 5554, remove também
+      else if (cleaned.startsWith('55')) {
+        cleaned = cleaned.substring(2)
+        console.log('🔍 Number started with 55, after removing:', cleaned)
       }
-      return numbersOnly
+
+      console.log('🔍 Final cleaned number:', cleaned)
+      return cleaned
     }
 
     const phoneNumber = cleanPhoneNumber(rawPhoneNumber)
     
     console.log('📱 Processing message from:', {
-      rawPhoneNumber,
+      originalNumber: rawPhoneNumber,
       cleanedNumber: phoneNumber,
       remoteJid: payload.data.key.remoteJid,
       processingSteps: {
-        numbersOnly: rawPhoneNumber.replace(/\D/g, ''),
-        finalNumber: phoneNumber
+        rawInput: rawPhoneNumber,
+        afterCleaning: phoneNumber
       }
     })
     
