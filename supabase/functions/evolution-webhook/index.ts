@@ -14,12 +14,16 @@ const supabaseClient = createClient(
 function cleanPhoneNumber(remoteJid: string): string {
   console.log('📱 Original remoteJid:', remoteJid)
   
-  // Extrai apenas o número antes do @
+  // Remove o @s.whatsapp.net ou @c.us do final
   const rawNumber = remoteJid.split('@')[0]
-  console.log('📱 Número extraído antes do @:', rawNumber)
+  console.log('📱 Número após remover @:', rawNumber)
+  
+  // Remove qualquer parte após : (alguns números vêm com :1 ou :2)
+  const numberBeforeColon = rawNumber.split(':')[0]
+  console.log('📱 Número após remover :', numberBeforeColon)
   
   // Remove caracteres não numéricos
-  let cleanNumber = rawNumber.replace(/\D/g, '')
+  let cleanNumber = numberBeforeColon.replace(/\D/g, '')
   console.log('📱 Número após remover não-numéricos:', cleanNumber)
 
   // Se começar com 55 e tiver mais de 12 dígitos, remove o primeiro 55
