@@ -55,9 +55,10 @@ serve(async (req) => {
       console.log('📱 Group message, using participant number:', phoneNumber)
     }
     
-    // Remove o prefixo 55 se existir
+    // Remove o prefixo 55 se existir e o número for maior que 11 dígitos
     if (phoneNumber.startsWith('55') && phoneNumber.length > 11) {
       phoneNumber = phoneNumber.substring(2)
+      console.log('📱 Removed country code, new number:', phoneNumber)
     }
     
     console.log('📱 Final processed phone number:', phoneNumber)
@@ -97,6 +98,8 @@ serve(async (req) => {
       throw instanceError
     }
 
+    console.log('📝 Saving contact with number:', phoneNumber, 'for instance:', instance.id)
+
     // Atualiza o último tempo de mensagem do cliente
     const { error: clientError } = await supabaseClient
       .from('Users_clientes')
@@ -113,6 +116,8 @@ serve(async (req) => {
       throw clientError
     }
 
+    console.log('✅ Contact saved successfully')
+
     // Salva a mensagem do usuário
     const { error: saveError } = await supabaseClient
       .from('chat_messages')
@@ -128,6 +133,8 @@ serve(async (req) => {
       console.error('❌ Error saving message:', saveError)
       throw saveError
     }
+
+    console.log('✅ Message saved successfully')
 
     // Processa com LangChain e envia resposta automaticamente
     console.log('🤖 Processing message with LangChain...')
