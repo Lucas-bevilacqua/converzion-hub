@@ -9,13 +9,15 @@ const corsHeaders = {
 const MAX_RETRIES = 3;
 const RETRY_DELAY = 1000; // 1 second
 
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
 async function retryOperation<T>(operation: () => Promise<T>, retries = MAX_RETRIES): Promise<T> {
   try {
     return await operation();
   } catch (error) {
     if (retries > 0) {
       console.log(`🔄 [DEBUG] Retrying operation, ${retries} attempts remaining`);
-      await new Promise(resolve => setTimeout(resolve, RETRY_DELAY));
+      await sleep(RETRY_DELAY);
       return retryOperation(operation, retries - 1);
     }
     throw error;
@@ -80,14 +82,15 @@ serve(async (req) => {
       throw new Error(`Instance ${followUp.instance?.name} not connected`)
     }
 
-    // Get contacts for this follow-up
+    // Get contacts that haven't been processed yet
     const { data: contacts, error: contactsError } = await retryOperation(async () => {
-      console.log(`🔍 [DEBUG] Fetching contacts for follow-up ${followUpId}`)
+      console.log(`🔍 [DEBUG] Fetching pending contacts for follow-up ${followUpId}`)
       return await supabaseClient
         .from('follow_up_contacts')
         .select('*')
         .eq('follow_up_id', followUpId)
         .eq('status', 'pending')
+        .is('sent_at', null) // Only get contacts that haven't been sent messages
     })
 
     if (contactsError) {
@@ -124,6 +127,18 @@ serve(async (req) => {
     for (const contact of (contacts || [])) {
       try {
         console.log(`🔄 [DEBUG] Processing contact:`, contact)
+
+        // Double check contact hasn't replied or been processed
+        const { data: contactStatus } = await supabaseClient
+          .from('follow_up_contacts')
+          .select('reply_at, sent_at')
+          .eq('id', contact.id)
+          .single()
+
+        if (contactStatus?.reply_at || contactStatus?.sent_at) {
+          console.log(`⚠️ [DEBUG] Contact ${contact.id} has already been processed or replied, skipping`)
+          continue
+        }
 
         // Send all messages in sequence through Evolution API
         for (const message of messages) {
@@ -170,7 +185,7 @@ serve(async (req) => {
           // Wait for the configured delay before sending next message
           if (message.delay_minutes > 0) {
             console.log(`⏳ [DEBUG] Waiting ${message.delay_minutes} minutes before next message`)
-            await new Promise(resolve => setTimeout(resolve, message.delay_minutes * 60 * 1000))
+            await sleep(message.delay_minutes * 60 * 1000)
           }
         }
 
@@ -186,6 +201,29 @@ serve(async (req) => {
           status: 'error',
           error: error.message
         })
+      }
+    }
+
+    // Check if all contacts have been processed
+    const { data: pendingContacts } = await supabaseClient
+      .from('follow_up_contacts')
+      .select('id')
+      .eq('follow_up_id', followUpId)
+      .eq('status', 'pending')
+      .is('sent_at', null)
+
+    // If no more pending contacts, mark follow-up as completed
+    if (!pendingContacts?.length) {
+      const { error: updateError } = await supabaseClient
+        .from('follow_ups')
+        .update({
+          status: 'completed',
+          completed_at: new Date().toISOString()
+        })
+        .eq('id', followUpId)
+
+      if (updateError) {
+        console.error('❌ [ERROR] Failed to update follow-up status:', updateError)
       }
     }
 
