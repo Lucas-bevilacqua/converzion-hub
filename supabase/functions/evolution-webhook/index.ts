@@ -39,9 +39,28 @@ serve(async (req) => {
     }
 
     const instanceName = payload.instance
-    // Extrai o número do telefone do remoteJid (formato: número@s.whatsapp.net)
-    const phoneNumber = payload.data.key.remoteJid.split('@')[0]
-    console.log('📱 Extracted phone number:', phoneNumber)
+    
+    // Extrai o número do telefone corretamente do remoteJid
+    let phoneNumber = payload.data.key.remoteJid
+    
+    // Log do número original para debug
+    console.log('📱 Original remoteJid:', phoneNumber)
+    
+    // Remove o sufixo @s.whatsapp.net ou @g.us
+    phoneNumber = phoneNumber.split('@')[0]
+    
+    // Se for um grupo (contém -), pega o número que enviou
+    if (phoneNumber.includes('-')) {
+      phoneNumber = payload.data.key.participant.split('@')[0]
+      console.log('📱 Group message, using participant number:', phoneNumber)
+    }
+    
+    // Remove o prefixo 55 se existir
+    if (phoneNumber.startsWith('55') && phoneNumber.length > 11) {
+      phoneNumber = phoneNumber.substring(2)
+    }
+    
+    console.log('📱 Final processed phone number:', phoneNumber)
     
     const messageId = payload.data.key.id
     const messageContent = payload.data.message.conversation || payload.data.message.text || ''
