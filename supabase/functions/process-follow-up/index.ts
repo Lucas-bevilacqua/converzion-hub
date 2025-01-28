@@ -97,7 +97,7 @@ serve(async (req) => {
 
     console.log(`✅ [DEBUG] Found ${contacts?.length || 0} contacts to process`)
 
-    // Get follow-up messages
+    // Get follow-up messages ordered by delay
     const { data: messages, error: messagesError } = await retryOperation(async () => {
       console.log(`🔍 [DEBUG] Fetching messages for follow-up ${followUpId}`)
       return await supabaseClient
@@ -125,43 +125,53 @@ serve(async (req) => {
       try {
         console.log(`🔄 [DEBUG] Processing contact:`, contact)
 
-        // Send message through Evolution API
-        const evolutionApiUrl = (Deno.env.get('EVOLUTION_API_URL') || '').replace(/\/+$/, '')
-        const evolutionApiEndpoint = `${evolutionApiUrl}/message/sendText/${followUp.instance.name}`
-        
-        console.log(`📤 [DEBUG] Sending to Evolution API:`, {
-          endpoint: evolutionApiEndpoint,
-          phone: contact.phone,
-          message: messages[0].message
-        })
-
-        const response = await fetch(evolutionApiEndpoint, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'apikey': Deno.env.get('EVOLUTION_API_KEY') || '',
-          },
-          body: JSON.stringify({
-            number: contact.phone,
-            text: messages[0].message
+        // Send all messages in sequence through Evolution API
+        for (const message of messages) {
+          console.log(`📤 [DEBUG] Sending message with delay ${message.delay_minutes} minutes:`, message)
+          
+          const evolutionApiUrl = (Deno.env.get('EVOLUTION_API_URL') || '').replace(/\/+$/, '')
+          const evolutionApiEndpoint = `${evolutionApiUrl}/message/sendText/${followUp.instance.name}`
+          
+          console.log(`📤 [DEBUG] Sending to Evolution API:`, {
+            endpoint: evolutionApiEndpoint,
+            phone: contact.phone,
+            message: message.message
           })
-        })
 
-        if (!response.ok) {
-          throw new Error(`Evolution API error: ${await response.text()}`)
-        }
-
-        // Update contact status
-        const { error: updateError } = await supabaseClient
-          .from('follow_up_contacts')
-          .update({ 
-            status: 'sent',
-            sent_at: new Date().toISOString()
+          const response = await fetch(evolutionApiEndpoint, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'apikey': Deno.env.get('EVOLUTION_API_KEY') || '',
+            },
+            body: JSON.stringify({
+              number: contact.phone,
+              text: message.message
+            })
           })
-          .eq('id', contact.id)
 
-        if (updateError) {
-          throw new Error(`Failed to update contact status: ${updateError.message}`)
+          if (!response.ok) {
+            throw new Error(`Evolution API error: ${await response.text()}`)
+          }
+
+          // Update contact status after each message
+          const { error: updateError } = await supabaseClient
+            .from('follow_up_contacts')
+            .update({ 
+              status: 'sent',
+              sent_at: new Date().toISOString()
+            })
+            .eq('id', contact.id)
+
+          if (updateError) {
+            throw new Error(`Failed to update contact status: ${updateError.message}`)
+          }
+
+          // Wait for the configured delay before sending next message
+          if (message.delay_minutes > 0) {
+            console.log(`⏳ [DEBUG] Waiting ${message.delay_minutes} minutes before next message`)
+            await new Promise(resolve => setTimeout(resolve, message.delay_minutes * 60 * 1000))
+          }
         }
 
         results.push({
