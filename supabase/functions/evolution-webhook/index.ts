@@ -39,48 +39,7 @@ serve(async (req) => {
     }
 
     const instanceName = payload.instance
-    // Extrai o número do telefone do remoteJid (formato: número@s.whatsapp.net)
-    const rawPhoneNumber = payload.data.key.remoteJid.split('@')[0]
-    
-    // Função auxiliar para limpar o número
-    const cleanPhoneNumber = (number: string) => {
-      console.log('🔍 Cleaning phone number:', {
-        input: number,
-        step1: number.replace(/\D/g, ''),
-      })
-
-      // Remove qualquer caractere que não seja número
-      let cleaned = number.replace(/\D/g, '')
-      
-      console.log('🔍 After removing non-digits:', cleaned)
-
-      // Se começar com 55 duplicado (ex: 555496...), remove o primeiro 55
-      if (cleaned.startsWith('5554')) {
-        cleaned = cleaned.substring(2)
-        console.log('🔍 Number started with 5554, after removing first 55:', cleaned)
-      }
-      // Se começar com 55 do Brasil e não for um caso de 5554, remove também
-      else if (cleaned.startsWith('55')) {
-        cleaned = cleaned.substring(2)
-        console.log('🔍 Number started with 55, after removing:', cleaned)
-      }
-
-      console.log('🔍 Final cleaned number:', cleaned)
-      return cleaned
-    }
-
-    const phoneNumber = cleanPhoneNumber(rawPhoneNumber)
-    
-    console.log('📱 Processing message from:', {
-      originalNumber: rawPhoneNumber,
-      cleanedNumber: phoneNumber,
-      remoteJid: payload.data.key.remoteJid,
-      processingSteps: {
-        rawInput: rawPhoneNumber,
-        afterCleaning: phoneNumber
-      }
-    })
-    
+    const phoneNumber = payload.data.key.remoteJid.split('@')[0]
     const messageId = payload.data.key.id
     const messageContent = payload.data.message.conversation || payload.data.message.text || ''
 
@@ -116,21 +75,15 @@ serve(async (req) => {
       throw instanceError
     }
 
-    console.log('📝 Saving contact:', {
-      phoneNumber,
-      instanceId: instance.id,
-      tableName: 'users_clientes'
-    })
-
     // Atualiza o último tempo de mensagem do cliente
     const { error: clientError } = await supabaseClient
-      .from('users_clientes')
+      .from('Users_clientes')
       .upsert({
-        telefoneclientes: phoneNumber,
-        nomedaempresa: instance.id,
+        TelefoneClientes: phoneNumber,
+        NomeDaEmpresa: instance.id,
         last_message_time: new Date().toISOString()
       }, {
-        onConflict: 'telefoneclientes'
+        onConflict: 'TelefoneClientes'
       })
 
     if (clientError) {
