@@ -7,13 +7,13 @@ on:
 
 concurrency:
   group: follow-up-processing
-  cancel-in-progress: true
+  cancel-in-progress: false # Changed to false to allow multiple runs
 
 jobs:
   process-follow-ups:
     name: Process Follow-ups
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 15    # Increased timeout to handle multiple messages
     
     steps:
       - name: Process Follow-ups
@@ -29,12 +29,18 @@ jobs:
             exit 1
           fi
           
+          # Make request with additional parameters to ensure all messages are processed
           curl -X POST \
             'https://vodexhppkasbulogmcqb.supabase.co/functions/v1/get-follow-up-contacts' \
             -H "Authorization: Bearer ${SUPABASE_KEY}" \
             -H "Content-Type: application/json" \
             -H "apikey: ${SUPABASE_KEY}" \
-            --data-raw "{\"scheduled\":true, \"source\":\"github-action\", \"timestamp\":\"${timestamp}\"}" \
+            --data-raw "{
+              \"scheduled\":true, 
+              \"source\":\"github-action\", 
+              \"timestamp\":\"${timestamp}\",
+              \"process_all_messages\": true
+            }" \
             --fail \
             --show-error \
             || {
