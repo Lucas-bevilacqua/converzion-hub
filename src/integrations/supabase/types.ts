@@ -888,6 +888,12 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: undefined
       }
+      is_valid_phone_number: {
+        Args: {
+          phone: string
+        }
+        Returns: boolean
+      }
       log_comprehensive_test: {
         Args: Record<PropertyKey, never>
         Returns: undefined
