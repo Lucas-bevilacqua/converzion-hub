@@ -11,6 +11,26 @@ const supabaseClient = createClient(
   SUPABASE_SERVICE_ROLE_KEY!
 )
 
+function cleanPhoneNumber(remoteJid: string): string {
+  console.log('📱 Original remoteJid:', remoteJid)
+  
+  // Extrai apenas o número antes do @
+  const rawNumber = remoteJid.split('@')[0]
+  console.log('📱 Número extraído antes do @:', rawNumber)
+  
+  // Remove caracteres não numéricos
+  let cleanNumber = rawNumber.replace(/\D/g, '')
+  console.log('📱 Número após remover não-numéricos:', cleanNumber)
+
+  // Se começar com 55 e tiver mais de 12 dígitos, remove o primeiro 55
+  if (cleanNumber.startsWith('55') && cleanNumber.length > 12) {
+    cleanNumber = cleanNumber.substring(2)
+    console.log('📱 Número após remover 55 inicial:', cleanNumber)
+  }
+
+  return cleanNumber
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -39,9 +59,16 @@ serve(async (req) => {
     }
 
     const instanceName = payload.instance
-    const phoneNumber = payload.data.key.remoteJid.split('@')[0]
+    const phoneNumber = cleanPhoneNumber(payload.data.key.remoteJid)
     const messageId = payload.data.key.id
     const messageContent = payload.data.message.conversation || payload.data.message.text || ''
+
+    console.log('📱 Processando mensagem:', {
+      instanceName,
+      phoneNumber,
+      messageId,
+      messageContent: messageContent.substring(0, 50) + '...'
+    })
 
     if (!instanceName) {
       console.error('❌ Instance name not found in webhook payload')
