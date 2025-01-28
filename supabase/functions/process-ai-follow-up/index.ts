@@ -61,6 +61,7 @@ serve(async (req) => {
       .order('created_at')
 
     if (followUpsError) {
+      console.error('❌ [ERROR] Error fetching follow-ups:', followUpsError)
       throw followUpsError
     }
 
@@ -82,33 +83,22 @@ serve(async (req) => {
             .select('*')
             .eq('follow_up_id', followUp.id)
             .eq('status', 'pending')
-            .is('sent_at', null) // Only get contacts that haven't been sent messages
+            .is('sent_at', null)
         })
 
         if (contactsError) {
+          console.error('❌ [ERROR] Error fetching contacts:', contactsError)
           throw contactsError
         }
 
-        console.log(`✅ [DEBUG] Found ${contacts?.length || 0} contacts to process`)
+        console.log(`✅ [DEBUG] Found ${contacts?.length || 0} contacts to process for follow-up ${followUp.id}`)
 
         // Process each contact
         for (const contact of contacts || []) {
           try {
             console.log(`🔄 [DEBUG] Processing contact:`, contact)
 
-            // Check if contact has already replied or has been processed
-            const { data: contactStatus } = await supabaseClient
-              .from('follow_up_contacts')
-              .select('reply_at, sent_at')
-              .eq('id', contact.id)
-              .single()
-
-            if (contactStatus?.reply_at || contactStatus?.sent_at) {
-              console.log(`⚠️ [DEBUG] Contact ${contact.id} has already been processed or replied, skipping`)
-              continue
-            }
-
-            // Generate AI message
+            // Generate AI message using system prompt from instance
             const openAiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
               method: 'POST',
               headers: {
@@ -120,11 +110,12 @@ serve(async (req) => {
                 messages: [
                   { 
                     role: 'system', 
-                    content: followUp.settings?.system_prompt || "You are a helpful assistant that generates natural follow-up messages." 
+                    content: followUp.instance.system_prompt || "Você é um assistente que gera mensagens de follow-up naturais e amigáveis." 
                   },
                   { 
                     role: 'user', 
-                    content: 'Please generate an appropriate follow-up message for this conversation.' 
+                    content: `Por favor, gere uma mensagem de follow-up apropriada para ${contact.metadata?.contact_name || 'o cliente'}. 
+                             A última interação foi em ${new Date(contact.metadata?.last_message_time || '').toLocaleString()}.` 
                   }
                 ],
                 temperature: 0.7,
@@ -133,11 +124,14 @@ serve(async (req) => {
 
             if (!openAiResponse.ok) {
               const errorText = await openAiResponse.text()
+              console.error('❌ [ERROR] OpenAI error:', errorText)
               throw new Error(`OpenAI error: ${errorText}`)
             }
 
             const aiData = await openAiResponse.json()
             const message = aiData.choices[0].message.content
+
+            console.log(`✅ [DEBUG] Generated AI message:`, message)
 
             // Send message through Evolution API
             const evolutionApiUrl = (Deno.env.get('EVOLUTION_API_URL') || '').replace(/\/+$/, '')
@@ -162,10 +156,12 @@ serve(async (req) => {
             })
 
             if (!response.ok) {
-              throw new Error(`Evolution API error: ${await response.text()}`)
+              const errorText = await response.text()
+              console.error('❌ [ERROR] Evolution API error:', errorText)
+              throw new Error(`Evolution API error: ${errorText}`)
             }
 
-            // Update contact status with sent_at timestamp
+            // Update contact status
             const { error: updateError } = await supabaseClient
               .from('follow_up_contacts')
               .update({ 
@@ -175,15 +171,11 @@ serve(async (req) => {
               .eq('id', contact.id)
 
             if (updateError) {
-              throw new Error(`Failed to update contact status: ${updateError.message}`)
+              console.error('❌ [ERROR] Error updating contact:', updateError)
+              throw updateError
             }
 
-            // Add delay before next message if configured
-            const delayMinutes = followUp.settings?.delay_minutes || 60
-            if (delayMinutes > 0) {
-              console.log(`⏳ [DEBUG] Waiting ${delayMinutes} minutes before next message`)
-              await sleep(delayMinutes * 60 * 1000)
-            }
+            console.log(`✅ [DEBUG] Successfully processed contact ${contact.id}`)
 
             results.push({
               followUpId: followUp.id,
@@ -192,7 +184,7 @@ serve(async (req) => {
             })
 
           } catch (error) {
-            console.error(`❌ [DEBUG] Error processing contact ${contact.id}:`, error)
+            console.error(`❌ [ERROR] Error processing contact ${contact.id}:`, error)
             results.push({
               followUpId: followUp.id,
               contactId: contact.id,
@@ -202,7 +194,7 @@ serve(async (req) => {
           }
         }
 
-        // Update follow-up status if all contacts processed
+        // Check if all contacts have been processed
         const { data: pendingContacts } = await supabaseClient
           .from('follow_up_contacts')
           .select('id')
@@ -211,6 +203,7 @@ serve(async (req) => {
           .is('sent_at', null)
 
         if (!pendingContacts?.length) {
+          // Update follow-up status to completed
           const { error: updateError } = await supabaseClient
             .from('follow_ups')
             .update({ 
@@ -220,12 +213,15 @@ serve(async (req) => {
             .eq('id', followUp.id)
 
           if (updateError) {
-            throw new Error(`Failed to update follow-up status: ${updateError.message}`)
+            console.error('❌ [ERROR] Error updating follow-up status:', updateError)
+            throw updateError
           }
+
+          console.log(`✅ [DEBUG] Follow-up ${followUp.id} completed successfully`)
         }
 
       } catch (error) {
-        console.error(`❌ [DEBUG] Error processing follow-up ${followUp.id}:`, error)
+        console.error(`❌ [ERROR] Error processing follow-up ${followUp.id}:`, error)
         results.push({
           followUpId: followUp.id,
           status: 'error',
@@ -249,7 +245,7 @@ serve(async (req) => {
     )
 
   } catch (error) {
-    console.error(`❌ [DEBUG] Fatal error:`, error)
+    console.error(`❌ [ERROR] Fatal error:`, error)
     return new Response(
       JSON.stringify({ 
         success: false, 
