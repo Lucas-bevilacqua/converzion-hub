@@ -19,7 +19,7 @@ function formatPhoneNumber(phone: string | null): string | null {
     return null
   }
 
-  // Get only numbers
+  // Remove all non-numeric characters
   let cleaned = phone.replace(/\D/g, '')
   
   console.log(`🔍 Original number: ${phone}`)
@@ -40,6 +40,13 @@ function formatPhoneNumber(phone: string | null): string | null {
   // Check if has correct length after formatting
   if (cleaned.length < 12 || cleaned.length > 13) {
     console.log(`⚠️ Invalid number length after formatting: ${cleaned.length} digits`)
+    return null
+  }
+
+  // Validate DDD (must be between 11 and 99)
+  const ddd = parseInt(cleaned.substring(2, 4))
+  if (ddd < 11 || ddd > 99) {
+    console.log(`⚠️ Invalid DDD: ${ddd}`)
     return null
   }
 
