@@ -142,13 +142,20 @@ serve(async (req) => {
 
             console.log(`✅ [DEBUG] Generated AI message:`, message)
 
+            // Format phone number for Evolution API
+            let phoneNumber = contact.phone
+            if (phoneNumber.startsWith('55')) {
+              phoneNumber = phoneNumber.substring(2)
+            }
+            console.log(`📱 [DEBUG] Formatted phone number:`, phoneNumber)
+
             // Send message through Evolution API
             const evolutionApiUrl = (Deno.env.get('EVOLUTION_API_URL') || '').replace(/\/+$/, '')
             const evolutionApiEndpoint = `${evolutionApiUrl}/message/sendText/${followUp.instance.name}`
 
             console.log(`📤 [DEBUG] Sending to Evolution API:`, {
               endpoint: evolutionApiEndpoint,
-              phone: contact.phone,
+              phone: phoneNumber,
               message: message
             })
 
@@ -159,8 +166,14 @@ serve(async (req) => {
                 'apikey': Deno.env.get('EVOLUTION_API_KEY') || '',
               },
               body: JSON.stringify({
-                number: contact.phone,
-                text: message
+                number: phoneNumber,
+                options: {
+                  delay: 1200,
+                  presence: "composing"
+                },
+                textMessage: {
+                  text: message
+                }
               })
             })
 
