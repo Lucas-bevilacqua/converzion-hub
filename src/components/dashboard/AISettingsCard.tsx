@@ -58,7 +58,7 @@ export function AISettingsCard() {
         console.log('AI settings found:', data)
         const aiSettings: AISettings = {
           system_prompt: data?.system_prompt,
-          settings: data?.settings || {
+          settings: (data?.settings as { delay_minutes: number; max_retries: number; }) || {
             delay_minutes: 5,
             max_retries: 3
           }
