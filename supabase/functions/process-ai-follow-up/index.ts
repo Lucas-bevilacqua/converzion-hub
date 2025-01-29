@@ -1,4 +1,3 @@
-import "https://deno.land/x/xhr@0.1.0/mod.ts"
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
@@ -71,6 +70,12 @@ serve(async (req) => {
 
     for (const followUp of followUps || []) {
       try {
+        console.log(`🔄 [DEBUG] Processing follow-up ${followUp.id}:`, {
+          type: followUp.type,
+          instanceStatus: followUp.instance?.connection_status,
+          settings: followUp.settings
+        })
+
         if (!followUp.instance?.connection_status?.toLowerCase().includes('connected')) {
           console.log(`⚠️ [DEBUG] Instance ${followUp.instance?.name} is not connected, skipping`)
           continue
@@ -96,7 +101,11 @@ serve(async (req) => {
         // Process each contact
         for (const contact of contacts || []) {
           try {
-            console.log(`🔄 [DEBUG] Processing contact:`, contact)
+            console.log(`🔄 [DEBUG] Processing contact:`, {
+              id: contact.id,
+              phone: contact.phone,
+              metadata: contact.metadata
+            })
 
             // Generate AI message using system prompt from instance
             const openAiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -106,7 +115,7 @@ serve(async (req) => {
                 'Content-Type': 'application/json',
               },
               body: JSON.stringify({
-                model: 'gpt-4o-mini',
+                model: 'gpt-4',
                 messages: [
                   { 
                     role: 'system', 
@@ -160,6 +169,9 @@ serve(async (req) => {
               console.error('❌ [ERROR] Evolution API error:', errorText)
               throw new Error(`Evolution API error: ${errorText}`)
             }
+
+            const evolutionResponse = await response.json()
+            console.log('✅ [DEBUG] Evolution API response:', evolutionResponse)
 
             // Update contact status
             const { error: updateError } = await supabaseClient
