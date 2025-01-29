@@ -9,94 +9,6 @@ interface TimingMetrics {
   totalTime?: number;
 }
 
-function decodeHexPhone(phone: string): string {
-  try {
-    // Remove o prefixo 3E se existir
-    const cleanHex = phone.replace(/^3E/, '');
-    
-    // Convert each pair of hex characters to a number
-    let result = '';
-    for (let i = 0; i < Math.min(cleanHex.length, 24); i += 2) {
-      const byte = parseInt(cleanHex.substr(i, 2), 16);
-      // Check if it's a valid number (0-9)
-      if (!isNaN(byte) && byte >= 48 && byte <= 57) {
-        result += String.fromCharCode(byte);
-      }
-    }
-
-    // If result is empty or invalid, try direct numeric extraction
-    if (!result || result.length < 8) {
-      result = cleanHex.replace(/[^0-9]/g, '');
-    }
-
-    // Add country code if missing
-    if (!result.startsWith('55')) {
-      result = '55' + result;
-    }
-
-    // Validate final length
-    if (result.length < 10 || result.length > 13) {
-      console.log('⚠️ Invalid number length:', result.length, 'for number:', result);
-      return '';
-    }
-
-    console.log('✅ Successfully decoded number:', {
-      original: phone,
-      cleaned: cleanHex,
-      result: result
-    });
-
-    return result;
-  } catch (e) {
-    console.error('❌ Error decoding hex:', e);
-    return '';
-  }
-}
-
-function cleanPhoneNumber(phone: string | null): string | null {
-  if (!phone) {
-    console.log('⚠️ Empty or null phone number')
-    return null
-  }
-
-  console.log(`🔍 Original number:`, phone)
-  
-  let cleaned = '';
-  
-  if (/^3[E-F]/.test(phone)) {
-    cleaned = decodeHexPhone(phone);
-    console.log(`🔄 Decoded hex number:`, cleaned);
-  } else {
-    cleaned = phone.replace(/\D/g, '');
-  }
-  
-  console.log(`🧹 Cleaned number:`, cleaned)
-
-  if (cleaned.startsWith('0')) {
-    cleaned = cleaned.substring(1)
-    console.log(`🔄 Removed initial 0:`, cleaned)
-  }
-
-  if (!cleaned.startsWith('55')) {
-    cleaned = `55${cleaned}`
-    console.log(`🔄 Added country code:`, cleaned)
-  }
-
-  if (cleaned.length < 10 || cleaned.length > 13) {
-    console.log(`⚠️ Invalid number length after formatting: ${cleaned.length} digits`)
-    return null
-  }
-
-  const ddd = parseInt(cleaned.substring(2, 4))
-  if (ddd < 11 || ddd > 99) {
-    console.log(`⚠️ Invalid DDD: ${ddd}`)
-    return null
-  }
-
-  console.log(`✅ Number formatted successfully:`, cleaned)
-  return cleaned
-}
-
 serve(async (req) => {
   const metrics: TimingMetrics = {
     startTime: Date.now()
@@ -130,7 +42,7 @@ serve(async (req) => {
         )
       `)
       .eq('settings->is_active', true)
-      .in('status', ['pending'])
+      .in('status', ['pending', 'in_progress'])
       .order('created_at', { ascending: false })
 
     if (followUpsError) {
@@ -189,29 +101,52 @@ serve(async (req) => {
           throw contactsError
         }
 
-        console.log(`🔍 Raw contact data for follow-up ${followUp.id}:`, contacts)
+        console.log(`🔍 Found ${contacts?.length || 0} potential contacts for follow-up ${followUp.id}`)
         
-        const validContacts = (contacts || [])
+        if (!contacts || contacts.length === 0) {
+          console.log(`ℹ️ No eligible contacts found for follow-up ${followUp.id}`)
+          return {
+            followUpId: followUp.id,
+            status: 'success',
+            type: followUp.type,
+            contacts: 0,
+            processingTime: Date.now() - followUpStartTime
+          }
+        }
+
+        // Get existing contacts to avoid duplicates
+        const { data: existingContacts, error: existingError } = await supabase
+          .from('follow_up_contacts')
+          .select('phone')
+          .eq('follow_up_id', followUp.id)
+
+        if (existingError) {
+          console.error(`❌ Error fetching existing contacts:`, existingError)
+          throw existingError
+        }
+
+        const existingPhones = new Set(existingContacts?.map(c => c.phone) || [])
+        
+        const validContacts = contacts
           .filter(contact => {
             if (!contact?.telefoneclientes || !contact?.last_message_time) {
               console.log('⚠️ Invalid contact - Missing required data:', contact)
               return false
             }
 
-            const formattedPhone = cleanPhoneNumber(contact.telefoneclientes)
-            if (!formattedPhone) {
-              console.log(`⚠️ Contact ignored - Invalid number: ${contact.telefoneclientes}`)
+            // Skip if already processed
+            if (existingPhones.has(contact.telefoneclientes)) {
+              console.log(`⚠️ Contact already processed: ${contact.telefoneclientes}`)
               return false
             }
 
-            contact.telefoneclientes = formattedPhone
             return true
           })
 
-        console.log(`✅ Filtered and formatted ${validContacts.length} valid contacts`)
+        console.log(`✅ Found ${validContacts.length} new valid contacts to process`)
 
         if (validContacts.length > 0) {
-          console.log(`🔄 Trying to insert ${validContacts.length} contacts for follow-up ${followUp.id}`)
+          console.log(`🔄 Inserting ${validContacts.length} contacts for follow-up ${followUp.id}`)
           
           const contactsToInsert = validContacts.map(contact => ({
             follow_up_id: followUp.id,
@@ -224,8 +159,6 @@ serve(async (req) => {
               original_phone: contact.telefoneclientes
             }
           }))
-
-          console.log(`📝 Contacts to be inserted:`, contactsToInsert)
 
           const { error: insertError } = await supabase
             .from('follow_up_contacts')
@@ -272,8 +205,6 @@ serve(async (req) => {
           } else {
             console.log(`📤 Manual follow-up ${followUp.id} ready for processing`)
           }
-        } else {
-          console.log(`ℹ️ No valid contacts found for follow-up ${followUp.id}`)
         }
 
         const followUpProcessingTime = Date.now() - followUpStartTime
