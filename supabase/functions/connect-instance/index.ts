@@ -93,8 +93,31 @@ serve(async (req) => {
     console.log('Evolution API Base URL:', baseUrl)
     console.log('Instance Name:', instanceName)
 
-    // Generate QR Code
-    const qrResponse = await fetch(`${baseUrl}/instance/qrcode/${instanceName}`, {
+    // First create the instance in Evolution API
+    const createInstanceResponse = await fetch(`${baseUrl}/instance/create`, {
+      method: 'POST',
+      headers: {
+        'apikey': evolutionApiKey,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        instanceName: instance.name,
+        qrcode: true,
+        number: instance.phone_number
+      })
+    })
+
+    if (!createInstanceResponse.ok) {
+      const errorText = await createInstanceResponse.text()
+      console.error('Evolution API instance creation error:', errorText)
+      throw new Error(`Failed to create instance: ${errorText}`)
+    }
+
+    const createInstanceData = await createInstanceResponse.json()
+    console.log('Instance created in Evolution API:', createInstanceData)
+
+    // Now get the QR code
+    const qrResponse = await fetch(`${baseUrl}/instance/qr/${instanceName}`, {
       method: 'GET',
       headers: {
         'apikey': evolutionApiKey,
