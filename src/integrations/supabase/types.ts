@@ -276,6 +276,59 @@ export type Database = {
             foreignKeyName: "follow_up_contacts_follow_up_id_fkey"
             columns: ["follow_up_id"]
             isOneToOne: false
+            referencedRelation: "follow_up_analytics"
+            referencedColumns: ["follow_up_id"]
+          },
+          {
+            foreignKeyName: "follow_up_contacts_follow_up_id_fkey"
+            columns: ["follow_up_id"]
+            isOneToOne: false
+            referencedRelation: "follow_ups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      follow_up_logs: {
+        Row: {
+          created_at: string | null
+          details: Json | null
+          event_type: string
+          follow_up_id: string | null
+          id: string
+        }
+        Insert: {
+          created_at?: string | null
+          details?: Json | null
+          event_type: string
+          follow_up_id?: string | null
+          id?: string
+        }
+        Update: {
+          created_at?: string | null
+          details?: Json | null
+          event_type?: string
+          follow_up_id?: string | null
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "follow_up_logs_follow_up_id_fkey"
+            columns: ["follow_up_id"]
+            isOneToOne: false
+            referencedRelation: "follow_up_analysis"
+            referencedColumns: ["follow_up_id"]
+          },
+          {
+            foreignKeyName: "follow_up_logs_follow_up_id_fkey"
+            columns: ["follow_up_id"]
+            isOneToOne: false
+            referencedRelation: "follow_up_analytics"
+            referencedColumns: ["follow_up_id"]
+          },
+          {
+            foreignKeyName: "follow_up_logs_follow_up_id_fkey"
+            columns: ["follow_up_id"]
+            isOneToOne: false
             referencedRelation: "follow_ups"
             referencedColumns: ["id"]
           },
@@ -315,6 +368,13 @@ export type Database = {
             columns: ["follow_up_id"]
             isOneToOne: false
             referencedRelation: "follow_up_analysis"
+            referencedColumns: ["follow_up_id"]
+          },
+          {
+            foreignKeyName: "follow_up_messages_follow_up_id_fkey"
+            columns: ["follow_up_id"]
+            isOneToOne: false
+            referencedRelation: "follow_up_analytics"
             referencedColumns: ["follow_up_id"]
           },
           {
@@ -755,6 +815,23 @@ export type Database = {
           },
         ]
       }
+      follow_up_analytics: {
+        Row: {
+          completed_at: string | null
+          created_at: string | null
+          follow_up_id: string | null
+          instance_name: string | null
+          instance_status: string | null
+          last_message_sent: string | null
+          pending_contacts: number | null
+          scheduled_for: string | null
+          sent_contacts: number | null
+          status: string | null
+          total_contacts: number | null
+          type: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       bytea_to_text: {
@@ -952,6 +1029,14 @@ export type Database = {
       }
       log_endpoint_test_result: {
         Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
+      log_follow_up_event: {
+        Args: {
+          p_follow_up_id: string
+          p_event_type: string
+          p_details?: Json
+        }
         Returns: undefined
       }
       log_follow_up_job_execution: {
