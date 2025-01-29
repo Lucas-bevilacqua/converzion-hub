@@ -10,6 +10,14 @@ import { useAuth } from "@/contexts/auth/AuthContext"
 import { useState, useEffect } from "react"
 import { useToast } from "@/components/ui/use-toast"
 
+interface AISettings {
+  settings: {
+    delay_minutes: number;
+    max_retries: number;
+  };
+  system_prompt: string | null;
+}
+
 export function AISettingsCard() {
   const { user } = useAuth()
   const { toast } = useToast()
@@ -35,7 +43,7 @@ export function AISettingsCard() {
         }
 
         console.log('AI settings found:', data)
-        return data
+        return data as AISettings
       } catch (error) {
         console.error('Error in AI settings query:', error)
         throw error
