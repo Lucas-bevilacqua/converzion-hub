@@ -29,7 +29,7 @@ export function InstanceSlotCard({
   const { toast } = useToast()
   const { user } = useAuth()
 
-  // Query for instance state and QR code
+  // Query for instance state and QR code with automatic refetch when QR dialog is open
   const { data: instanceData, isLoading: isLoadingInstance, refetch: refetchInstance } = useQuery({
     queryKey: ['instance-data', instance?.id],
     queryFn: async () => {
@@ -39,6 +39,7 @@ export function InstanceSlotCard({
       }
 
       try {
+        console.log('Fetching instance data for:', instance.id)
         const { data: instanceData, error: instanceError } = await supabase
           .from('evolution_instances')
           .select('*')
@@ -51,6 +52,7 @@ export function InstanceSlotCard({
           return null
         }
 
+        console.log('Instance data fetched:', instanceData)
         return instanceData
       } catch (error) {
         console.error('Error in instance query:', error)
@@ -250,7 +252,7 @@ export function InstanceSlotCard({
             <QRCodeDialog
               open={showQRCode}
               onOpenChange={setShowQRCode}
-              qrCode={instance.qr_code || null}
+              qrCode={instanceData?.qr_code || null}
             />
           </Dialog>
 
