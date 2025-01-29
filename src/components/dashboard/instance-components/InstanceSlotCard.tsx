@@ -29,14 +29,15 @@ export function InstanceSlotCard({
   const { toast } = useToast()
   const { user } = useAuth()
 
-  const { data: stateData, isLoading: isLoadingState, refetch: refetchState } = useQuery({
-    queryKey: ['instance-state', instance?.id],
+  // Query for instance state and QR code
+  const { data: instanceData, isLoading: isLoadingInstance, refetch: refetchInstance } = useQuery({
+    queryKey: ['instance-data', instance?.id],
     queryFn: async () => {
       if (!instance?.id || !user) {
-        console.log('Usuário não autenticado ou instância não encontrada')
+        console.log('No instance or user found')
         return null
       }
-      
+
       try {
         const { data: instanceData, error: instanceError } = await supabase
           .from('evolution_instances')
@@ -46,22 +47,41 @@ export function InstanceSlotCard({
           .single()
 
         if (instanceError) {
-          console.error('Erro ao verificar instância:', instanceError)
+          console.error('Error fetching instance:', instanceError)
           return null
         }
 
-        console.log('Verificando estado para instância:', instance.name)
+        return instanceData
+      } catch (error) {
+        console.error('Error in instance query:', error)
+        return null
+      }
+    },
+    enabled: !!instance?.id && !!user?.id,
+    refetchInterval: showQRCode ? 15000 : false // Only refetch every 15s when QR dialog is open
+  })
+
+  const { data: stateData, isLoading: isLoadingState } = useQuery({
+    queryKey: ['instance-state', instance?.id],
+    queryFn: async () => {
+      if (!instance?.id || !user) {
+        console.log('User not authenticated or instance not found')
+        return null
+      }
+      
+      try {
+        console.log('Checking state for instance:', instance.name)
         
         const { data, error } = await supabase.functions.invoke('check-instance-state', {
           body: { instanceId: instance.id }
         })
 
         if (error) {
-          console.error('Erro ao verificar estado:', error)
+          console.error('Error checking state:', error)
           throw error
         }
 
-        // Atualizar o status no banco de dados
+        // Update status in database
         if (data?.state === 'connected' || data?.instance?.instance?.state === 'open') {
           const { error: updateError } = await supabase
             .from('evolution_instances')
@@ -72,9 +92,9 @@ export function InstanceSlotCard({
             .eq('id', instance.id)
 
           if (updateError) {
-            console.error('Erro ao atualizar status no banco:', updateError)
+            console.error('Error updating status in database:', updateError)
           } else {
-            console.log('Status atualizado no banco para connected')
+            console.log('Status updated in database to connected')
           }
         } else if (data?.state === 'disconnected') {
           const { error: updateError } = await supabase
@@ -86,16 +106,16 @@ export function InstanceSlotCard({
             .eq('id', instance.id)
 
           if (updateError) {
-            console.error('Erro ao atualizar status no banco:', updateError)
+            console.error('Error updating status in database:', updateError)
           } else {
-            console.log('Status atualizado no banco para disconnected')
+            console.log('Status updated in database to disconnected')
           }
         }
 
-        console.log('Estado recebido da API:', data)
+        console.log('State received from API:', data)
         return data
       } catch (error) {
-        console.error('Erro ao verificar estado:', error)
+        console.error('Error checking state:', error)
         toast({
           title: "Erro",
           description: "Falha ao verificar estado da instância. Tente novamente.",
@@ -112,7 +132,7 @@ export function InstanceSlotCard({
     staleTime: 0
   })
 
-  // Add QR code refresh functionality
+  // Effect to handle QR code refresh
   useEffect(() => {
     let intervalId: NodeJS.Timeout | null = null;
 
@@ -124,8 +144,6 @@ export function InstanceSlotCard({
       intervalId = setInterval(() => {
         console.log('Refreshing QR code for instance:', instance.id);
         handleConnect();
-        // Refetch instance data to get the new QR code
-        refetchState();
       }, 15000); // 15 seconds
     }
 
@@ -153,7 +171,7 @@ export function InstanceSlotCard({
     }
 
     try {
-      console.log('Iniciando conexão para instância:', instance?.id)
+      console.log('Starting connection for instance:', instance?.id)
       
       const { data, error } = await supabase.functions.invoke('connect-instance', {
         body: { instanceId: instance?.id }
@@ -161,10 +179,10 @@ export function InstanceSlotCard({
 
       if (error) throw error
 
-      console.log('QR Code gerado com sucesso:', data)
+      console.log('QR Code generated successfully:', data)
 
       // Refetch instance data to get the new QR code
-      await refetchState()
+      await refetchInstance()
 
       toast({
         title: "Sucesso",
@@ -173,7 +191,7 @@ export function InstanceSlotCard({
 
       setShowQRCode(true)
     } catch (error) {
-      console.error('Erro ao conectar:', error)
+      console.error('Error connecting:', error)
       toast({
         title: "Erro",
         description: error instanceof Error ? error.message : "Erro ao conectar instância",
