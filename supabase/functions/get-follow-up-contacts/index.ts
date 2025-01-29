@@ -130,7 +130,7 @@ serve(async (req) => {
         )
       `)
       .eq('settings->is_active', true)
-      .in('status', ['pending', 'in_progress'])
+      .in('status', ['pending'])
       .order('created_at', { ascending: false })
 
     if (followUpsError) {
@@ -238,7 +238,21 @@ serve(async (req) => {
 
           console.log(`✅ Successfully inserted ${validContacts.length} contacts for follow-up ${followUp.id}`)
 
-          // Directly process AI follow-ups after inserting contacts
+          // Update follow-up status to in_progress
+          const { error: updateError } = await supabase
+            .from('follow_ups')
+            .update({ 
+              status: 'in_progress',
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', followUp.id)
+
+          if (updateError) {
+            console.error(`❌ Error updating follow-up status:`, updateError)
+            throw updateError
+          }
+
+          // Initiate processing based on follow-up type
           if (followUp.type === 'ai') {
             console.log(`🤖 Initiating AI follow-up processing for ${followUp.id}`)
             const processResponse = await supabase.functions.invoke('process-ai-follow-up', {
