@@ -11,15 +11,19 @@ export const useInstanceMutations = () => {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`
         },
-        body: JSON.stringify(data)
+        body: JSON.stringify({
+          ...data,
+          userId: (await supabase.auth.getSession()).data.session?.user.id
+        })
       })
 
+      const responseData = await response.json()
+      
       if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.message || 'Failed to create instance')
+        throw new Error(responseData.error || 'Failed to create instance')
       }
 
-      return response.json()
+      return responseData
     }
   })
 

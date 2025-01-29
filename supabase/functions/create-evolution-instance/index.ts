@@ -6,11 +6,6 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-const EVOLUTION_API_URL = Deno.env.get('EVOLUTION_API_URL')
-const EVOLUTION_API_KEY = Deno.env.get('EVOLUTION_API_KEY')
-const SUPABASE_URL = Deno.env.get('SUPABASE_URL')
-const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
-
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
@@ -25,7 +20,7 @@ serve(async (req) => {
     }
 
     // Clean the base URL by removing trailing slashes
-    const cleanBaseUrl = EVOLUTION_API_URL?.replace(/\/+$/, '')
+    const cleanBaseUrl = Deno.env.get('EVOLUTION_API_URL')?.replace(/\/+$/, '')
     console.log('Clean base URL:', cleanBaseUrl)
 
     // Create instance in Evolution API
@@ -33,13 +28,13 @@ serve(async (req) => {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'apikey': EVOLUTION_API_KEY
+        'apikey': Deno.env.get('EVOLUTION_API_KEY') || ''
       },
       body: JSON.stringify({
         instanceName: name,
         qrcode: true,
         number: phone_number,
-        token: EVOLUTION_API_KEY,
+        token: Deno.env.get('EVOLUTION_API_KEY'),
         integration: "WHATSAPP-BAILEYS"
       })
     })
@@ -53,9 +48,12 @@ serve(async (req) => {
     const instanceData = await createInstanceResponse.json()
     console.log('Instance created successfully:', instanceData)
 
-    // Create instance in Supabase
-    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+    // Create Supabase client
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+    const supabase = createClient(supabaseUrl, supabaseKey)
     
+    // Create instance in Supabase
     const { data: instance, error: dbError } = await supabase
       .from('evolution_instances')
       .insert({
@@ -76,7 +74,12 @@ serve(async (req) => {
 
     return new Response(
       JSON.stringify(instance),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { 
+        headers: { 
+          ...corsHeaders, 
+          'Content-Type': 'application/json'
+        } 
+      }
     )
   } catch (error) {
     console.error('Error in create-evolution-instance:', error)
@@ -84,7 +87,10 @@ serve(async (req) => {
       JSON.stringify({ error: error.message }),
       { 
         status: 400, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        headers: { 
+          ...corsHeaders, 
+          'Content-Type': 'application/json'
+        } 
       }
     )
   }
