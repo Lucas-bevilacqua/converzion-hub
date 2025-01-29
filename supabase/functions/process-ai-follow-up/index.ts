@@ -6,27 +6,11 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-const MAX_RETRIES = 3
-const INITIAL_DELAY = 1000
+const MAX_RETRIES = 3;
+const INITIAL_DELAY = 1000;
+const MIN_DELAY_MINUTES = 5;
 
-const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
-
-async function retryOperation<T>(
-  operation: () => Promise<T>,
-  retries: number = MAX_RETRIES,
-  delay: number = INITIAL_DELAY
-): Promise<T> {
-  try {
-    return await operation()
-  } catch (error) {
-    if (retries > 0) {
-      console.log(`🔄 [DEBUG] Retrying operation, ${retries} attempts remaining, waiting ${delay}ms`)
-      await sleep(delay)
-      return retryOperation(operation, retries - 1, delay * 2)
-    }
-    throw error
-  }
-}
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 serve(async (req) => {
   const executionId = crypto.randomUUID()
@@ -82,14 +66,14 @@ serve(async (req) => {
         }
 
         // Get eligible contacts that haven't been processed yet
-        const { data: contacts, error: contactsError } = await retryOperation(async () => {
-          return await supabaseClient
-            .from('follow_up_contacts')
-            .select('*')
-            .eq('follow_up_id', followUp.id)
-            .eq('status', 'pending')
-            .is('sent_at', null)
-        })
+        const { data: contacts, error: contactsError } = await supabaseClient
+          .from('follow_up_contacts')
+          .select('*')
+          .eq('follow_up_id', followUp.id)
+          .eq('status', 'pending')
+          .is('sent_at', null)
+          .order('created_at')
+          .limit(10) // Process in batches
 
         if (contactsError) {
           console.error('❌ [ERROR] Error fetching contacts:', contactsError)
@@ -98,124 +82,139 @@ serve(async (req) => {
 
         console.log(`✅ [DEBUG] Found ${contacts?.length || 0} contacts to process for follow-up ${followUp.id}`)
 
-        // Process each contact
+        // Process each contact with retries
         for (const contact of contacts || []) {
-          try {
-            console.log(`🔄 [DEBUG] Processing contact:`, {
-              id: contact.id,
-              phone: contact.phone,
-              metadata: contact.metadata
-            })
+          let retries = MAX_RETRIES;
+          let delay = INITIAL_DELAY;
+          let success = false;
 
-            // Generate AI message using system prompt from instance
-            const openAiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
-              method: 'POST',
-              headers: {
-                'Authorization': `Bearer ${Deno.env.get('OPENAI_API_KEY')}`,
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                model: 'gpt-4',
-                messages: [
-                  { 
-                    role: 'system', 
-                    content: followUp.instance.system_prompt || "Você é um assistente que gera mensagens de follow-up naturais e amigáveis." 
-                  },
-                  { 
-                    role: 'user', 
-                    content: `Por favor, gere uma mensagem de follow-up apropriada para ${contact.metadata?.contact_name || 'o cliente'}. 
-                             A última interação foi em ${new Date(contact.metadata?.last_message_time || '').toLocaleString()}.` 
-                  }
-                ],
-                temperature: 0.7,
-              }),
-            })
+          while (retries > 0 && !success) {
+            try {
+              console.log(`🔄 [DEBUG] Processing contact (Attempt ${MAX_RETRIES - retries + 1}):`, {
+                id: contact.id,
+                phone: contact.phone,
+                metadata: contact.metadata
+              })
 
-            if (!openAiResponse.ok) {
-              const errorText = await openAiResponse.text()
-              console.error('❌ [ERROR] OpenAI error:', errorText)
-              throw new Error(`OpenAI error: ${errorText}`)
-            }
-
-            const aiData = await openAiResponse.json()
-            const message = aiData.choices[0].message.content
-
-            console.log(`✅ [DEBUG] Generated AI message:`, message)
-
-            // Format phone number for Evolution API
-            let phoneNumber = contact.phone
-            if (phoneNumber.startsWith('55')) {
-              phoneNumber = phoneNumber.substring(2)
-            }
-            console.log(`📱 [DEBUG] Formatted phone number:`, phoneNumber)
-
-            // Send message through Evolution API
-            const evolutionApiUrl = (Deno.env.get('EVOLUTION_API_URL') || '').replace(/\/+$/, '')
-            const evolutionApiEndpoint = `${evolutionApiUrl}/message/sendText/${followUp.instance.name}`
-
-            console.log(`📤 [DEBUG] Sending to Evolution API:`, {
-              endpoint: evolutionApiEndpoint,
-              phone: phoneNumber,
-              message: message
-            })
-
-            const response = await fetch(evolutionApiEndpoint, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'apikey': Deno.env.get('EVOLUTION_API_KEY') || '',
-              },
-              body: JSON.stringify({
-                number: phoneNumber,
-                options: {
-                  delay: 1200,
-                  presence: "composing"
+              // Generate AI message using system prompt from instance
+              const openAiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+                method: 'POST',
+                headers: {
+                  'Authorization': `Bearer ${Deno.env.get('OPENAI_API_KEY')}`,
+                  'Content-Type': 'application/json',
                 },
-                textMessage: {
-                  text: message
-                }
+                body: JSON.stringify({
+                  model: 'gpt-4',
+                  messages: [
+                    { 
+                      role: 'system', 
+                      content: followUp.instance.system_prompt || "Você é um assistente que gera mensagens de follow-up naturais e amigáveis." 
+                    },
+                    { 
+                      role: 'user', 
+                      content: `Por favor, gere uma mensagem de follow-up apropriada para ${contact.metadata?.contact_name || 'o cliente'}. 
+                               A última interação foi em ${new Date(contact.metadata?.last_message_time || '').toLocaleString()}.` 
+                    }
+                  ],
+                  temperature: 0.7,
+                }),
               })
-            })
 
-            if (!response.ok) {
-              const errorText = await response.text()
-              console.error('❌ [ERROR] Evolution API error:', errorText)
-              throw new Error(`Evolution API error: ${errorText}`)
-            }
+              if (!openAiResponse.ok) {
+                const errorText = await openAiResponse.text()
+                console.error('❌ [ERROR] OpenAI error:', errorText)
+                throw new Error(`OpenAI error: ${errorText}`)
+              }
 
-            const evolutionResponse = await response.json()
-            console.log('✅ [DEBUG] Evolution API response:', evolutionResponse)
+              const aiData = await openAiResponse.json()
+              const message = aiData.choices[0].message.content
 
-            // Update contact status
-            const { error: updateError } = await supabaseClient
-              .from('follow_up_contacts')
-              .update({ 
-                status: 'sent',
-                sent_at: new Date().toISOString()
+              console.log(`✅ [DEBUG] Generated AI message:`, message)
+
+              // Send message through Evolution API - mantendo o número com 55
+              const evolutionApiUrl = (Deno.env.get('EVOLUTION_API_URL') || '').replace(/\/+$/, '')
+              const evolutionApiEndpoint = `${evolutionApiUrl}/message/sendText/${followUp.instance.name}`
+
+              console.log(`📱 [DEBUG] Using phone number:`, contact.phone)
+
+              console.log(`📤 [DEBUG] Sending to Evolution API:`, {
+                endpoint: evolutionApiEndpoint,
+                phone: contact.phone,
+                message: message
               })
-              .eq('id', contact.id)
 
-            if (updateError) {
-              console.error('❌ [ERROR] Error updating contact:', updateError)
-              throw updateError
+              const response = await fetch(evolutionApiEndpoint, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'apikey': Deno.env.get('EVOLUTION_API_KEY') || '',
+                },
+                body: JSON.stringify({
+                  number: contact.phone,
+                  options: {
+                    delay: MIN_DELAY_MINUTES * 60 * 1000, // Convertendo minutos para milissegundos
+                    presence: "composing"
+                  },
+                  textMessage: {
+                    text: message
+                  }
+                })
+              })
+
+              if (!response.ok) {
+                const errorText = await response.text()
+                console.error('❌ [ERROR] Evolution API error:', errorText)
+                throw new Error(`Evolution API error: ${errorText}`)
+              }
+
+              const evolutionResponse = await response.json()
+              console.log('✅ [DEBUG] Evolution API response:', evolutionResponse)
+
+              // Update contact status
+              const { error: updateError } = await supabaseClient
+                .from('follow_up_contacts')
+                .update({ 
+                  status: 'sent',
+                  sent_at: new Date().toISOString()
+                })
+                .eq('id', contact.id)
+
+              if (updateError) {
+                console.error('❌ [ERROR] Error updating contact:', updateError)
+                throw updateError
+              }
+
+              console.log(`✅ [DEBUG] Successfully processed contact ${contact.id}`)
+              success = true;
+
+              results.push({
+                followUpId: followUp.id,
+                contactId: contact.id,
+                status: 'success'
+              })
+
+            } catch (error) {
+              console.error(`❌ [ERROR] Error processing contact ${contact.id} (Attempt ${MAX_RETRIES - retries + 1}):`, error)
+              retries--;
+              
+              if (retries > 0) {
+                console.log(`🔄 [DEBUG] Retrying in ${delay}ms...`)
+                await sleep(delay);
+                delay *= 2; // Exponential backoff
+              } else {
+                results.push({
+                  followUpId: followUp.id,
+                  contactId: contact.id,
+                  status: 'error',
+                  error: error.message
+                })
+              }
             }
+          }
 
-            console.log(`✅ [DEBUG] Successfully processed contact ${contact.id}`)
-
-            results.push({
-              followUpId: followUp.id,
-              contactId: contact.id,
-              status: 'success'
-            })
-
-          } catch (error) {
-            console.error(`❌ [ERROR] Error processing contact ${contact.id}:`, error)
-            results.push({
-              followUpId: followUp.id,
-              contactId: contact.id,
-              status: 'error',
-              error: error.message
-            })
+          // Add delay between contacts
+          if (contacts.length > 1) {
+            await sleep(MIN_DELAY_MINUTES * 60 * 1000);
           }
         }
 
