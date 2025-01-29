@@ -136,9 +136,9 @@ serve(async (req) => {
       console.log('Instance created in Evolution API:', createInstanceData)
     }
 
-    // Get QR code
+    // Get QR code using the correct endpoint
     console.log('Fetching QR code for instance')
-    const qrResponse = await fetch(`${baseUrl}/instance/qr/${instanceName}`, {
+    const qrResponse = await fetch(`${baseUrl}/instance/qrcode/${instanceName}`, {
       method: 'GET',
       headers: {
         'apikey': evolutionApiKey,
