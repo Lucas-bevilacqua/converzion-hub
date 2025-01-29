@@ -129,7 +129,8 @@ serve(async (req) => {
           system_prompt
         )
       `)
-      .eq('settings->is_active', true) // Mudança aqui: removido o .in('status', ['pending', 'in_progress'])
+      .eq('settings->is_active', true)
+      .in('status', ['pending', 'in_progress'])
       .order('created_at', { ascending: false })
 
     if (followUpsError) {
@@ -147,7 +148,6 @@ serve(async (req) => {
       - AI Follow-ups: ${aiFollowUps.length}
       - Manual Follow-ups: ${manualFollowUps.length}`)
 
-    // Melhorado o log de status da instância
     followUps?.forEach(followUp => {
       console.log(`🔍 Follow-up ${followUp.id} details:
         - Type: ${followUp.type}
@@ -238,37 +238,28 @@ serve(async (req) => {
 
           console.log(`✅ Successfully inserted ${validContacts.length} contacts for follow-up ${followUp.id}`)
 
-          const processingEndpoint = followUp.type === 'ai' ? 'process-ai-follow-up' : 'process-follow-up'
-          console.log(`🔄 Calling ${processingEndpoint} for follow-up ${followUp.id} of type ${followUp.type}`)
-          
-          const processResponse = await supabase.functions.invoke(processingEndpoint, {
-            body: {
-              followUpId: followUp.id,
-              scheduled: true,
-              systemPrompt: followUp.instance?.system_prompt
-            }
-          })
+          // Directly process AI follow-ups after inserting contacts
+          if (followUp.type === 'ai') {
+            console.log(`🤖 Initiating AI follow-up processing for ${followUp.id}`)
+            const processResponse = await supabase.functions.invoke('process-ai-follow-up', {
+              body: {
+                followUpId: followUp.id,
+                scheduled: true,
+                systemPrompt: followUp.instance?.system_prompt
+              }
+            })
 
-          if (!processResponse.error) {
-            console.log(`✅ Follow-up ${followUp.id} processed successfully`)
+            if (processResponse.error) {
+              console.error(`❌ Error processing AI follow-up ${followUp.id}:`, processResponse.error)
+              throw new Error(`Failed to process AI follow-up: ${processResponse.error.message}`)
+            }
+
+            console.log(`✅ AI follow-up ${followUp.id} initiated successfully`)
           } else {
-            console.error(`❌ Error processing follow-up ${followUp.id}:`, processResponse.error)
-            throw new Error(`Failed to process follow-up: ${processResponse.error.message}`)
+            console.log(`📤 Manual follow-up ${followUp.id} ready for processing`)
           }
         } else {
           console.log(`ℹ️ No valid contacts found for follow-up ${followUp.id}`)
-        }
-
-        if (followUp.status === 'pending') {
-          const { error: updateError } = await supabase
-            .from('follow_ups')
-            .update({ 
-              status: 'in_progress',
-              updated_at: new Date().toISOString()
-            })
-            .eq('id', followUp.id)
-
-          if (updateError) throw updateError
         }
 
         const followUpProcessingTime = Date.now() - followUpStartTime
