@@ -39,28 +39,33 @@ export function MetricsOverview() {
 
       console.log('Raw metrics data:', metricsData)
       
-      // Initialize array with all days
-      const formattedData = []
+      // Initialize array with all days and aggregate metrics by day
+      const dailyMetrics = new Map()
+      
+      // Initialize all days with zero values
       for (let i = 6; i >= 0; i--) {
         const date = subDays(new Date(), i)
         const dateStr = format(date, 'yyyy-MM-dd')
-        
-        // Find all metrics for this day and sum them
-        const dayMetrics = metricsData?.filter(m => 
-          format(new Date(m.created_at), 'yyyy-MM-dd') === dateStr
-        ) || []
-        
-        const messages_sent = dayMetrics.reduce((sum, m) => sum + (m.messages_sent || 0), 0)
-        const messages_received = dayMetrics.reduce((sum, m) => sum + (m.messages_received || 0), 0)
-        
-        formattedData.push({
+        dailyMetrics.set(dateStr, {
           date: format(date, 'dd/MM/yyyy', { locale: ptBR }),
-          messages_sent,
-          messages_received,
-          created_at: date.toISOString(),
+          messages_sent: 0,
+          messages_received: 0,
+          created_at: date.toISOString()
         })
       }
 
+      // Aggregate metrics by day
+      metricsData?.forEach(metric => {
+        const dateStr = format(new Date(metric.created_at), 'yyyy-MM-dd')
+        const existingMetric = dailyMetrics.get(dateStr)
+        
+        if (existingMetric) {
+          existingMetric.messages_sent += (metric.messages_sent || 0)
+          existingMetric.messages_received += (metric.messages_received || 0)
+        }
+      })
+
+      const formattedData = Array.from(dailyMetrics.values())
       console.log('Formatted metrics data:', formattedData)
       return formattedData
     },
@@ -103,8 +108,8 @@ export function MetricsOverview() {
     )
   }
 
-  const totalMessagesSent = metrics?.reduce((acc, curr) => acc + (curr.messages_sent || 0), 0) || 0
-  const totalMessagesReceived = metrics?.reduce((acc, curr) => acc + (curr.messages_received || 0), 0) || 0
+  const totalMessagesSent = metrics?.reduce((acc, curr) => acc + curr.messages_sent, 0) || 0
+  const totalMessagesReceived = metrics?.reduce((acc, curr) => acc + curr.messages_received, 0) || 0
 
   return (
     <Card className="relative overflow-hidden bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
