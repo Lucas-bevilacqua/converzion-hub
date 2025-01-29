@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { supabase } from "@/integrations/supabase/client"
 import { Button } from "@/components/ui/button"
@@ -111,6 +111,29 @@ export function InstanceSlotCard({
     gcTime: 0,
     staleTime: 0
   })
+
+  // Add QR code refresh functionality
+  useEffect(() => {
+    let intervalId: NodeJS.Timeout | null = null;
+
+    if (showQRCode && instance?.id) {
+      // Initial QR code refresh
+      handleConnect();
+
+      // Set up interval for QR code refresh
+      intervalId = setInterval(() => {
+        console.log('Refreshing QR code for instance:', instance.id);
+        handleConnect();
+      }, 15000); // 15 seconds
+    }
+
+    // Cleanup interval on component unmount or when QR code dialog is closed
+    return () => {
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
+    };
+  }, [showQRCode, instance?.id]);
 
   const isConnected = 
     instance?.connection_status === 'connected' ||
