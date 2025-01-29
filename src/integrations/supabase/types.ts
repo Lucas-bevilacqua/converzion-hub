@@ -13,6 +13,7 @@ export type Database = {
         Row: {
           created_at: string
           id: string
+          instance_id: string | null
           settings: Json | null
           system_prompt: string | null
           temperature: number | null
@@ -22,6 +23,7 @@ export type Database = {
         Insert: {
           created_at?: string
           id?: string
+          instance_id?: string | null
           settings?: Json | null
           system_prompt?: string | null
           temperature?: number | null
@@ -31,6 +33,7 @@ export type Database = {
         Update: {
           created_at?: string
           id?: string
+          instance_id?: string | null
           settings?: Json | null
           system_prompt?: string | null
           temperature?: number | null
@@ -38,6 +41,13 @@ export type Database = {
           user_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "ai_settings_instance_id_fkey"
+            columns: ["instance_id"]
+            isOneToOne: false
+            referencedRelation: "evolution_instances"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "ai_settings_user_id_fkey"
             columns: ["user_id"]

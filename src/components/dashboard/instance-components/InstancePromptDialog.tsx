@@ -25,6 +25,13 @@ interface InstancePromptDialogProps {
   currentPrompt?: string | null
 }
 
+interface AISettingsResponse {
+  settings: {
+    delay_minutes: number;
+    max_retries: number;
+  } | null;
+}
+
 export function InstancePromptDialog({
   open,
   onOpenChange,
@@ -56,11 +63,12 @@ export function InstancePromptDialog({
 
         if (error) throw error
 
-        if (data?.settings) {
+        const aiSettings = data as AISettingsResponse | null
+        if (aiSettings?.settings) {
           setValues(prev => ({
             ...prev,
-            delayMinutes: data.settings.delay_minutes || 5,
-            maxRetries: data.settings.max_retries || 3
+            delayMinutes: aiSettings.settings.delay_minutes || 5,
+            maxRetries: aiSettings.settings.max_retries || 3
           }))
         }
       } catch (error) {
