@@ -11,19 +11,14 @@ interface TimingMetrics {
 
 function decodeHexPhone(phone: string): string {
   try {
-    // Remove 3E or 3F prefix if present
     const cleanHex = phone.replace(/^(3E|3F|3[E-F])/, '');
-    
-    // Convert pairs of hex chars to bytes and extract numbers
     let result = '';
     for (let i = 0; i < cleanHex.length; i += 2) {
       const byte = parseInt(cleanHex.substr(i, 2), 16);
-      // Only add if it's a valid number character
-      if (byte >= 48 && byte <= 57) { // ASCII codes for 0-9
+      if (byte >= 48 && byte <= 57) {
         result += String.fromCharCode(byte);
       }
     }
-    
     console.log('🔄 Decoded number:', result);
     return result;
   } catch (e) {
@@ -42,36 +37,30 @@ function cleanPhoneNumber(phone: string | null): string | null {
   
   let cleaned = '';
   
-  // If number starts with 3E or 3F, it's hex encoded
   if (/^3[E-F]/.test(phone)) {
     cleaned = decodeHexPhone(phone);
     console.log(`🔄 Decoded hex number:`, cleaned);
   } else {
-    // Remove all non-numeric characters
     cleaned = phone.replace(/\D/g, '');
   }
   
   console.log(`🧹 Cleaned number:`, cleaned)
 
-  // If starts with 0, remove it
   if (cleaned.startsWith('0')) {
     cleaned = cleaned.substring(1)
     console.log(`🔄 Removed initial 0:`, cleaned)
   }
 
-  // Add country code if doesn't have it
   if (!cleaned.startsWith('55')) {
     cleaned = `55${cleaned}`
     console.log(`🔄 Added country code:`, cleaned)
   }
 
-  // Basic validation - should be 10-13 digits for Brazilian numbers
   if (cleaned.length < 10 || cleaned.length > 13) {
     console.log(`⚠️ Invalid number length after formatting: ${cleaned.length} digits`)
     return null
   }
 
-  // Validate DDD (must be between 11 and 99)
   const ddd = parseInt(cleaned.substring(2, 4))
   if (ddd < 11 || ddd > 99) {
     console.log(`⚠️ Invalid DDD: ${ddd}`)
@@ -99,8 +88,10 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    // Get active follow-ups that are pending or in_progress
     const dbStartTime = Date.now()
+    
+    // Get active follow-ups that are pending or in_progress
+    console.log('🔍 Fetching active follow-ups...')
     const { data: followUps, error: followUpsError } = await supabase
       .from('follow_ups')
       .select(`
@@ -124,11 +115,18 @@ serve(async (req) => {
     metrics.dbFetchTime = Date.now() - dbStartTime
     console.log(`✅ Database fetch completed in ${metrics.dbFetchTime}ms`)
     console.log(`✅ Found ${followUps?.length || 0} follow-ups to process`)
+    
+    // Log follow-ups by type
+    const aiFollowUps = followUps?.filter(f => f.type === 'ai') || []
+    const manualFollowUps = followUps?.filter(f => f.type === 'manual') || []
+    console.log(`📊 Follow-ups breakdown:
+      - AI Follow-ups: ${aiFollowUps.length}
+      - Manual Follow-ups: ${manualFollowUps.length}`)
 
     // Filter connected instances
     const activeFollowUps = followUps?.filter(followUp => {
       const isConnected = followUp.instance?.connection_status?.toLowerCase() === 'connected'
-      console.log(`🔌 Instance ${followUp.instance_id} status: ${followUp.instance?.connection_status}`)
+      console.log(`🔌 Instance ${followUp.instance_id} status: ${followUp.instance?.connection_status} (Type: ${followUp.type})`)
       return isConnected
     }) || []
 
@@ -140,6 +138,8 @@ serve(async (req) => {
     const results = await Promise.all(activeFollowUps.map(async (followUp) => {
       const followUpStartTime = Date.now()
       try {
+        console.log(`🔄 Processing follow-up ${followUp.id} (Type: ${followUp.type})`)
+        
         // Get eligible contacts using the optimized stored procedure
         const { data: contacts, error: contactsError } = await supabase
           .from('users_clientes')
@@ -210,7 +210,8 @@ serve(async (req) => {
           const processResponse = await supabase.functions.invoke(processingEndpoint, {
             body: {
               followUpId: followUp.id,
-              scheduled: true
+              scheduled: true,
+              systemPrompt: followUp.instance?.system_prompt // Adiciona o system_prompt para follow-ups de IA
             }
           })
 
