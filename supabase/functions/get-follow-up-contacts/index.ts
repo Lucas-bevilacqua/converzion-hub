@@ -11,7 +11,7 @@ interface TimingMetrics {
 
 // Function to clean and validate phone number
 function cleanPhoneNumber(phone: string): string | null {
-  console.log('🔄 Cleaning phone number:', phone)
+  console.log('🔄 Original phone:', phone)
   
   if (!phone) {
     console.log('❌ Invalid phone: empty or null')
@@ -29,6 +29,12 @@ function cleanPhoneNumber(phone: string): string | null {
   // Remove any part after : (some numbers come with :1 or :2)
   cleaned = cleaned.split(':')[0]
   console.log('📱 After removing :', cleaned)
+
+  // If it starts with 55 and is too long, remove the first 55
+  if (cleaned.startsWith('55') && cleaned.length > 13) {
+    cleaned = cleaned.substring(2)
+    console.log('📱 After removing extra 55:', cleaned)
+  }
 
   // If it doesn't start with 55, add it
   if (!cleaned.startsWith('55')) {
@@ -185,13 +191,18 @@ serve(async (req) => {
             }
           }))
 
-          const { error: insertError } = await supabase
-            .from('follow_up_contacts')
-            .insert(contactsToInsert)
+          // Insert contacts in smaller batches to avoid potential issues
+          const batchSize = 50
+          for (let i = 0; i < contactsToInsert.length; i += batchSize) {
+            const batch = contactsToInsert.slice(i, i + batchSize)
+            const { error: insertError } = await supabase
+              .from('follow_up_contacts')
+              .insert(batch)
 
-          if (insertError) {
-            console.error(`❌ Error inserting contacts for follow-up ${followUp.id}:`, insertError)
-            throw insertError
+            if (insertError) {
+              console.error(`❌ Error inserting contacts batch for follow-up ${followUp.id}:`, insertError)
+              throw insertError
+            }
           }
 
           console.log(`✅ Successfully inserted ${validContacts.length} contacts for follow-up ${followUp.id}`)
