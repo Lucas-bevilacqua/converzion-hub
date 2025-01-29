@@ -84,6 +84,8 @@ interface FormData {
   stop_on_keyword: string[];
   manual_messages: ManualMessage[];
   system_prompt: string;
+  delay_minutes: number;
+  max_retries: number;
 }
 
 interface FollowUpData {
@@ -100,6 +102,8 @@ interface FollowUpData {
     stop_on_reply?: boolean;
     stop_on_keyword?: string[];
     system_prompt?: string;
+    delay_minutes?: number;
+    max_retries?: number;
   };
   metadata: Record<string, any>;
   instance?: {
@@ -201,7 +205,9 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
     stop_on_reply: followUp?.settings?.stop_on_reply ?? true,
     stop_on_keyword: followUp?.settings?.stop_on_keyword || ['comprou', 'agendou', 'agendado', 'comprado'],
     manual_messages: [],
-    system_prompt: followUp?.settings?.system_prompt || ''
+    system_prompt: followUp?.settings?.system_prompt || '',
+    delay_minutes: followUp?.settings?.delay_minutes || 5,
+    max_retries: followUp?.settings?.max_retries || 3
   });
 
   useEffect(() => {
@@ -217,7 +223,9 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
           message: msg.message,
           delay_minutes: msg.delay_minutes
         })),
-        system_prompt: followUp.settings?.system_prompt || ''
+        system_prompt: followUp.settings?.system_prompt || '',
+        delay_minutes: followUp.settings?.delay_minutes || 5,
+        max_retries: followUp.settings?.max_retries || 3
       }));
     }
   }, [followUp, followUpMessages]);
@@ -327,7 +335,7 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
 
       if (error) {
         console.error('❌ [ERROR] Error testing follow-up:', error)
-        throw error
+        throw error;
       }
 
       if (!data?.success) {
@@ -480,7 +488,9 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
               is_active: data.is_active,
               stop_on_reply: data.stop_on_reply,
               stop_on_keyword: data.stop_on_keyword,
-              system_prompt: data.system_prompt
+              system_prompt: data.system_prompt,
+              delay_minutes: data.delay_minutes,
+              max_retries: data.max_retries
             }
           }])
           .select()
@@ -516,7 +526,9 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
               is_active: data.is_active,
               stop_on_reply: data.stop_on_reply,
               stop_on_keyword: data.stop_on_keyword,
-              system_prompt: data.system_prompt
+              system_prompt: data.system_prompt,
+              delay_minutes: data.delay_minutes,
+              max_retries: data.max_retries
             }
           })
           .eq('id', followUp.id)
@@ -673,20 +685,48 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
             </div>
 
             {formData.type === 'ai' && (
-              <div className="grid gap-2">
-                <Label>Prompt do Sistema (Instruções para a IA)</Label>
-                <Textarea
-                  value={formData.system_prompt}
-                  onChange={(e) => setFormData(prev => ({ 
-                    ...prev, 
-                    system_prompt: e.target.value 
-                  }))}
-                  placeholder="Instruções para a IA sobre como gerar as mensagens de follow-up"
-                  className="min-h-[100px]"
-                />
-                <p className="text-sm text-muted-foreground">
-                  Este prompt ajuda a IA a entender como deve gerar as mensagens de follow-up
-                </p>
+              <div className="space-y-4">
+                <div className="grid gap-2">
+                  <Label>Prompt do Sistema (Instruções para a IA)</Label>
+                  <Textarea
+                    value={formData.system_prompt}
+                    onChange={(e) => setFormData(prev => ({ 
+                      ...prev, 
+                      system_prompt: e.target.value 
+                    }))}
+                    placeholder="Instruções para a IA sobre como gerar as mensagens de follow-up"
+                    className="min-h-[100px]"
+                  />
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label>Intervalo entre mensagens (minutos)</Label>
+                    <Input
+                      type="number"
+                      min={1}
+                      value={formData.delay_minutes}
+                      onChange={(e) => setFormData(prev => ({ 
+                        ...prev, 
+                        delay_minutes: Number(e.target.value) 
+                      }))}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Número máximo de tentativas</Label>
+                    <Input
+                      type="number"
+                      min={1}
+                      max={10}
+                      value={formData.max_retries}
+                      onChange={(e) => setFormData(prev => ({ 
+                        ...prev, 
+                        max_retries: Number(e.target.value) 
+                      }))}
+                    />
+                  </div>
+                </div>
               </div>
             )}
 
@@ -771,7 +811,9 @@ export function FollowUpSection({ instanceId }: FollowUpSectionProps) {
                         message: msg.message,
                         delay_minutes: msg.delay_minutes
                       })),
-                      system_prompt: followUp.settings?.system_prompt || ''
+                      system_prompt: followUp.settings?.system_prompt || '',
+                      delay_minutes: followUp.settings?.delay_minutes || 5,
+                      max_retries: followUp.settings?.max_retries || 3
                     });
                   }
                 }}

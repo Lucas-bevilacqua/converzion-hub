@@ -25,13 +25,6 @@ interface InstancePromptDialogProps {
   currentPrompt?: string | null
 }
 
-interface AISettingsResponse {
-  settings: {
-    delay_minutes: number
-    max_retries: number
-  } | null
-}
-
 export function InstancePromptDialog({
   open,
   onOpenChange,
@@ -42,8 +35,6 @@ export function InstancePromptDialog({
   const [values, setValues] = useState({
     prompt: "",
     objective: "custom" as const,
-    delayMinutes: 5,
-    maxRetries: 3,
   })
 
   useEffect(() => {
@@ -51,63 +42,18 @@ export function InstancePromptDialog({
       console.log('Updating form with current values:', { prompt: currentPrompt, objective: 'custom' })
       setValues(prev => ({ ...prev, prompt: currentPrompt }))
     }
-
-    // Fetch AI settings
-    const fetchAISettings = async () => {
-      try {
-        console.log('Fetching AI settings for instance:', instanceId)
-        const { data, error } = await supabase
-          .from('ai_settings')
-          .select('settings')
-          .eq('instance_id', instanceId)
-          .maybeSingle()
-
-        if (error) {
-          console.error('Error fetching AI settings:', error)
-          throw error
-        }
-
-        console.log('Received AI settings:', data)
-        const aiSettings = data as AISettingsResponse | null
-        if (aiSettings?.settings) {
-          setValues(prev => ({
-            ...prev,
-            delayMinutes: aiSettings.settings.delay_minutes || 5,
-            maxRetries: aiSettings.settings.max_retries || 3
-          }))
-        }
-      } catch (error) {
-        console.error('Error fetching AI settings:', error)
-      }
-    }
-
-    fetchAISettings()
-  }, [currentPrompt, instanceId])
+  }, [currentPrompt])
 
   const handleSave = async () => {
     try {
       console.log('Saving instance settings:', values)
       
-      // Update instance prompt
       const { error: instanceError } = await supabase
         .from('evolution_instances')
         .update({ system_prompt: values.prompt })
         .eq('id', instanceId)
 
       if (instanceError) throw instanceError
-
-      // Update AI settings
-      const { error: aiSettingsError } = await supabase
-        .from('ai_settings')
-        .upsert({
-          instance_id: instanceId,
-          settings: {
-            delay_minutes: values.delayMinutes,
-            max_retries: values.maxRetries
-          }
-        })
-
-      if (aiSettingsError) throw aiSettingsError
 
       toast({
         title: "Sucesso",
@@ -196,31 +142,6 @@ export function InstancePromptDialog({
                     placeholder="Digite as instruções para o assistente..."
                     className="min-h-[200px]"
                   />
-                </div>
-
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="delayMinutes">Intervalo entre mensagens (minutos)</Label>
-                    <Input
-                      id="delayMinutes"
-                      type="number"
-                      min={1}
-                      value={values.delayMinutes}
-                      onChange={(e) => setValues(prev => ({ ...prev, delayMinutes: Number(e.target.value) }))}
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="maxRetries">Número máximo de tentativas</Label>
-                    <Input
-                      id="maxRetries"
-                      type="number"
-                      min={1}
-                      max={10}
-                      value={values.maxRetries}
-                      onChange={(e) => setValues(prev => ({ ...prev, maxRetries: Number(e.target.value) }))}
-                    />
-                  </div>
                 </div>
 
                 <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 sm:space-x-2">
