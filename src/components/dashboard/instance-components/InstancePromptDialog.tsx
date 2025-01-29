@@ -27,9 +27,9 @@ interface InstancePromptDialogProps {
 
 interface AISettingsResponse {
   settings: {
-    delay_minutes: number;
-    max_retries: number;
-  } | null;
+    delay_minutes: number
+    max_retries: number
+  } | null
 }
 
 export function InstancePromptDialog({
@@ -55,14 +55,19 @@ export function InstancePromptDialog({
     // Fetch AI settings
     const fetchAISettings = async () => {
       try {
+        console.log('Fetching AI settings for instance:', instanceId)
         const { data, error } = await supabase
           .from('ai_settings')
           .select('settings')
           .eq('instance_id', instanceId)
           .maybeSingle()
 
-        if (error) throw error
+        if (error) {
+          console.error('Error fetching AI settings:', error)
+          throw error
+        }
 
+        console.log('Received AI settings:', data)
         const aiSettings = data as AISettingsResponse | null
         if (aiSettings?.settings) {
           setValues(prev => ({
@@ -81,6 +86,8 @@ export function InstancePromptDialog({
 
   const handleSave = async () => {
     try {
+      console.log('Saving instance settings:', values)
+      
       // Update instance prompt
       const { error: instanceError } = await supabase
         .from('evolution_instances')
