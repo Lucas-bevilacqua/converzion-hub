@@ -1,6 +1,8 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import { Bot, Loader2 } from "lucide-react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { supabase } from "@/integrations/supabase/client"
@@ -13,6 +15,8 @@ export function AISettingsCard() {
   const { toast } = useToast()
   const queryClient = useQueryClient()
   const [prompt, setPrompt] = useState("")
+  const [delayMinutes, setDelayMinutes] = useState(5)
+  const [maxRetries, setMaxRetries] = useState(3)
 
   const { data: settings, isLoading } = useQuery({
     queryKey: ['ai-settings', user?.id],
@@ -44,14 +48,26 @@ export function AISettingsCard() {
     if (settings?.system_prompt) {
       setPrompt(settings.system_prompt)
     }
+    if (settings?.settings?.delay_minutes) {
+      setDelayMinutes(settings.settings.delay_minutes)
+    }
+    if (settings?.settings?.max_retries) {
+      setMaxRetries(settings.settings.max_retries)
+    }
   }, [settings])
 
   const mutation = useMutation({
-    mutationFn: async (newPrompt: string) => {
-      console.log('Updating AI settings with new prompt:', newPrompt)
+    mutationFn: async (values: { prompt: string; delayMinutes: number; maxRetries: number }) => {
+      console.log('Updating AI settings:', values)
       const { error } = await supabase
         .from('ai_settings')
-        .update({ system_prompt: newPrompt })
+        .update({ 
+          system_prompt: values.prompt,
+          settings: {
+            delay_minutes: values.delayMinutes,
+            max_retries: values.maxRetries
+          }
+        })
         .eq('user_id', user?.id)
       
       if (error) throw error
@@ -74,7 +90,11 @@ export function AISettingsCard() {
   })
 
   const handleSave = () => {
-    mutation.mutate(prompt)
+    mutation.mutate({ 
+      prompt,
+      delayMinutes: Number(delayMinutes),
+      maxRetries: Number(maxRetries)
+    })
   }
 
   return (
@@ -95,15 +115,45 @@ export function AISettingsCard() {
           </div>
         ) : (
           <div className="space-y-4">
-            <Textarea
-              placeholder="Digite o prompt do sistema..."
-              value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
-              rows={4}
-            />
+            <div className="space-y-2">
+              <Label>Prompt do Sistema</Label>
+              <Textarea
+                placeholder="Digite o prompt do sistema..."
+                value={prompt}
+                onChange={(e) => setPrompt(e.target.value)}
+                rows={4}
+              />
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label>Intervalo entre mensagens (minutos)</Label>
+                <Input
+                  type="number"
+                  min={1}
+                  value={delayMinutes}
+                  onChange={(e) => setDelayMinutes(Number(e.target.value))}
+                  placeholder="Ex: 5"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label>Número máximo de tentativas</Label>
+                <Input
+                  type="number"
+                  min={1}
+                  max={10}
+                  value={maxRetries}
+                  onChange={(e) => setMaxRetries(Number(e.target.value))}
+                  placeholder="Ex: 3"
+                />
+              </div>
+            </div>
+
             <Button 
               onClick={handleSave}
               disabled={mutation.isPending}
+              className="w-full"
             >
               {mutation.isPending && (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
