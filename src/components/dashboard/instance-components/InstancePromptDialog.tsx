@@ -9,6 +9,7 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
+import { Input } from "@/components/ui/input"
 import { useState, useEffect } from "react"
 import { supabase } from "@/integrations/supabase/client"
 import { useToast } from "@/components/ui/use-toast"
@@ -34,23 +35,64 @@ export function InstancePromptDialog({
   const [values, setValues] = useState({
     prompt: "",
     objective: "custom" as const,
+    delayMinutes: 5,
+    maxRetries: 3,
   })
 
   useEffect(() => {
     if (currentPrompt) {
       console.log('Updating form with current values:', { prompt: currentPrompt, objective: 'custom' })
-      setValues({ prompt: currentPrompt, objective: 'custom' })
+      setValues(prev => ({ ...prev, prompt: currentPrompt }))
     }
-  }, [currentPrompt])
+
+    // Fetch AI settings
+    const fetchAISettings = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('ai_settings')
+          .select('settings')
+          .eq('instance_id', instanceId)
+          .maybeSingle()
+
+        if (error) throw error
+
+        if (data?.settings) {
+          setValues(prev => ({
+            ...prev,
+            delayMinutes: data.settings.delay_minutes || 5,
+            maxRetries: data.settings.max_retries || 3
+          }))
+        }
+      } catch (error) {
+        console.error('Error fetching AI settings:', error)
+      }
+    }
+
+    fetchAISettings()
+  }, [currentPrompt, instanceId])
 
   const handleSave = async () => {
     try {
-      const { error } = await supabase
+      // Update instance prompt
+      const { error: instanceError } = await supabase
         .from('evolution_instances')
         .update({ system_prompt: values.prompt })
         .eq('id', instanceId)
 
-      if (error) throw error
+      if (instanceError) throw instanceError
+
+      // Update AI settings
+      const { error: aiSettingsError } = await supabase
+        .from('ai_settings')
+        .upsert({
+          instance_id: instanceId,
+          settings: {
+            delay_minutes: values.delayMinutes,
+            max_retries: values.maxRetries
+          }
+        })
+
+      if (aiSettingsError) throw aiSettingsError
 
       toast({
         title: "Sucesso",
@@ -106,6 +148,7 @@ export function InstancePromptDialog({
                     </SelectContent>
                   </Select>
                 </div>
+
                 <div className="grid gap-2">
                   <Label htmlFor="prompt">Prompt do Sistema</Label>
                   <Textarea
@@ -116,6 +159,32 @@ export function InstancePromptDialog({
                     className="min-h-[200px]"
                   />
                 </div>
+
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="delayMinutes">Intervalo entre mensagens (minutos)</Label>
+                    <Input
+                      id="delayMinutes"
+                      type="number"
+                      min={1}
+                      value={values.delayMinutes}
+                      onChange={(e) => setValues(prev => ({ ...prev, delayMinutes: Number(e.target.value) }))}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="maxRetries">Número máximo de tentativas</Label>
+                    <Input
+                      id="maxRetries"
+                      type="number"
+                      min={1}
+                      max={10}
+                      value={values.maxRetries}
+                      onChange={(e) => setValues(prev => ({ ...prev, maxRetries: Number(e.target.value) }))}
+                    />
+                  </div>
+                </div>
+
                 <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 sm:space-x-2">
                   <Button variant="outline" onClick={() => onOpenChange(false)}>
                     Cancelar
