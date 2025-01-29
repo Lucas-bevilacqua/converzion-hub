@@ -29,7 +29,7 @@ export function InstanceSlotCard({
   const { toast } = useToast()
   const { user } = useAuth()
 
-  const { data: stateData, isLoading: isLoadingState } = useQuery({
+  const { data: stateData, isLoading: isLoadingState, refetch: refetchState } = useQuery({
     queryKey: ['instance-state', instance?.id],
     queryFn: async () => {
       if (!instance?.id || !user) {
@@ -124,6 +124,8 @@ export function InstanceSlotCard({
       intervalId = setInterval(() => {
         console.log('Refreshing QR code for instance:', instance.id);
         handleConnect();
+        // Refetch instance data to get the new QR code
+        refetchState();
       }, 15000); // 15 seconds
     }
 
@@ -160,6 +162,9 @@ export function InstanceSlotCard({
       if (error) throw error
 
       console.log('QR Code gerado com sucesso:', data)
+
+      // Refetch instance data to get the new QR code
+      await refetchState()
 
       toast({
         title: "Sucesso",
