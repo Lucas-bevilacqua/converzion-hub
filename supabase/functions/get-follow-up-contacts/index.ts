@@ -11,18 +11,33 @@ interface TimingMetrics {
 
 function decodeHexPhone(phone: string): string {
   try {
-    const cleanHex = phone.replace(/^(3E|3F|3[E-F])/, '');
+    // Remove o prefixo 3E se existir
+    const cleanHex = phone.replace(/^3E/, '');
+    
+    // Converte cada par de caracteres hex para decimal
     let result = '';
     for (let i = 0; i < cleanHex.length; i += 2) {
       const byte = parseInt(cleanHex.substr(i, 2), 16);
+      // Verifica se é um número válido (0-9)
       if (byte >= 48 && byte <= 57) {
         result += String.fromCharCode(byte);
       }
     }
-    console.log('🔄 Decoded number:', result);
+
+    // Adiciona 55 no início se não começar com ele
+    if (!result.startsWith('55')) {
+      result = '55' + result;
+    }
+
+    console.log('🔄 Hex decodificado:', {
+      original: phone,
+      cleaned: cleanHex,
+      result: result
+    });
+
     return result;
   } catch (e) {
-    console.error('❌ Error decoding hex phone:', e);
+    console.error('❌ Erro ao decodificar hex:', e);
     return '';
   }
 }
