@@ -187,6 +187,17 @@ export function InstancePromptDialog({
 
             <TabsContent value="ai">
               <div className="grid gap-4 py-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="prompt">Prompt do Sistema</Label>
+                  <Textarea
+                    id="prompt"
+                    value={values.prompt}
+                    onChange={(e) => setValues((prev) => ({ ...prev, prompt: e.target.value }))}
+                    placeholder="Digite as instruções para o assistente..."
+                    className="min-h-[200px]"
+                  />
+                </div>
+
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="space-y-2">
                     <Label htmlFor="delayMinutes">Intervalo entre mensagens (minutos)</Label>
