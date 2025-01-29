@@ -103,8 +103,8 @@ serve(async (req) => {
           system_prompt
         )
       `)
-      .in('status', ['pending', 'in_progress'])
-      .eq('settings->is_active', true)
+      .eq('settings->is_active', true) // Mudança aqui: removido o .in('status', ['pending', 'in_progress'])
+      .order('created_at', { ascending: false })
 
     if (followUpsError) {
       console.error('❌ Error fetching follow-ups:', followUpsError)
@@ -121,10 +121,24 @@ serve(async (req) => {
       - AI Follow-ups: ${aiFollowUps.length}
       - Manual Follow-ups: ${manualFollowUps.length}`)
 
+    // Melhorado o log de status da instância
+    followUps?.forEach(followUp => {
+      console.log(`🔍 Follow-up ${followUp.id} details:
+        - Type: ${followUp.type}
+        - Status: ${followUp.status}
+        - Instance Status: ${followUp.instance?.connection_status}
+        - Is Active: ${followUp.settings?.is_active}
+      `)
+    })
+
     const activeFollowUps = followUps?.filter(followUp => {
       const isConnected = followUp.instance?.connection_status?.toLowerCase().includes('connected') || 
                          followUp.instance?.connection_status?.toLowerCase().includes('open')
-      console.log(`🔌 Instance ${followUp.instance_id} status: ${followUp.instance?.connection_status} (Type: ${followUp.type})`)
+      console.log(`🔌 Instance ${followUp.instance_id} connection check:
+        - Status: ${followUp.instance?.connection_status}
+        - Is Connected: ${isConnected}
+        - Follow-up Type: ${followUp.type}
+      `)
       return isConnected
     }) || []
 
