@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query"
 import { supabase } from "@/integrations/supabase/client"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { ChartContainer } from "@/components/ui/chart"
-import { LineChart, Line, XAxis, YAxis, Tooltip, Legend } from "recharts"
+import { LineChart, Line, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer } from "recharts"
 import { useAuth } from "@/contexts/auth/AuthContext"
 import { format, subDays, startOfDay, endOfDay } from "date-fns"
 import { ptBR } from "date-fns/locale"
@@ -37,7 +37,7 @@ export function MetricsOverview() {
         throw error
       }
 
-      console.log('Metrics data received:', data)
+      console.log('Raw metrics data:', data)
       
       const formattedData = []
       for (let i = 6; i >= 0; i--) {
@@ -54,7 +54,7 @@ export function MetricsOverview() {
         })
       }
 
-      console.log('Formatted data:', formattedData)
+      console.log('Formatted metrics data:', formattedData)
       return formattedData
     },
     enabled: !!user?.id,
@@ -108,102 +108,68 @@ export function MetricsOverview() {
       </CardHeader>
       <CardContent className="p-6">
         <div className="min-h-[300px] w-full">
-          <ChartContainer
-            className="w-full h-full"
-            config={{
-              messages_sent: {
-                theme: {
-                  light: "#F97316",
-                  dark: "#FB923C",
-                },
-                label: "Mensagens Enviadas",
-              },
-              messages_received: {
-                theme: {
-                  light: "#10B981",
-                  dark: "#34D399",
-                },
-                label: "Mensagens Recebidas",
-              }
-            }}
-          >
-            <div style={{ width: '100%', height: 300 }}>
-              <LineChart
-                width={800}
-                height={300}
-                data={metrics}
-                margin={{ top: 20, right: 30, left: 0, bottom: 5 }}
-              >
-                <XAxis
-                  dataKey="date"
-                  fontSize={12}
-                  tickLine={false}
-                  axisLine={true}
-                  stroke="#94A3B8"
-                  dy={10}
-                  angle={-45}
-                  textAnchor="end"
-                  height={60}
-                  scale="point"
-                  padding={{ left: 10, right: 10 }}
-                />
-                <YAxis 
-                  fontSize={12}
-                  tickLine={false}
-                  axisLine={true}
-                  stroke="#94A3B8"
-                  dx={-10}
-                  label={{ 
-                    value: 'Quantidade de Mensagens', 
-                    angle: -90, 
-                    position: 'insideLeft',
-                    style: { textAnchor: 'middle' }
-                  }}
-                  scale="linear"
-                  padding={{ top: 10, bottom: 10 }}
-                />
-                <Tooltip 
-                  cursor={{ stroke: 'rgba(0,0,0,0.05)', strokeWidth: 2 }}
-                  contentStyle={{
-                    backgroundColor: 'white',
-                    border: '1px solid #E2E8F0',
-                    borderRadius: '6px',
-                    padding: '8px',
-                    boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-                  }}
-                  formatter={(value: number, name: string) => {
-                    const formattedName = name === "messages_sent" ? "Mensagens Enviadas" : "Mensagens Recebidas"
-                    return [value, formattedName]
-                  }}
-                  labelFormatter={(label) => `Data: ${label}`}
-                />
-                <Legend 
-                  wrapperStyle={{
-                    paddingTop: '20px'
-                  }}
-                  formatter={(value) => {
-                    return value === "messages_sent" ? "Mensagens Enviadas" : "Mensagens Recebidas"
-                  }}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="messages_sent"
-                  name="messages_sent"
-                  stroke="var(--color-messages_sent)"
-                  strokeWidth={2}
-                  dot={{ fill: "var(--color-messages_sent)" }}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="messages_received"
-                  name="messages_received"
-                  stroke="var(--color-messages_received)"
-                  strokeWidth={2}
-                  dot={{ fill: "var(--color-messages_received)" }}
-                />
-              </LineChart>
-            </div>
-          </ChartContainer>
+          <ResponsiveContainer width="100%" height={300}>
+            <LineChart
+              data={metrics}
+              margin={{ top: 20, right: 30, left: 0, bottom: 5 }}
+            >
+              <XAxis
+                dataKey="date"
+                fontSize={12}
+                tickLine={false}
+                axisLine={true}
+                stroke="#94A3B8"
+                dy={10}
+                angle={-45}
+                textAnchor="end"
+                height={60}
+              />
+              <YAxis 
+                fontSize={12}
+                tickLine={false}
+                axisLine={true}
+                stroke="#94A3B8"
+                dx={-10}
+              />
+              <Tooltip 
+                cursor={{ stroke: 'rgba(0,0,0,0.05)', strokeWidth: 2 }}
+                contentStyle={{
+                  backgroundColor: 'white',
+                  border: '1px solid #E2E8F0',
+                  borderRadius: '6px',
+                  padding: '8px'
+                }}
+                formatter={(value: number, name: string) => {
+                  const label = name === "messages_sent" ? "Mensagens Enviadas" : "Mensagens Recebidas"
+                  return [value, label]
+                }}
+                labelFormatter={(label) => `Data: ${label}`}
+              />
+              <Legend 
+                formatter={(value) => {
+                  return value === "messages_sent" ? "Mensagens Enviadas" : "Mensagens Recebidas"
+                }}
+              />
+              <Line
+                type="monotone"
+                dataKey="messages_sent"
+                stroke="#F97316"
+                strokeWidth={2}
+                dot={{ fill: "#F97316", stroke: "#F97316" }}
+                activeDot={{ r: 6 }}
+                name="messages_sent"
+              />
+              <Line
+                type="monotone"
+                dataKey="messages_received"
+                stroke="#10B981"
+                strokeWidth={2}
+                dot={{ fill: "#10B981", stroke: "#10B981" }}
+                activeDot={{ r: 6 }}
+                name="messages_received"
+              />
+            </LineChart>
+          </ResponsiveContainer>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
