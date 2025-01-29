@@ -137,8 +137,9 @@ export function InstancePromptDialog({
 
         <ScrollArea className="h-full max-h-[calc(90vh-8rem)] pr-4">
           <Tabs defaultValue="general" className="w-full">
-            <TabsList className="w-full grid grid-cols-3 mb-4">
+            <TabsList className="w-full grid grid-cols-4 mb-4">
               <TabsTrigger value="general">Geral</TabsTrigger>
+              <TabsTrigger value="ai">IA</TabsTrigger>
               <TabsTrigger value="follow-up">Follow-up</TabsTrigger>
               <TabsTrigger value="tools">Ferramentas</TabsTrigger>
             </TabsList>
@@ -175,6 +176,17 @@ export function InstancePromptDialog({
                   />
                 </div>
 
+                <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 sm:space-x-2">
+                  <Button variant="outline" onClick={() => onOpenChange(false)}>
+                    Cancelar
+                  </Button>
+                  <Button onClick={handleSave}>Salvar</Button>
+                </div>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="ai">
+              <div className="grid gap-4 py-4">
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="space-y-2">
                     <Label htmlFor="delayMinutes">Intervalo entre mensagens (minutos)</Label>
