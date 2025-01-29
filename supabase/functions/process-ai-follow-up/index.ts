@@ -131,15 +131,17 @@ serve(async (req) => {
 
               console.log(`✅ [DEBUG] Generated AI message:`, message)
 
-              // Send message through Evolution API - mantendo o número com 55
+              // Get the phone number from metadata if available, otherwise use the contact.phone
+              const phoneNumber = contact.metadata?.original_phone || contact.phone
+              console.log(`📱 [DEBUG] Using phone number:`, phoneNumber)
+
+              // Send message through Evolution API
               const evolutionApiUrl = (Deno.env.get('EVOLUTION_API_URL') || '').replace(/\/+$/, '')
               const evolutionApiEndpoint = `${evolutionApiUrl}/message/sendText/${followUp.instance.name}`
 
-              console.log(`📱 [DEBUG] Using phone number:`, contact.phone)
-
               console.log(`📤 [DEBUG] Sending to Evolution API:`, {
                 endpoint: evolutionApiEndpoint,
-                phone: contact.phone,
+                phone: phoneNumber,
                 message: message
               })
 
@@ -150,9 +152,9 @@ serve(async (req) => {
                   'apikey': Deno.env.get('EVOLUTION_API_KEY') || '',
                 },
                 body: JSON.stringify({
-                  number: contact.phone,
+                  number: phoneNumber,
                   options: {
-                    delay: MIN_DELAY_MINUTES * 60 * 1000, // Convertendo minutos para milissegundos
+                    delay: MIN_DELAY_MINUTES * 60 * 1000,
                     presence: "composing"
                   },
                   textMessage: {
