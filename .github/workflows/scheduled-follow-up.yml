@@ -16,20 +16,19 @@ jobs:
     timeout-minutes: 15    # Increased timeout to handle multiple messages
     
     steps:
-      - name: Process Follow-ups
-        id: process
+      - name: Process Manual Follow-ups
+        id: process-manual
         env:
           SUPABASE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: |
           timestamp=$(date '+%Y-%m-%d %H:%M:%S')
-          echo "Starting follow-up processing at ${timestamp}"
+          echo "Starting manual follow-up processing at ${timestamp}"
           
           if [ -z "$SUPABASE_KEY" ]; then
             echo "::error::SUPABASE_SERVICE_ROLE_KEY is not set"
             exit 1
           fi
           
-          # Make request with additional parameters to ensure all messages are processed
           curl -X POST \
             'https://vodexhppkasbulogmcqb.supabase.co/functions/v1/get-follow-up-contacts' \
             -H "Authorization: Bearer ${SUPABASE_KEY}" \
@@ -44,8 +43,35 @@ jobs:
             --fail \
             --show-error \
             || {
-              echo "❌ Error processing follow-ups"
+              echo "❌ Error processing manual follow-ups"
               exit 1
             }
           
-          echo "✅ Follow-up processing completed at $(date '+%Y-%m-%d %H:%M:%S')"
+          echo "✅ Manual follow-up processing completed at $(date '+%Y-%m-%d %H:%M:%S')"
+
+      - name: Process AI Follow-ups
+        id: process-ai
+        env:
+          SUPABASE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+          echo "Starting AI follow-up processing at ${timestamp}"
+          
+          curl -X POST \
+            'https://vodexhppkasbulogmcqb.supabase.co/functions/v1/process-ai-follow-up' \
+            -H "Authorization: Bearer ${SUPABASE_KEY}" \
+            -H "Content-Type: application/json" \
+            -H "apikey: ${SUPABASE_KEY}" \
+            --data-raw "{
+              \"scheduled\":true, 
+              \"source\":\"github-action\", 
+              \"timestamp\":\"${timestamp}\"
+            }" \
+            --fail \
+            --show-error \
+            || {
+              echo "❌ Error processing AI follow-ups"
+              exit 1
+            }
+          
+          echo "✅ AI follow-up processing completed at $(date '+%Y-%m-%d %H:%M:%S')"
