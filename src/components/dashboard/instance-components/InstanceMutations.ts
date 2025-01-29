@@ -5,25 +5,19 @@ export const useInstanceMutations = () => {
   const createMutation = useMutation({
     mutationFn: async (data: { name: string; phone_number: string }) => {
       console.log('Creating instance with data:', data)
-      const response = await fetch('/functions/v1/create-evolution-instance', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`
-        },
-        body: JSON.stringify({
+      const response = await supabase.functions.invoke('create-evolution-instance', {
+        body: {
           ...data,
           userId: (await supabase.auth.getSession()).data.session?.user.id
-        })
+        }
       })
 
-      const responseData = await response.json()
-      
-      if (!response.ok) {
-        throw new Error(responseData.error || 'Failed to create instance')
+      if (response.error) {
+        console.error('Error creating instance:', response.error)
+        throw new Error(response.error.message || 'Failed to create instance')
       }
 
-      return responseData
+      return response.data
     }
   })
 
