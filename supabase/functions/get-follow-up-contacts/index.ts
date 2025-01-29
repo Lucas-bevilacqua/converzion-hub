@@ -90,7 +90,6 @@ serve(async (req) => {
 
     const dbStartTime = Date.now()
     
-    // Get active follow-ups that are pending or in_progress
     console.log('🔍 Fetching active follow-ups...')
     const { data: followUps, error: followUpsError } = await supabase
       .from('follow_ups')
@@ -116,16 +115,15 @@ serve(async (req) => {
     console.log(`✅ Database fetch completed in ${metrics.dbFetchTime}ms`)
     console.log(`✅ Found ${followUps?.length || 0} follow-ups to process`)
     
-    // Log follow-ups by type
     const aiFollowUps = followUps?.filter(f => f.type === 'ai') || []
     const manualFollowUps = followUps?.filter(f => f.type === 'manual') || []
     console.log(`📊 Follow-ups breakdown:
       - AI Follow-ups: ${aiFollowUps.length}
       - Manual Follow-ups: ${manualFollowUps.length}`)
 
-    // Filter connected instances
     const activeFollowUps = followUps?.filter(followUp => {
-      const isConnected = followUp.instance?.connection_status?.toLowerCase() === 'connected'
+      const isConnected = followUp.instance?.connection_status?.toLowerCase().includes('connected') || 
+                         followUp.instance?.connection_status?.toLowerCase().includes('open')
       console.log(`🔌 Instance ${followUp.instance_id} status: ${followUp.instance?.connection_status} (Type: ${followUp.type})`)
       return isConnected
     }) || []
@@ -134,13 +132,11 @@ serve(async (req) => {
 
     const processingStartTime = Date.now()
     
-    // Process each follow-up in parallel for better performance
     const results = await Promise.all(activeFollowUps.map(async (followUp) => {
       const followUpStartTime = Date.now()
       try {
         console.log(`🔄 Processing follow-up ${followUp.id} (Type: ${followUp.type})`)
         
-        // Get eligible contacts using the optimized stored procedure
         const { data: contacts, error: contactsError } = await supabase
           .from('users_clientes')
           .select('telefoneclientes, nomeclientes, last_message_time')
@@ -155,7 +151,6 @@ serve(async (req) => {
 
         console.log(`🔍 Raw contact data for follow-up ${followUp.id}:`, contacts)
         
-        // Filter and format valid contacts
         const validContacts = (contacts || [])
           .filter(contact => {
             if (!contact?.telefoneclientes || !contact?.last_message_time) {
@@ -203,7 +198,6 @@ serve(async (req) => {
 
           console.log(`✅ Successfully inserted ${validContacts.length} contacts for follow-up ${followUp.id}`)
 
-          // Call appropriate processing function based on follow-up type
           const processingEndpoint = followUp.type === 'ai' ? 'process-ai-follow-up' : 'process-follow-up'
           console.log(`🔄 Calling ${processingEndpoint} for follow-up ${followUp.id} of type ${followUp.type}`)
           
@@ -211,7 +205,7 @@ serve(async (req) => {
             body: {
               followUpId: followUp.id,
               scheduled: true,
-              systemPrompt: followUp.instance?.system_prompt // Adiciona o system_prompt para follow-ups de IA
+              systemPrompt: followUp.instance?.system_prompt
             }
           })
 
@@ -225,7 +219,6 @@ serve(async (req) => {
           console.log(`ℹ️ No valid contacts found for follow-up ${followUp.id}`)
         }
 
-        // Update follow-up status if needed
         if (followUp.status === 'pending') {
           const { error: updateError } = await supabase
             .from('follow_ups')
