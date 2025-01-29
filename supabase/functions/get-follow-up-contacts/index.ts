@@ -109,7 +109,8 @@ serve(async (req) => {
           id,
           name,
           connection_status,
-          user_id
+          user_id,
+          system_prompt
         )
       `)
       .in('status', ['pending', 'in_progress'])
@@ -202,9 +203,11 @@ serve(async (req) => {
 
           console.log(`✅ Successfully inserted ${validContacts.length} contacts for follow-up ${followUp.id}`)
 
-          // Call process-follow-up for each follow-up with contacts
-          console.log(`🔄 Calling process-follow-up for follow-up ${followUp.id}`)
-          const processResponse = await supabase.functions.invoke('process-follow-up', {
+          // Call appropriate processing function based on follow-up type
+          const processingEndpoint = followUp.type === 'ai' ? 'process-ai-follow-up' : 'process-follow-up'
+          console.log(`🔄 Calling ${processingEndpoint} for follow-up ${followUp.id} of type ${followUp.type}`)
+          
+          const processResponse = await supabase.functions.invoke(processingEndpoint, {
             body: {
               followUpId: followUp.id,
               scheduled: true
@@ -240,6 +243,7 @@ serve(async (req) => {
         return {
           followUpId: followUp.id,
           status: 'success',
+          type: followUp.type,
           contacts: validContacts.length,
           processingTime: followUpProcessingTime
         }
@@ -248,6 +252,7 @@ serve(async (req) => {
         return {
           followUpId: followUp.id,
           status: 'error',
+          type: followUp.type,
           error: error.message,
           processingTime: Date.now() - followUpStartTime
         }
