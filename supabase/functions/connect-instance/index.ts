@@ -93,30 +93,51 @@ serve(async (req) => {
     console.log('Evolution API Base URL:', baseUrl)
     console.log('Instance Name:', instanceName)
 
-    // First create the instance in Evolution API
-    const createInstanceResponse = await fetch(`${baseUrl}/instance/create`, {
-      method: 'POST',
+    // First check if instance exists
+    const checkInstanceResponse = await fetch(`${baseUrl}/instance/connectionState/${instanceName}`, {
+      method: 'GET',
       headers: {
         'apikey': evolutionApiKey,
         'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        instanceName: instance.name,
-        qrcode: true,
-        number: instance.phone_number
-      })
+      }
     })
 
-    if (!createInstanceResponse.ok) {
-      const errorText = await createInstanceResponse.text()
-      console.error('Evolution API instance creation error:', errorText)
-      throw new Error(`Failed to create instance: ${errorText}`)
+    let needsCreation = true
+    if (checkInstanceResponse.ok) {
+      console.log('Instance already exists in Evolution API')
+      needsCreation = false
+    } else {
+      console.log('Instance does not exist, will create it')
     }
 
-    const createInstanceData = await createInstanceResponse.json()
-    console.log('Instance created in Evolution API:', createInstanceData)
+    // Create instance if needed
+    if (needsCreation) {
+      console.log('Creating new instance in Evolution API')
+      const createInstanceResponse = await fetch(`${baseUrl}/instance/create`, {
+        method: 'POST',
+        headers: {
+          'apikey': evolutionApiKey,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          instanceName: instance.name,
+          qrcode: true,
+          number: instance.phone_number
+        })
+      })
 
-    // Now get the QR code
+      if (!createInstanceResponse.ok) {
+        const errorText = await createInstanceResponse.text()
+        console.error('Evolution API instance creation error:', errorText)
+        throw new Error(`Failed to create instance: ${errorText}`)
+      }
+
+      const createInstanceData = await createInstanceResponse.json()
+      console.log('Instance created in Evolution API:', createInstanceData)
+    }
+
+    // Get QR code
+    console.log('Fetching QR code for instance')
     const qrResponse = await fetch(`${baseUrl}/instance/qr/${instanceName}`, {
       method: 'GET',
       headers: {
