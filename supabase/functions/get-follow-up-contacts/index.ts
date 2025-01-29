@@ -9,6 +9,50 @@ interface TimingMetrics {
   totalTime?: number;
 }
 
+// Function to clean and validate phone number
+function cleanPhoneNumber(phone: string): string | null {
+  console.log('🔄 Cleaning phone number:', phone)
+  
+  if (!phone) {
+    console.log('❌ Invalid phone: empty or null')
+    return null
+  }
+
+  // Remove any non-numeric characters
+  let cleaned = phone.replace(/\D/g, '')
+  console.log('📱 After removing non-numeric:', cleaned)
+
+  // Remove @s.whatsapp.net or @c.us if present
+  cleaned = cleaned.split('@')[0]
+  console.log('📱 After removing @:', cleaned)
+
+  // Remove any part after : (some numbers come with :1 or :2)
+  cleaned = cleaned.split(':')[0]
+  console.log('📱 After removing :', cleaned)
+
+  // If it doesn't start with 55, add it
+  if (!cleaned.startsWith('55')) {
+    cleaned = '55' + cleaned
+    console.log('📱 After adding 55:', cleaned)
+  }
+
+  // Validate length (should be 12 or 13 digits including 55)
+  if (cleaned.length < 12 || cleaned.length > 13) {
+    console.log('❌ Invalid length:', cleaned.length)
+    return null
+  }
+
+  // Validate DDD (should be between 11 and 99)
+  const ddd = parseInt(cleaned.substring(2, 4))
+  if (ddd < 11 || ddd > 99) {
+    console.log('❌ Invalid DDD:', ddd)
+    return null
+  }
+
+  console.log('✅ Valid phone number:', cleaned)
+  return cleaned
+}
+
 serve(async (req) => {
   const metrics: TimingMetrics = {
     startTime: Date.now()
@@ -53,38 +97,10 @@ serve(async (req) => {
     metrics.dbFetchTime = Date.now() - dbStartTime
     console.log(`✅ Database fetch completed in ${metrics.dbFetchTime}ms`)
     console.log(`✅ Found ${followUps?.length || 0} follow-ups to process`)
-    
-    const aiFollowUps = followUps?.filter(f => f.type === 'ai') || []
-    const manualFollowUps = followUps?.filter(f => f.type === 'manual') || []
-    console.log(`📊 Follow-ups breakdown:
-      - AI Follow-ups: ${aiFollowUps.length}
-      - Manual Follow-ups: ${manualFollowUps.length}`)
-
-    followUps?.forEach(followUp => {
-      console.log(`🔍 Follow-up ${followUp.id} details:
-        - Type: ${followUp.type}
-        - Status: ${followUp.status}
-        - Instance Status: ${followUp.instance?.connection_status}
-        - Is Active: ${followUp.settings?.is_active}
-      `)
-    })
-
-    const activeFollowUps = followUps?.filter(followUp => {
-      const isConnected = followUp.instance?.connection_status?.toLowerCase().includes('connected') || 
-                         followUp.instance?.connection_status?.toLowerCase().includes('open')
-      console.log(`🔌 Instance ${followUp.instance_id} connection check:
-        - Status: ${followUp.instance?.connection_status}
-        - Is Connected: ${isConnected}
-        - Follow-up Type: ${followUp.type}
-      `)
-      return isConnected
-    }) || []
-
-    console.log(`✅ ${activeFollowUps.length} follow-ups have connected instances`)
 
     const processingStartTime = Date.now()
     
-    const results = await Promise.all(activeFollowUps.map(async (followUp) => {
+    const results = await Promise.all(followUps?.map(async (followUp) => {
       const followUpStartTime = Date.now()
       try {
         console.log(`🔄 Processing follow-up ${followUp.id} (Type: ${followUp.type})`)
@@ -134,12 +150,21 @@ serve(async (req) => {
               return false
             }
 
-            // Skip if already processed
-            if (existingPhones.has(contact.telefoneclientes)) {
-              console.log(`⚠️ Contact already processed: ${contact.telefoneclientes}`)
+            // Clean and validate phone number
+            const cleanedPhone = cleanPhoneNumber(contact.telefoneclientes)
+            if (!cleanedPhone) {
+              console.log('⚠️ Invalid phone number format:', contact.telefoneclientes)
               return false
             }
 
+            // Skip if already processed
+            if (existingPhones.has(cleanedPhone)) {
+              console.log(`⚠️ Contact already processed: ${cleanedPhone}`)
+              return false
+            }
+
+            // Update the phone number to the cleaned version
+            contact.telefoneclientes = cleanedPhone
             return true
           })
 
@@ -184,27 +209,6 @@ serve(async (req) => {
             console.error(`❌ Error updating follow-up status:`, updateError)
             throw updateError
           }
-
-          // Initiate processing based on follow-up type
-          if (followUp.type === 'ai') {
-            console.log(`🤖 Initiating AI follow-up processing for ${followUp.id}`)
-            const processResponse = await supabase.functions.invoke('process-ai-follow-up', {
-              body: {
-                followUpId: followUp.id,
-                scheduled: true,
-                systemPrompt: followUp.instance?.system_prompt
-              }
-            })
-
-            if (processResponse.error) {
-              console.error(`❌ Error processing AI follow-up ${followUp.id}:`, processResponse.error)
-              throw new Error(`Failed to process AI follow-up: ${processResponse.error.message}`)
-            }
-
-            console.log(`✅ AI follow-up ${followUp.id} initiated successfully`)
-          } else {
-            console.log(`📤 Manual follow-up ${followUp.id} ready for processing`)
-          }
         }
 
         const followUpProcessingTime = Date.now() - followUpStartTime
@@ -227,7 +231,7 @@ serve(async (req) => {
           processingTime: Date.now() - followUpStartTime
         }
       }
-    }))
+    }) || [])
 
     metrics.processingTime = Date.now() - processingStartTime
     metrics.totalTime = Date.now() - metrics.startTime
