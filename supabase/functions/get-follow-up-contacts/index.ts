@@ -14,22 +14,33 @@ function decodeHexPhone(phone: string): string {
     // Remove o prefixo 3E se existir
     const cleanHex = phone.replace(/^3E/, '');
     
-    // Converte cada par de caracteres hex para decimal
+    // Convert each pair of hex characters to a number
     let result = '';
-    for (let i = 0; i < cleanHex.length; i += 2) {
+    for (let i = 0; i < Math.min(cleanHex.length, 24); i += 2) {
       const byte = parseInt(cleanHex.substr(i, 2), 16);
-      // Verifica se é um número válido (0-9)
-      if (byte >= 48 && byte <= 57) {
+      // Check if it's a valid number (0-9)
+      if (!isNaN(byte) && byte >= 48 && byte <= 57) {
         result += String.fromCharCode(byte);
       }
     }
 
-    // Adiciona 55 no início se não começar com ele
+    // If result is empty or invalid, try direct numeric extraction
+    if (!result || result.length < 8) {
+      result = cleanHex.replace(/[^0-9]/g, '');
+    }
+
+    // Add country code if missing
     if (!result.startsWith('55')) {
       result = '55' + result;
     }
 
-    console.log('🔄 Hex decodificado:', {
+    // Validate final length
+    if (result.length < 10 || result.length > 13) {
+      console.log('⚠️ Invalid number length:', result.length, 'for number:', result);
+      return '';
+    }
+
+    console.log('✅ Successfully decoded number:', {
       original: phone,
       cleaned: cleanHex,
       result: result
@@ -37,7 +48,7 @@ function decodeHexPhone(phone: string): string {
 
     return result;
   } catch (e) {
-    console.error('❌ Erro ao decodificar hex:', e);
+    console.error('❌ Error decoding hex:', e);
     return '';
   }
 }
