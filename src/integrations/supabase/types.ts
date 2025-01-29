@@ -269,6 +269,13 @@ export type Database = {
             foreignKeyName: "follow_up_contacts_follow_up_id_fkey"
             columns: ["follow_up_id"]
             isOneToOne: false
+            referencedRelation: "follow_up_analysis"
+            referencedColumns: ["follow_up_id"]
+          },
+          {
+            foreignKeyName: "follow_up_contacts_follow_up_id_fkey"
+            columns: ["follow_up_id"]
+            isOneToOne: false
             referencedRelation: "follow_ups"
             referencedColumns: ["id"]
           },
@@ -303,6 +310,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "follow_up_messages_follow_up_id_fkey"
+            columns: ["follow_up_id"]
+            isOneToOne: false
+            referencedRelation: "follow_up_analysis"
+            referencedColumns: ["follow_up_id"]
+          },
           {
             foreignKeyName: "follow_up_messages_follow_up_id_fkey"
             columns: ["follow_up_id"]
@@ -715,7 +729,32 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      follow_up_analysis: {
+        Row: {
+          follow_up_created: string | null
+          follow_up_id: string | null
+          instance_id: string | null
+          instance_name: string | null
+          instance_status: string | null
+          last_message_sent: string | null
+          pending_contacts: number | null
+          sent_contacts: number | null
+          settings: Json | null
+          status: string | null
+          status_description: string | null
+          total_contacts: number | null
+          type: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "follow_ups_instance_id_fkey"
+            columns: ["instance_id"]
+            isOneToOne: false
+            referencedRelation: "evolution_instances"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       bytea_to_text: {
