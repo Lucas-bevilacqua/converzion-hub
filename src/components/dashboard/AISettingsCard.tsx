@@ -18,6 +18,19 @@ interface AISettings {
   system_prompt: string | null;
 }
 
+type AISettingsResponse = {
+  id: string;
+  user_id: string | null;
+  system_prompt: string | null;
+  temperature: number | null;
+  created_at: string;
+  updated_at: string;
+  settings: {
+    delay_minutes: number;
+    max_retries: number;
+  } | null;
+}
+
 export function AISettingsCard() {
   const { user } = useAuth()
   const { toast } = useToast()
@@ -43,7 +56,14 @@ export function AISettingsCard() {
         }
 
         console.log('AI settings found:', data)
-        return data as AISettings
+        const aiSettings: AISettings = {
+          system_prompt: data?.system_prompt,
+          settings: data?.settings || {
+            delay_minutes: 5,
+            max_retries: 3
+          }
+        }
+        return aiSettings
       } catch (error) {
         console.error('Error in AI settings query:', error)
         throw error
