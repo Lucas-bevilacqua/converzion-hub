@@ -24,7 +24,7 @@ export function MetricsOverview() {
 
       console.log('Fetching metrics from', startDate, 'to', endDate)
 
-      const { data, error } = await supabase
+      const { data: metricsData, error } = await supabase
         .from('instance_metrics')
         .select('*')
         .eq('user_id', user.id)
@@ -37,19 +37,26 @@ export function MetricsOverview() {
         throw error
       }
 
-      console.log('Raw metrics data:', data)
+      console.log('Raw metrics data:', metricsData)
       
+      // Initialize array with all days
       const formattedData = []
       for (let i = 6; i >= 0; i--) {
         const date = subDays(new Date(), i)
-        const dayData = data?.find(m => 
-          format(new Date(m.created_at), 'yyyy-MM-dd') === format(date, 'yyyy-MM-dd')
-        )
+        const dateStr = format(date, 'yyyy-MM-dd')
+        
+        // Find all metrics for this day and sum them
+        const dayMetrics = metricsData?.filter(m => 
+          format(new Date(m.created_at), 'yyyy-MM-dd') === dateStr
+        ) || []
+        
+        const messages_sent = dayMetrics.reduce((sum, m) => sum + (m.messages_sent || 0), 0)
+        const messages_received = dayMetrics.reduce((sum, m) => sum + (m.messages_received || 0), 0)
         
         formattedData.push({
           date: format(date, 'dd/MM/yyyy', { locale: ptBR }),
-          messages_sent: dayData?.messages_sent || 0,
-          messages_received: dayData?.messages_received || 0,
+          messages_sent,
+          messages_received,
           created_at: date.toISOString(),
         })
       }
@@ -155,18 +162,20 @@ export function MetricsOverview() {
                 dataKey="messages_sent"
                 stroke="#F97316"
                 strokeWidth={2}
-                dot={{ fill: "#F97316", stroke: "#F97316" }}
-                activeDot={{ r: 6 }}
+                dot={{ fill: "#F97316", stroke: "#F97316", r: 4 }}
+                activeDot={{ r: 6, stroke: "#F97316", strokeWidth: 2 }}
                 name="messages_sent"
+                isAnimationActive={true}
               />
               <Line
                 type="monotone"
                 dataKey="messages_received"
                 stroke="#10B981"
                 strokeWidth={2}
-                dot={{ fill: "#10B981", stroke: "#10B981" }}
-                activeDot={{ r: 6 }}
+                dot={{ fill: "#10B981", stroke: "#10B981", r: 4 }}
+                activeDot={{ r: 6, stroke: "#10B981", strokeWidth: 2 }}
                 name="messages_received"
+                isAnimationActive={true}
               />
             </LineChart>
           </ResponsiveContainer>
