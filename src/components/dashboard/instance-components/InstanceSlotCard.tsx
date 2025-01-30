@@ -31,7 +31,7 @@ export function InstanceSlotCard({
 
   // Query for instance state and QR code with automatic refetch when QR dialog is open
   const { data: instanceData, isLoading: isLoadingInstance, refetch: refetchInstance } = useQuery({
-    queryKey: ['instance-data', instance?.id],
+    queryKey: ['instance-data', instance?.id, showQRCode], // Added showQRCode to trigger refetch when dialog opens
     queryFn: async () => {
       if (!instance?.id || !user) {
         console.log('No instance or user found')
@@ -60,7 +60,8 @@ export function InstanceSlotCard({
       }
     },
     enabled: !!instance?.id && !!user?.id,
-    refetchInterval: showQRCode ? 15000 : false // Only refetch every 15s when QR dialog is open
+    refetchInterval: showQRCode ? 15000 : false, // Refetch every 15s when QR dialog is open
+    refetchIntervalInBackground: true
   })
 
   const { data: stateData, isLoading: isLoadingState } = useQuery({
@@ -146,6 +147,7 @@ export function InstanceSlotCard({
       intervalId = setInterval(() => {
         console.log('Refreshing QR code for instance:', instance.id);
         handleConnect();
+        refetchInstance(); // Added refetch call here
       }, 15000); // 15 seconds
     }
 
