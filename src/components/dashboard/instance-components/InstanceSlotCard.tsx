@@ -63,7 +63,7 @@ export function InstanceSlotCard({
     refetchInterval: showQRCode ? 5000 : false, // Refetch every 5s when QR dialog is open
     refetchIntervalInBackground: true,
     staleTime: 0,
-    gcTime: 0 // Changed from cacheTime to gcTime
+    gcTime: 0
   })
 
   const { data: stateData, isLoading: isLoadingState } = useQuery({
@@ -142,9 +142,16 @@ export function InstanceSlotCard({
     let intervalId: NodeJS.Timeout | null = null;
 
     const refreshQRCode = async () => {
-      console.log('Refreshing QR code for instance:', instance?.id);
-      await handleConnect();
-      await refetchInstance();
+      if (!instance?.id) return;
+      
+      console.log('Refreshing QR code for instance:', instance.id);
+      try {
+        await handleConnect();
+        await refetchInstance();
+        console.log('QR code refreshed successfully');
+      } catch (error) {
+        console.error('Error refreshing QR code:', error);
+      }
     };
 
     if (showQRCode && instance?.id) {
