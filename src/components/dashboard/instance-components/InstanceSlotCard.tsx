@@ -63,10 +63,9 @@ export function InstanceSlotCard({
     refetchInterval: showQRCode ? 5000 : false, // Refetch every 5s when QR dialog is open
     refetchIntervalInBackground: true,
     staleTime: 0,
-    cacheTime: 0
+    gcTime: 0 // Changed from cacheTime to gcTime
   })
 
-  // Query for instance state
   const { data: stateData, isLoading: isLoadingState } = useQuery({
     queryKey: ['instance-state', instance?.id],
     queryFn: async () => {
