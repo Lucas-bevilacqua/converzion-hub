@@ -29,9 +29,9 @@ export function InstanceSlotCard({
   const { toast } = useToast()
   const { user } = useAuth()
 
-  // Query for instance state and QR code with automatic refetch when QR dialog is open
+  // Query for instance data with automatic refetch when QR dialog is open
   const { data: instanceData, isLoading: isLoadingInstance, refetch: refetchInstance } = useQuery({
-    queryKey: ['instance-data', instance?.id, showQRCode], // Added showQRCode to trigger refetch when dialog opens
+    queryKey: ['instance-data', instance?.id, showQRCode], // Added showQRCode to trigger refetch
     queryFn: async () => {
       if (!instance?.id || !user) {
         console.log('No instance or user found')
@@ -59,11 +59,14 @@ export function InstanceSlotCard({
         return null
       }
     },
-    enabled: !!instance?.id && !!user?.id,
-    refetchInterval: showQRCode ? 15000 : false, // Refetch every 15s when QR dialog is open
-    refetchIntervalInBackground: true
+    enabled: !!instance?.id && !!user?.id && showQRCode, // Only enabled when QR dialog is open
+    refetchInterval: showQRCode ? 5000 : false, // Refetch every 5s when QR dialog is open
+    refetchIntervalInBackground: true,
+    staleTime: 0,
+    cacheTime: 0
   })
 
+  // Query for instance state
   const { data: stateData, isLoading: isLoadingState } = useQuery({
     queryKey: ['instance-state', instance?.id],
     queryFn: async () => {
@@ -139,16 +142,18 @@ export function InstanceSlotCard({
   useEffect(() => {
     let intervalId: NodeJS.Timeout | null = null;
 
+    const refreshQRCode = async () => {
+      console.log('Refreshing QR code for instance:', instance?.id);
+      await handleConnect();
+      await refetchInstance();
+    };
+
     if (showQRCode && instance?.id) {
       // Initial QR code refresh
-      handleConnect();
+      refreshQRCode();
 
       // Set up interval for QR code refresh
-      intervalId = setInterval(() => {
-        console.log('Refreshing QR code for instance:', instance.id);
-        handleConnect();
-        refetchInstance(); // Added refetch call here
-      }, 15000); // 15 seconds
+      intervalId = setInterval(refreshQRCode, 5000); // 5 seconds
     }
 
     // Cleanup interval on component unmount or when QR code dialog is closed
