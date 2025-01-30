@@ -59,8 +59,8 @@ export function InstanceSlotCard({
         return null
       }
     },
-    enabled: !!instance?.id && !!user?.id && showQRCode, // Only enabled when QR dialog is open
-    refetchInterval: showQRCode ? 5000 : false, // Refetch every 5s when QR dialog is open
+    enabled: !!instance?.id && !!user?.id && showQRCode,
+    refetchInterval: showQRCode ? 30000 : false, // Refetch every 30s when QR dialog is open
     refetchIntervalInBackground: true,
     staleTime: 0,
     gcTime: 0
@@ -144,11 +144,11 @@ export function InstanceSlotCard({
     const refreshQRCode = async () => {
       if (!instance?.id) return;
       
-      console.log('Refreshing QR code for instance:', instance.id);
+      console.log('Refreshing QR code for instance:', instance.id, 'at:', new Date().toISOString());
       try {
         await handleConnect();
         await refetchInstance();
-        console.log('QR code refreshed successfully');
+        console.log('QR code refreshed successfully at:', new Date().toISOString());
       } catch (error) {
         console.error('Error refreshing QR code:', error);
       }
@@ -158,14 +158,16 @@ export function InstanceSlotCard({
       // Initial QR code refresh
       refreshQRCode();
 
-      // Set up interval for QR code refresh
-      intervalId = setInterval(refreshQRCode, 5000); // 5 seconds
+      // Set up interval for QR code refresh every 30 seconds
+      intervalId = setInterval(refreshQRCode, 30000);
+      console.log('QR code refresh interval set up for every 30 seconds');
     }
 
     // Cleanup interval on component unmount or when QR code dialog is closed
     return () => {
       if (intervalId) {
         clearInterval(intervalId);
+        console.log('QR code refresh interval cleared');
       }
     };
   }, [showQRCode, instance?.id]);
