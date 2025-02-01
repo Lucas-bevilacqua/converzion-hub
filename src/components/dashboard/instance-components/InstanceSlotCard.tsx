@@ -2,7 +2,6 @@ import { useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { supabase } from "@/integrations/supabase/client"
 import { Button } from "@/components/ui/button"
-import { Dialog } from "@/components/ui/dialog"
 import { QRCodeDialog } from "./QRCodeDialog"
 import { InstancePromptDialog } from "./InstancePromptDialog"
 import { useToast } from "@/hooks/use-toast"
@@ -56,7 +55,6 @@ export function InstanceSlotCard({
 
         if (instanceError) {
           console.error('Error fetching instance:', instanceError)
-          // Only show toast for non-network errors
           if (!instanceError.message.includes('NetworkError') && 
               !instanceError.message.includes('Failed to fetch')) {
             toast({
@@ -76,11 +74,11 @@ export function InstanceSlotCard({
       }
     },
     enabled: !!instance?.id && !!user?.id,
-    refetchInterval: 30000, // Refetch every 30 seconds
-    retry: 5, // Increase retries for network issues
-    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000), // Exponential backoff with max 30s delay
-    retryOnMount: true, // Retry when component mounts
-    staleTime: 1000 * 60 * 5, // Consider data stale after 5 minutes
+    refetchInterval: 30000,
+    retry: 5,
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
+    retryOnMount: true,
+    staleTime: 1000 * 60 * 5,
   })
 
   const handleDelete = async () => {
@@ -95,7 +93,6 @@ export function InstanceSlotCard({
         description: "Instância excluída com sucesso.",
       })
 
-      // Invalidate and refetch instances query
       await queryClient.invalidateQueries({ queryKey: ['instances'] })
     } catch (error) {
       console.error('Error deleting instance:', error)
@@ -130,7 +127,6 @@ export function InstanceSlotCard({
 
       console.log('QR Code generated successfully:', data)
 
-      // Refetch instance data to get the new QR code
       await refetchInstance()
 
       toast({
@@ -228,13 +224,11 @@ export function InstanceSlotCard({
 
       {instance && (
         <>
-          <Dialog open={showQRCode} onOpenChange={setShowQRCode}>
-            <QRCodeDialog
-              open={showQRCode}
-              onOpenChange={setShowQRCode}
-              qrCode={instanceData?.qr_code || null}
-            />
-          </Dialog>
+          <QRCodeDialog
+            open={showQRCode}
+            onOpenChange={setShowQRCode}
+            qrCode={instanceData?.qr_code || null}
+          />
 
           <InstancePromptDialog
             open={showSettings}
