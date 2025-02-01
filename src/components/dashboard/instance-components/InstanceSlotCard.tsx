@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { supabase } from "@/integrations/supabase/client"
 import { Button } from "@/components/ui/button"
@@ -33,7 +33,7 @@ export function InstanceSlotCard({
   const { user } = useAuth()
   const { deleteMutation } = useInstanceMutations()
 
-  const { data: instanceData, isLoading: isLoadingInstance } = useQuery({
+  const { data: instanceData, isLoading: isLoadingInstance, refetch: refetchInstance } = useQuery({
     queryKey: ['instance-data', instance?.id],
     queryFn: async () => {
       if (!instance?.id || !user) {
@@ -63,6 +63,7 @@ export function InstanceSlotCard({
       }
     },
     enabled: !!instance?.id && !!user?.id,
+    refetchInterval: 30000 // Refetch every 30 seconds
   })
 
   const handleDelete = async () => {
@@ -146,6 +147,7 @@ export function InstanceSlotCard({
               <div className="flex items-center gap-2">
                 <InstanceConnectionStatus 
                   instance={instance}
+                  stateData={null}
                   isLoading={isLoadingInstance}
                 />
                 {isUsed && (
@@ -186,6 +188,7 @@ export function InstanceSlotCard({
             <InstanceActions
               instance={instance!}
               isConnected={isConnected}
+              isLoading={isLoadingInstance}
               onConnect={handleConnect}
               onDisconnect={onDisconnect}
               onSettings={() => setShowSettings(true)}
