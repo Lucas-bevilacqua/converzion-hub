@@ -1,4 +1,4 @@
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Loader2 } from "lucide-react"
 
 export interface QRCodeDialogProps {
@@ -15,19 +15,24 @@ export function QRCodeDialog({ open, onOpenChange, qrCode }: QRCodeDialogProps) 
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Conecte seu WhatsApp</DialogTitle>
+          <DialogDescription>
+            Escaneie o código QR abaixo para conectar seu WhatsApp
+          </DialogDescription>
         </DialogHeader>
         <div className="flex flex-col items-center justify-center space-y-4">
           {qrCode ? (
             <>
-              <img 
-                src={qrCode.startsWith('data:image') ? qrCode : `data:image/png;base64,${qrCode}`}
-                alt="QR Code" 
-                className="w-64 h-64"
-                onError={(e) => {
-                  console.error('Error loading QR code image:', e)
-                  e.currentTarget.style.display = 'none'
-                }}
-              />
+              <div className="relative w-64 h-64 bg-white rounded-lg shadow-sm overflow-hidden">
+                <img 
+                  src={qrCode.startsWith('data:image') ? qrCode : `data:image/png;base64,${qrCode}`}
+                  alt="QR Code" 
+                  className="w-full h-full object-contain"
+                  onError={(e) => {
+                    console.error('Error loading QR code image:', e)
+                    e.currentTarget.style.display = 'none'
+                  }}
+                />
+              </div>
               <p className="text-sm text-muted-foreground text-center">
                 Abra o WhatsApp no seu celular<br/>
                 Toque em Menu ou Configurações e selecione Aparelhos Conectados<br/>
