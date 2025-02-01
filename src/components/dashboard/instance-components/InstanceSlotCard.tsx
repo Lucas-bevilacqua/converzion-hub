@@ -13,6 +13,7 @@ import { InstanceActions } from "./InstanceActions"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
 import { Trash2 } from "lucide-react"
 import { useInstanceMutations } from "./InstanceMutations"
+import { useQueryClient } from "@tanstack/react-query"
 
 interface InstanceSlotCardProps {
   instance: EvolutionInstance | null
@@ -32,6 +33,7 @@ export function InstanceSlotCard({
   const { toast } = useToast()
   const { user } = useAuth()
   const { deleteMutation } = useInstanceMutations()
+  const queryClient = useQueryClient()
 
   const { data: instanceData, isLoading: isLoadingInstance, refetch: refetchInstance } = useQuery({
     queryKey: ['instance-data', instance?.id],
@@ -77,6 +79,9 @@ export function InstanceSlotCard({
         title: "Sucesso",
         description: "Instância excluída com sucesso.",
       })
+
+      // Invalidate and refetch instances query
+      await queryClient.invalidateQueries({ queryKey: ['instances'] })
     } catch (error) {
       console.error('Error deleting instance:', error)
       toast({
