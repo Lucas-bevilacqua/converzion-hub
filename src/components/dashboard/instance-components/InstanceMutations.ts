@@ -5,6 +5,24 @@ export const useInstanceMutations = () => {
   const createMutation = useMutation({
     mutationFn: async (data: { name: string; phone_number: string }) => {
       console.log('Creating instance with data:', data)
+
+      // First check if an instance with this name already exists
+      const { data: existingInstance, error: checkError } = await supabase
+        .from('evolution_instances')
+        .select('id, name')
+        .eq('name', data.name)
+        .single()
+
+      if (existingInstance) {
+        console.error('Instance with this name already exists:', existingInstance)
+        throw new Error('Uma instância com este nome já existe. Por favor, escolha outro nome.')
+      }
+
+      if (checkError && checkError.code !== 'PGRST116') { // PGRST116 means no rows returned
+        console.error('Error checking existing instance:', checkError)
+        throw checkError
+      }
+
       const response = await supabase.functions.invoke('create-evolution-instance', {
         body: {
           ...data,
@@ -14,7 +32,12 @@ export const useInstanceMutations = () => {
 
       if (response.error) {
         console.error('Error creating instance:', response.error)
-        throw new Error(response.error.message || 'Failed to create instance')
+        // Parse the error message to make it user friendly
+        const errorBody = JSON.parse(response.error.message || '{}')
+        if (errorBody.error && errorBody.error.includes('already in use')) {
+          throw new Error('Uma instância com este nome já existe. Por favor, escolha outro nome.')
+        }
+        throw new Error(response.error.message || 'Falha ao criar instância')
       }
 
       return response.data
