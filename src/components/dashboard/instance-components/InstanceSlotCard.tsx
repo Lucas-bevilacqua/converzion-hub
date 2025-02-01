@@ -35,7 +35,7 @@ export function InstanceSlotCard({
   const { deleteMutation } = useInstanceMutations()
   const queryClient = useQueryClient()
 
-  const { data: instanceData, isLoading: isLoadingInstance, refetch: refetchInstance } = useQuery({
+  const { data: instanceData, isLoading: isLoadingInstance, refetch: refetchInstance, error } = useQuery({
     queryKey: ['instance-data', instance?.id],
     queryFn: async () => {
       if (!instance?.id || !user) {
@@ -50,22 +50,32 @@ export function InstanceSlotCard({
           .select('*')
           .eq('id', instance.id)
           .eq('user_id', user.id)
-          .single()
+          .maybeSingle()
 
         if (instanceError) {
           console.error('Error fetching instance:', instanceError)
-          return null
+          throw instanceError
         }
 
         console.log('Instance data fetched:', instanceData)
         return instanceData
       } catch (error) {
         console.error('Error in instance query:', error)
-        return null
+        // Only show toast for non-network errors since network errors are usually temporary
+        if (!(error instanceof Error) || !error.message.includes('NetworkError')) {
+          toast({
+            title: "Erro",
+            description: "Falha ao carregar dados da instância. Tente novamente.",
+            variant: "destructive",
+          })
+        }
+        throw error
       }
     },
     enabled: !!instance?.id && !!user?.id,
-    refetchInterval: 30000 // Refetch every 30 seconds
+    refetchInterval: 30000, // Refetch every 30 seconds
+    retry: 3, // Retry failed requests 3 times
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000), // Exponential backoff
   })
 
   const handleDelete = async () => {
