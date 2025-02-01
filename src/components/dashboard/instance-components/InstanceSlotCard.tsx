@@ -57,7 +57,8 @@ export function InstanceSlotCard({
           console.error('Error fetching instance:', instanceError)
           // Only show toast for non-network errors
           if (!instanceError.message.includes('NetworkError') && 
-              !instanceError.message.includes('Failed to fetch')) {
+              !instanceError.message.includes('Failed to fetch') &&
+              !instanceError.message.includes('CORS')) {
             toast({
               title: "Erro",
               description: "Falha ao carregar dados da instância. Tente novamente.",
