@@ -35,6 +35,8 @@ export function InstanceSlotCard({
   const { deleteMutation } = useInstanceMutations()
   const queryClient = useQueryClient()
 
+  console.log('InstanceSlotCard - Rendering with instance:', instance?.id)
+
   const { data: instanceData, isLoading: isLoadingInstance, refetch: refetchInstance } = useQuery({
     queryKey: ['instance-data', instance?.id],
     queryFn: async () => {
@@ -55,7 +57,8 @@ export function InstanceSlotCard({
         if (instanceError) {
           console.error('Error fetching instance:', instanceError)
           // Only show toast for non-network errors
-          if (!instanceError.message.includes('NetworkError')) {
+          if (!instanceError.message.includes('NetworkError') && 
+              !instanceError.message.includes('Failed to fetch')) {
             toast({
               title: "Erro",
               description: "Falha ao carregar dados da instância. Tente novamente.",
@@ -138,9 +141,10 @@ export function InstanceSlotCard({
       setShowQRCode(true)
     } catch (error) {
       console.error('Error connecting:', error)
+      const errorMessage = error instanceof Error ? error.message : "Erro ao conectar instância"
       toast({
         title: "Erro",
-        description: error instanceof Error ? error.message : "Erro ao conectar instância",
+        description: errorMessage,
         variant: "destructive",
       })
     }
