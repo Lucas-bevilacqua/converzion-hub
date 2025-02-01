@@ -92,52 +92,9 @@ serve(async (req) => {
     
     console.log('Evolution API Base URL:', baseUrl)
     console.log('Instance Name:', instanceName)
+    console.log('Attempting to generate QR code...')
 
-    // First check if instance exists
-    const checkInstanceResponse = await fetch(`${baseUrl}/instance/connectionState/${instanceName}`, {
-      method: 'GET',
-      headers: {
-        'apikey': evolutionApiKey,
-        'Content-Type': 'application/json'
-      }
-    })
-
-    let needsCreation = true
-    if (checkInstanceResponse.ok) {
-      console.log('Instance already exists in Evolution API')
-      needsCreation = false
-    } else {
-      console.log('Instance does not exist, will create it')
-    }
-
-    // Create instance if needed
-    if (needsCreation) {
-      console.log('Creating new instance in Evolution API')
-      const createInstanceResponse = await fetch(`${baseUrl}/instance/create`, {
-        method: 'POST',
-        headers: {
-          'apikey': evolutionApiKey,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          instanceName: instance.name,
-          qrcode: true,
-          number: instance.phone_number
-        })
-      })
-
-      if (!createInstanceResponse.ok) {
-        const errorText = await createInstanceResponse.text()
-        console.error('Evolution API instance creation error:', errorText)
-        throw new Error(`Failed to create instance: ${errorText}`)
-      }
-
-      const createInstanceData = await createInstanceResponse.json()
-      console.log('Instance created in Evolution API:', createInstanceData)
-    }
-
-    // Get QR code using the correct connect endpoint
-    console.log('Fetching QR code for instance')
+    // Generate QR code
     const qrResponse = await fetch(`${baseUrl}/instance/connect/${instanceName}`, {
       method: 'GET',
       headers: {
@@ -153,8 +110,9 @@ serve(async (req) => {
     }
 
     const qrData = await qrResponse.json()
-    const qrCode = qrData.qrcode?.base64 || qrData.qrcode || qrData.base64
+    console.log('QR code response:', qrData)
 
+    const qrCode = qrData.qrcode?.base64 || qrData.qrcode || qrData.base64
     if (!qrCode) {
       console.error('No QR code in response:', qrData)
       throw new Error('No QR code found in Evolution API response')
@@ -175,7 +133,7 @@ serve(async (req) => {
       throw updateError
     }
 
-    console.log('Successfully processed instance connection')
+    console.log('Successfully generated and stored QR code')
 
     return new Response(
       JSON.stringify({
