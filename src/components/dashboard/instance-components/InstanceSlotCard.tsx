@@ -54,6 +54,14 @@ export function InstanceSlotCard({
 
         if (instanceError) {
           console.error('Error fetching instance:', instanceError)
+          // Only show toast for non-network errors
+          if (!instanceError.message.includes('NetworkError')) {
+            toast({
+              title: "Erro",
+              description: "Falha ao carregar dados da instância. Tente novamente.",
+              variant: "destructive",
+            })
+          }
           throw instanceError
         }
 
@@ -61,20 +69,12 @@ export function InstanceSlotCard({
         return instanceData
       } catch (error) {
         console.error('Error in instance query:', error)
-        // Only show toast for non-network errors since network errors are usually temporary
-        if (!(error instanceof Error) || !error.message.includes('NetworkError')) {
-          toast({
-            title: "Erro",
-            description: "Falha ao carregar dados da instância. Tente novamente.",
-            variant: "destructive",
-          })
-        }
         throw error
       }
     },
     enabled: !!instance?.id && !!user?.id,
     refetchInterval: 30000, // Refetch every 30 seconds
-    retry: 3, // Retry failed requests 3 times
+    retry: 5, // Increase retries for network issues
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000), // Exponential backoff with max 30s delay
     retryOnMount: true, // Retry when component mounts
     staleTime: 1000 * 60 * 5, // Consider data stale after 5 minutes
