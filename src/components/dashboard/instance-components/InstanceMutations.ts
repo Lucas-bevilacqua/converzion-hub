@@ -49,8 +49,31 @@ export const useInstanceMutations = () => {
     }
   })
 
+  const deleteMutation = useMutation({
+    mutationFn: async (instanceId: string) => {
+      console.log('Deleting instance:', instanceId)
+      
+      // First disconnect the instance
+      await disconnectMutation.mutateAsync(instanceId)
+      
+      // Then delete the instance from the database
+      const { error } = await supabase
+        .from('evolution_instances')
+        .delete()
+        .eq('id', instanceId)
+
+      if (error) {
+        console.error('Error deleting instance:', error)
+        throw error
+      }
+
+      return true
+    }
+  })
+
   return {
     createMutation,
-    disconnectMutation
+    disconnectMutation,
+    deleteMutation
   }
 }

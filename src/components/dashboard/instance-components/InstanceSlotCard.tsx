@@ -10,6 +10,9 @@ import type { EvolutionInstance } from "@/integrations/supabase/database-types/e
 import { useAuth } from "@/contexts/auth/AuthContext"
 import { InstanceConnectionStatus } from "./InstanceConnectionStatus"
 import { InstanceActions } from "./InstanceActions"
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
+import { Trash2 } from "lucide-react"
+import { useInstanceMutations } from "./InstanceMutations"
 
 interface InstanceSlotCardProps {
   instance: EvolutionInstance | null
@@ -28,10 +31,10 @@ export function InstanceSlotCard({
   const [showSettings, setShowSettings] = useState(false)
   const { toast } = useToast()
   const { user } = useAuth()
+  const { deleteMutation } = useInstanceMutations()
 
-  // Query for instance data with automatic refetch when QR dialog is open
-  const { data: instanceData, isLoading: isLoadingInstance, refetch: refetchInstance } = useQuery({
-    queryKey: ['instance-data', instance?.id, showQRCode], // Added showQRCode to trigger refetch
+  const { data: instanceData, isLoading: isLoadingInstance } = useQuery({
+    queryKey: ['instance-data', instance?.id],
     queryFn: async () => {
       if (!instance?.id || !user) {
         console.log('No instance or user found')
@@ -59,123 +62,32 @@ export function InstanceSlotCard({
         return null
       }
     },
-    enabled: !!instance?.id && !!user?.id && showQRCode,
-    refetchInterval: showQRCode ? 30000 : false, // Refetch every 30s when QR dialog is open
-    refetchIntervalInBackground: true,
-    staleTime: 0,
-    gcTime: 0
-  })
-
-  const { data: stateData, isLoading: isLoadingState } = useQuery({
-    queryKey: ['instance-state', instance?.id],
-    queryFn: async () => {
-      if (!instance?.id || !user) {
-        console.log('User not authenticated or instance not found')
-        return null
-      }
-      
-      try {
-        console.log('Checking state for instance:', instance.name)
-        
-        const { data, error } = await supabase.functions.invoke('check-instance-state', {
-          body: { instanceId: instance.id }
-        })
-
-        if (error) {
-          console.error('Error checking state:', error)
-          throw error
-        }
-
-        // Update status in database
-        if (data?.state === 'connected' || data?.instance?.instance?.state === 'open') {
-          const { error: updateError } = await supabase
-            .from('evolution_instances')
-            .update({ 
-              connection_status: 'connected',
-              status: 'connected'
-            })
-            .eq('id', instance.id)
-
-          if (updateError) {
-            console.error('Error updating status in database:', updateError)
-          } else {
-            console.log('Status updated in database to connected')
-          }
-        } else if (data?.state === 'disconnected') {
-          const { error: updateError } = await supabase
-            .from('evolution_instances')
-            .update({ 
-              connection_status: 'disconnected',
-              status: 'disconnected'
-            })
-            .eq('id', instance.id)
-
-          if (updateError) {
-            console.error('Error updating status in database:', updateError)
-          } else {
-            console.log('Status updated in database to disconnected')
-          }
-        }
-
-        console.log('State received from API:', data)
-        return data
-      } catch (error) {
-        console.error('Error checking state:', error)
-        toast({
-          title: "Erro",
-          description: "Falha ao verificar estado da instância. Tente novamente.",
-          variant: "destructive",
-        })
-        throw error
-      }
-    },
     enabled: !!instance?.id && !!user?.id,
-    refetchInterval: 2000,
-    retry: true,
-    retryDelay: 1000,
-    gcTime: 0,
-    staleTime: 0
   })
 
-  // Effect to handle QR code refresh
-  useEffect(() => {
-    let intervalId: NodeJS.Timeout | null = null;
+  const handleDelete = async () => {
+    if (!instance?.id) return
 
-    const refreshQRCode = async () => {
-      if (!instance?.id) return;
+    try {
+      console.log('Deleting instance:', instance.id)
+      await deleteMutation.mutateAsync(instance.id)
       
-      console.log('Refreshing QR code for instance:', instance.id, 'at:', new Date().toISOString());
-      try {
-        await handleConnect();
-        await refetchInstance();
-        console.log('QR code refreshed successfully at:', new Date().toISOString());
-      } catch (error) {
-        console.error('Error refreshing QR code:', error);
-      }
-    };
-
-    if (showQRCode && instance?.id) {
-      // Initial QR code refresh
-      refreshQRCode();
-
-      // Set up interval for QR code refresh every 30 seconds
-      intervalId = setInterval(refreshQRCode, 30000);
-      console.log('QR code refresh interval set up for every 30 seconds');
+      toast({
+        title: "Sucesso",
+        description: "Instância excluída com sucesso.",
+      })
+    } catch (error) {
+      console.error('Error deleting instance:', error)
+      toast({
+        title: "Erro",
+        description: "Falha ao excluir instância. Tente novamente.",
+        variant: "destructive",
+      })
     }
-
-    // Cleanup interval on component unmount or when QR code dialog is closed
-    return () => {
-      if (intervalId) {
-        clearInterval(intervalId);
-        console.log('QR code refresh interval cleared');
-      }
-    };
-  }, [showQRCode, instance?.id]);
+  }
 
   const isConnected = 
-    instance?.connection_status === 'connected' ||
-    stateData?.state === 'connected' ||
-    stateData?.instance?.instance?.state === 'open'
+    instance?.connection_status === 'connected'
 
   const handleConnect = async () => {
     if (!user) {
@@ -231,11 +143,42 @@ export function InstanceSlotCard({
               </p>
             </div>
             {instance && (
-              <InstanceConnectionStatus 
-                instance={instance}
-                stateData={stateData}
-                isLoading={isLoadingState}
-              />
+              <div className="flex items-center gap-2">
+                <InstanceConnectionStatus 
+                  instance={instance}
+                  isLoading={isLoadingInstance}
+                />
+                {isUsed && (
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="text-destructive hover:text-destructive/90"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Excluir Instância</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          Tem certeza que deseja excluir esta instância? Esta ação não pode ser desfeita.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                        <AlertDialogAction 
+                          onClick={handleDelete}
+                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        >
+                          Excluir
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                )}
+              </div>
             )}
           </div>
 
@@ -243,7 +186,6 @@ export function InstanceSlotCard({
             <InstanceActions
               instance={instance!}
               isConnected={isConnected}
-              isLoading={isLoadingState}
               onConnect={handleConnect}
               onDisconnect={onDisconnect}
               onSettings={() => setShowSettings(true)}
