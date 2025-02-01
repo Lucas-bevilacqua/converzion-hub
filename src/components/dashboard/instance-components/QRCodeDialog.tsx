@@ -8,6 +8,8 @@ export interface QRCodeDialogProps {
 }
 
 export function QRCodeDialog({ open, onOpenChange, qrCode }: QRCodeDialogProps) {
+  console.log('QRCodeDialog - Rendering with QR code:', qrCode ? 'present' : 'null')
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
@@ -21,6 +23,10 @@ export function QRCodeDialog({ open, onOpenChange, qrCode }: QRCodeDialogProps) 
                 src={qrCode.startsWith('data:image') ? qrCode : `data:image/png;base64,${qrCode}`}
                 alt="QR Code" 
                 className="w-64 h-64"
+                onError={(e) => {
+                  console.error('Error loading QR code image:', e)
+                  e.currentTarget.style.display = 'none'
+                }}
               />
               <p className="text-sm text-muted-foreground text-center">
                 Abra o WhatsApp no seu celular<br/>
@@ -30,8 +36,11 @@ export function QRCodeDialog({ open, onOpenChange, qrCode }: QRCodeDialogProps) 
               </p>
             </>
           ) : (
-            <div className="flex items-center justify-center w-64 h-64">
+            <div className="flex flex-col items-center justify-center w-64 h-64 gap-4">
               <Loader2 className="h-8 w-8 animate-spin" />
+              <p className="text-sm text-muted-foreground text-center">
+                Gerando QR Code...
+              </p>
             </div>
           )}
         </div>
