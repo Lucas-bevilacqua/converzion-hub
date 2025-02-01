@@ -86,7 +86,7 @@ export function InstanceSlotCard({
     },
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
     retryOnMount: true,
-    staleTime: 1000 * 60 * 5, // Consider data stale after 5 minutes
+    staleTime: 1000 * 60 * 5 // Consider data stale after 5 minutes
   })
 
   const handleDelete = async () => {
@@ -127,7 +127,7 @@ export function InstanceSlotCard({
     try {
       console.log('Starting connection for instance:', instance?.id)
       
-      const { data, error } = await supabase.functions.invoke('connect-instance', {
+      const { data, error } = await supabase.functions.invoke('connect-evolution-instance', {
         body: { instanceId: instance?.id }
       })
 
