@@ -35,7 +35,7 @@ export function InstanceSlotCard({
   const { deleteMutation } = useInstanceMutations()
   const queryClient = useQueryClient()
 
-  const { data: instanceData, isLoading: isLoadingInstance, refetch: refetchInstance, error } = useQuery({
+  const { data: instanceData, isLoading: isLoadingInstance, refetch: refetchInstance } = useQuery({
     queryKey: ['instance-data', instance?.id],
     queryFn: async () => {
       if (!instance?.id || !user) {
@@ -75,7 +75,9 @@ export function InstanceSlotCard({
     enabled: !!instance?.id && !!user?.id,
     refetchInterval: 30000, // Refetch every 30 seconds
     retry: 3, // Retry failed requests 3 times
-    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000), // Exponential backoff
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000), // Exponential backoff with max 30s delay
+    retryOnMount: true, // Retry when component mounts
+    staleTime: 1000 * 60 * 5, // Consider data stale after 5 minutes
   })
 
   const handleDelete = async () => {
@@ -102,8 +104,7 @@ export function InstanceSlotCard({
     }
   }
 
-  const isConnected = 
-    instance?.connection_status === 'connected'
+  const isConnected = instance?.connection_status === 'connected'
 
   const handleConnect = async () => {
     if (!user) {
