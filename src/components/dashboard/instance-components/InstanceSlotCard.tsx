@@ -86,7 +86,7 @@ export function InstanceSlotCard({
     },
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
     retryOnMount: true,
-    staleTime: 1000 * 60 * 5,
+    staleTime: 1000 * 60 * 5, // Consider data stale after 5 minutes
   })
 
   const handleDelete = async () => {
