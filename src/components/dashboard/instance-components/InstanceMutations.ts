@@ -25,6 +25,23 @@ export const useInstanceMutations = () => {
     mutationFn: async (instanceId: string) => {
       console.log('Disconnecting instance:', instanceId)
       
+      // First check if instance exists and is connected
+      const { data: instance, error: instanceError } = await supabase
+        .from('evolution_instances')
+        .select('connection_status')
+        .eq('id', instanceId)
+        .single()
+
+      if (instanceError) {
+        console.error('Error checking instance status:', instanceError)
+        throw instanceError
+      }
+
+      if (instance.connection_status !== 'connected') {
+        console.log('Instance is already disconnected')
+        throw new Error('Esta instância já está desconectada')
+      }
+
       const { data, error } = await supabase.functions.invoke('disconnect-evolution-instance', {
         body: { instanceId }
       })
@@ -53,8 +70,21 @@ export const useInstanceMutations = () => {
     mutationFn: async (instanceId: string) => {
       console.log('Deleting instance:', instanceId)
       
-      // First disconnect the instance
-      await disconnectMutation.mutateAsync(instanceId)
+      // First disconnect the instance if it's connected
+      const { data: instance } = await supabase
+        .from('evolution_instances')
+        .select('connection_status')
+        .eq('id', instanceId)
+        .single()
+
+      if (instance?.connection_status === 'connected') {
+        try {
+          await disconnectMutation.mutateAsync(instanceId)
+        } catch (error) {
+          console.log('Instance was already disconnected or disconnect failed:', error)
+          // Continue with deletion even if disconnect fails
+        }
+      }
       
       // Then delete the instance from the database
       const { error } = await supabase
