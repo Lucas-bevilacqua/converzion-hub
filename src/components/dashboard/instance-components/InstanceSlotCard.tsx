@@ -55,6 +55,7 @@ export function InstanceSlotCard({
 
         if (instanceError) {
           console.error('Error fetching instance:', instanceError)
+          // Only show toast for non-network errors
           if (!instanceError.message.includes('NetworkError') && 
               !instanceError.message.includes('Failed to fetch')) {
             toast({
@@ -75,7 +76,14 @@ export function InstanceSlotCard({
     },
     enabled: !!instance?.id && !!user?.id,
     refetchInterval: 30000,
-    retry: 5,
+    retry: (failureCount, error) => {
+      // Don't retry on 4xx errors
+      if (error instanceof Error && error.message.includes('4')) {
+        return false
+      }
+      // Retry up to 3 times for other errors
+      return failureCount < 3
+    },
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
     retryOnMount: true,
     staleTime: 1000 * 60 * 5,
