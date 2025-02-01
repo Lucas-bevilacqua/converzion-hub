@@ -12,7 +12,7 @@ export function QRCodeDialog({ open, onOpenChange, qrCode }: QRCodeDialogProps) 
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent>
         <DialogHeader>
           <DialogTitle>Conecte seu WhatsApp</DialogTitle>
           <DialogDescription>
