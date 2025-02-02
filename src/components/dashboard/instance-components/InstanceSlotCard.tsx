@@ -153,6 +153,15 @@ export function InstanceSlotCard({
 
   const isConnected = instance?.connection_status === 'connected'
 
+  // Render loading state or error fallback
+  if (isLoadingInstance) {
+    return (
+      <div className="relative p-6 rounded-lg border bg-card text-card-foreground shadow-sm animate-pulse">
+        <div className="h-20 bg-gray-200 rounded"></div>
+      </div>
+    )
+  }
+
   return (
     <>
       <div className="relative p-6 rounded-lg border bg-card text-card-foreground shadow-sm">
