@@ -138,10 +138,10 @@ export function InstanceSlotCard({
       }
 
       console.log('QR Code generated successfully:', data)
-
-      await refetchInstance()
       
       setShowQRCode(true)
+
+      await refetchInstance()
 
       toast({
         title: "Sucesso",
