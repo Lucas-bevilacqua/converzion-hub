@@ -54,7 +54,6 @@ export function InstanceSlotCard({
 
         if (instanceError) {
           console.error('Erro ao buscar instância:', instanceError)
-          // Don't throw here, return null instead to allow React Query to handle retries
           return null
         }
 
@@ -62,13 +61,12 @@ export function InstanceSlotCard({
         return instanceData
       } catch (error) {
         console.error('Erro na consulta da instância:', error)
-        // Return null instead of throwing to allow React Query to handle retries
         return null
       }
     },
     enabled: !!instance?.id && !!user?.id,
     refetchInterval: 30000,
-    retry: 5, // Increased retries
+    retry: 5,
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
     retryOnMount: true,
     staleTime: 1000 * 60 * 5,
@@ -77,7 +75,7 @@ export function InstanceSlotCard({
         console.error('Erro na query da instância:', error)
         toast({
           title: "Erro de conexão",
-          description: "Não foi possível conectar ao servidor. Tentando novamente...",
+          description: "Não foi possível conectar ao servidor. Tentando novamente em alguns segundos...",
           variant: "destructive",
         })
       }
