@@ -34,18 +34,18 @@ export function InstanceSlotCard({
   const { deleteMutation } = useInstanceMutations()
   const queryClient = useQueryClient()
 
-  console.log('InstanceSlotCard - Rendering with instance:', instance?.id)
+  console.log('InstanceSlotCard - Renderizando com instância:', instance?.id)
 
   const { data: instanceData, isLoading: isLoadingInstance, refetch: refetchInstance } = useQuery({
     queryKey: ['instance-data', instance?.id],
     queryFn: async () => {
       if (!instance?.id || !user) {
-        console.log('No instance or user found')
+        console.log('Nenhuma instância ou usuário encontrado')
         return null
       }
 
       try {
-        console.log('Fetching instance data for:', instance.id)
+        console.log('Buscando dados da instância:', instance.id)
         const { data: instanceData, error: instanceError } = await supabase
           .from('evolution_instances')
           .select('*')
@@ -54,10 +54,10 @@ export function InstanceSlotCard({
           .maybeSingle()
 
         if (instanceError) {
-          // Only show toast for non-network errors
+          // Só mostra toast para erros que não são de rede
           if (!instanceError.message.includes('NetworkError') && 
               !instanceError.message.includes('Failed to fetch')) {
-            console.error('Error fetching instance:', instanceError)
+            console.error('Erro ao buscar instância:', instanceError)
             toast({
               title: "Erro",
               description: "Falha ao carregar dados da instância. Tente novamente.",
@@ -67,11 +67,11 @@ export function InstanceSlotCard({
           throw instanceError
         }
 
-        console.log('Instance data fetched:', instanceData)
+        console.log('Dados da instância obtidos:', instanceData)
         return instanceData
       } catch (error) {
-        console.error('Error in instance query:', error)
-        // Don't throw network errors to allow retries
+        console.error('Erro na consulta da instância:', error)
+        // Não lança erros de rede para permitir novas tentativas
         if (error instanceof Error && 
             (error.message.includes('NetworkError') || 
              error.message.includes('Failed to fetch'))) {
@@ -83,25 +83,25 @@ export function InstanceSlotCard({
     enabled: !!instance?.id && !!user?.id,
     refetchInterval: 30000,
     retry: (failureCount, error) => {
-      // Retry network errors up to 3 times
+      // Tenta novamente erros de rede até 3 vezes
       if (error instanceof Error && 
           (error.message.includes('NetworkError') || 
            error.message.includes('Failed to fetch'))) {
         return failureCount < 3
       }
-      // Don't retry other errors
+      // Não tenta novamente outros erros
       return false
     },
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
     retryOnMount: true,
-    staleTime: 1000 * 60 * 5 // Consider data stale after 5 minutes
+    staleTime: 1000 * 60 * 5 // Considera dados obsoletos após 5 minutos
   })
 
   const handleDelete = async () => {
     if (!instance?.id) return
 
     try {
-      console.log('Deleting instance:', instance.id)
+      console.log('Excluindo instância:', instance.id)
       await deleteMutation.mutateAsync(instance.id)
       
       toast({
@@ -111,7 +111,7 @@ export function InstanceSlotCard({
 
       await queryClient.invalidateQueries({ queryKey: ['instances'] })
     } catch (error) {
-      console.error('Error deleting instance:', error)
+      console.error('Erro ao excluir instância:', error)
       toast({
         title: "Erro",
         description: "Falha ao excluir instância. Tente novamente.",
@@ -131,18 +131,18 @@ export function InstanceSlotCard({
     }
 
     try {
-      console.log('Starting connection for instance:', instance?.id)
+      console.log('Iniciando conexão para instância:', instance?.id)
       
       const { data, error } = await supabase.functions.invoke('connect-evolution-instance', {
         body: { instanceId: instance?.id }
       })
 
       if (error) {
-        console.error('Error connecting:', error)
+        console.error('Erro ao conectar:', error)
         throw error
       }
 
-      console.log('QR Code generated successfully:', data)
+      console.log('QR Code gerado com sucesso:', data)
       
       setShowQRCode(true)
 
@@ -153,7 +153,7 @@ export function InstanceSlotCard({
         description: "QR Code gerado com sucesso. Escaneie para conectar.",
       })
     } catch (error) {
-      console.error('Error connecting:', error)
+      console.error('Erro ao conectar:', error)
       const errorMessage = error instanceof Error ? error.message : "Erro ao conectar instância"
       toast({
         title: "Erro",
