@@ -71,13 +71,15 @@ export function InstanceSlotCard({
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
     retryOnMount: true,
     staleTime: 1000 * 60 * 5,
-    onError: (error) => {
-      console.error('Erro na query da instância:', error)
-      toast({
-        title: "Erro de conexão",
-        description: "Não foi possível conectar ao servidor. Tentando novamente...",
-        variant: "destructive",
-      })
+    meta: {
+      onError: (error: Error) => {
+        console.error('Erro na query da instância:', error)
+        toast({
+          title: "Erro de conexão",
+          description: "Não foi possível conectar ao servidor. Tentando novamente...",
+          variant: "destructive",
+        })
+      }
     }
   })
 
