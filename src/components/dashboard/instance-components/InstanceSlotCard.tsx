@@ -132,18 +132,21 @@ export function InstanceSlotCard({
         body: { instanceId: instance?.id }
       })
 
-      if (error) throw error
+      if (error) {
+        console.error('Error connecting:', error)
+        throw error
+      }
 
       console.log('QR Code generated successfully:', data)
 
       await refetchInstance()
+      
+      setShowQRCode(true)
 
       toast({
         title: "Sucesso",
         description: "QR Code gerado com sucesso. Escaneie para conectar.",
       })
-
-      setShowQRCode(true)
     } catch (error) {
       console.error('Error connecting:', error)
       const errorMessage = error instanceof Error ? error.message : "Erro ao conectar instância"
