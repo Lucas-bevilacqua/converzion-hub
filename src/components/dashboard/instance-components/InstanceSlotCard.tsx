@@ -54,14 +54,15 @@ export function InstanceSlotCard({
 
         if (instanceError) {
           console.error('Erro ao buscar instância:', instanceError)
-          throw instanceError
+          // Don't throw here, return null instead to allow React Query to handle retries
+          return null
         }
 
         console.log('Dados da instância obtidos:', instanceData)
         return instanceData
       } catch (error) {
         console.error('Erro na consulta da instância:', error)
-        // Don't throw here, let React Query handle the retry
+        // Return null instead of throwing to allow React Query to handle retries
         return null
       }
     },
