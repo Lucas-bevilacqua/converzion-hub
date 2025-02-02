@@ -54,7 +54,6 @@ export function InstanceSlotCard({
           .maybeSingle()
 
         if (instanceError) {
-          // Só mostra toast para erros que não são de rede
           if (!instanceError.message.includes('NetworkError') && 
               !instanceError.message.includes('Failed to fetch')) {
             console.error('Erro ao buscar instância:', instanceError)
@@ -71,7 +70,6 @@ export function InstanceSlotCard({
         return instanceData
       } catch (error) {
         console.error('Erro na consulta da instância:', error)
-        // Não lança erros de rede para permitir novas tentativas
         if (error instanceof Error && 
             (error.message.includes('NetworkError') || 
              error.message.includes('Failed to fetch'))) {
@@ -83,18 +81,16 @@ export function InstanceSlotCard({
     enabled: !!instance?.id && !!user?.id,
     refetchInterval: 30000,
     retry: (failureCount, error) => {
-      // Tenta novamente erros de rede até 3 vezes
       if (error instanceof Error && 
           (error.message.includes('NetworkError') || 
            error.message.includes('Failed to fetch'))) {
         return failureCount < 3
       }
-      // Não tenta novamente outros erros
       return false
     },
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
     retryOnMount: true,
-    staleTime: 1000 * 60 * 5 // Considera dados obsoletos após 5 minutos
+    staleTime: 1000 * 60 * 5
   })
 
   const handleDelete = async () => {
@@ -140,6 +136,10 @@ export function InstanceSlotCard({
       if (error) {
         console.error('Erro ao conectar:', error)
         throw error
+      }
+
+      if (!data?.qrCode) {
+        throw new Error('QR Code não gerado')
       }
 
       console.log('QR Code gerado com sucesso:', data)
