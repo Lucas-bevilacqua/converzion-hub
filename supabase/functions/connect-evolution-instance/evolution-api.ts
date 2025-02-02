@@ -57,6 +57,11 @@ export async function createInstance(baseUrl: string, evolutionApiKey: string, i
         throw new Error(`Failed to create instance: ${errorText}`)
       }
     }
+
+    const responseData = await createResponse.json()
+    console.log('Create instance response:', responseData)
+    
+    return responseData
   } catch (error) {
     console.error('Error creating instance:', error)
     throw error
@@ -87,6 +92,18 @@ export async function connectInstance(baseUrl: string, evolutionApiKey: string, 
     const evolutionData = await evolutionResponse.json()
     console.log('Evolution API response:', evolutionData)
     
+    // Validate QR code presence in response
+    const hasQRCode = evolutionData.base64 || 
+                     evolutionData.qrcode?.base64 || 
+                     evolutionData.qrcode || 
+                     evolutionData.data?.qrcode?.base64 || 
+                     evolutionData.data?.qrcode
+
+    if (!hasQRCode) {
+      console.error('No QR code found in response:', evolutionData)
+      throw new Error('Evolution API response missing QR code')
+    }
+
     return evolutionData
   } catch (error) {
     console.error('Error connecting instance:', error)

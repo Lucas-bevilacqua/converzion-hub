@@ -103,19 +103,30 @@ serve(async (req) => {
     // Connect and get QR code
     console.log('Connecting instance')
     const evolutionData = await connectInstance(baseUrl, evolutionApiKey, instance.name)
+    console.log('Evolution API response:', evolutionData)
 
-    // Extract QR code from response
-    const qrCode = evolutionData.base64 || 
-                  evolutionData.qrcode?.base64 || 
-                  evolutionData.qrcode || 
-                  evolutionData.data?.qrcode?.base64 || 
-                  evolutionData.data?.qrcode
-
-    console.log('QR code found:', qrCode ? 'Yes' : 'No')
+    // Extract QR code from response with better error handling
+    let qrCode = null
+    if (evolutionData.base64) {
+      qrCode = evolutionData.base64
+    } else if (evolutionData.qrcode?.base64) {
+      qrCode = evolutionData.qrcode.base64
+    } else if (evolutionData.qrcode) {
+      qrCode = evolutionData.qrcode
+    } else if (evolutionData.data?.qrcode?.base64) {
+      qrCode = evolutionData.data.qrcode.base64
+    } else if (evolutionData.data?.qrcode) {
+      qrCode = evolutionData.data.qrcode
+    }
 
     if (!qrCode) {
-      console.error('No QR code found in response')
+      console.error('No QR code found in response:', evolutionData)
       throw new Error('No QR code found in Evolution API response')
+    }
+
+    // Ensure QR code is properly formatted
+    if (!qrCode.startsWith('data:image')) {
+      qrCode = `data:image/png;base64,${qrCode}`
     }
 
     // Update instance status and QR code
