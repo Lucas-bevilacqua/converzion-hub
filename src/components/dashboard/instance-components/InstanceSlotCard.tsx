@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { useQuery } from "@tanstack/react-query"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { supabase } from "@/integrations/supabase/client"
 import { Button } from "@/components/ui/button"
 import { QRCodeDialog } from "./QRCodeDialog"
@@ -12,7 +12,6 @@ import { InstanceActions } from "./InstanceActions"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
 import { Trash2 } from "lucide-react"
 import { useInstanceMutations } from "./InstanceMutations"
-import { useQueryClient } from "@tanstack/react-query"
 
 interface InstanceSlotCardProps {
   instance: EvolutionInstance | null
@@ -54,15 +53,7 @@ export function InstanceSlotCard({
           .maybeSingle()
 
         if (instanceError) {
-          if (!instanceError.message.includes('NetworkError') && 
-              !instanceError.message.includes('Failed to fetch')) {
-            console.error('Erro ao buscar instância:', instanceError)
-            toast({
-              title: "Erro",
-              description: "Falha ao carregar dados da instância. Tente novamente.",
-              variant: "destructive",
-            })
-          }
+          console.error('Erro ao buscar instância:', instanceError)
           throw instanceError
         }
 
@@ -70,24 +61,12 @@ export function InstanceSlotCard({
         return instanceData
       } catch (error) {
         console.error('Erro na consulta da instância:', error)
-        if (error instanceof Error && 
-            (error.message.includes('NetworkError') || 
-             error.message.includes('Failed to fetch'))) {
-          return null
-        }
         throw error
       }
     },
     enabled: !!instance?.id && !!user?.id,
     refetchInterval: 30000,
-    retry: (failureCount, error) => {
-      if (error instanceof Error && 
-          (error.message.includes('NetworkError') || 
-           error.message.includes('Failed to fetch'))) {
-        return failureCount < 3
-      }
-      return false
-    },
+    retry: 3,
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
     retryOnMount: true,
     staleTime: 1000 * 60 * 5
@@ -142,10 +121,9 @@ export function InstanceSlotCard({
         throw new Error('QR Code não gerado')
       }
 
-      console.log('QR Code gerado com sucesso:', data)
+      console.log('QR Code gerado com sucesso')
       
       setShowQRCode(true)
-
       await refetchInstance()
 
       toast({
@@ -259,4 +237,3 @@ export function InstanceSlotCard({
       )}
     </>
   )
-}
