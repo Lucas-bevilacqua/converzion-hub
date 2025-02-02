@@ -54,11 +54,10 @@ export function InstanceSlotCard({
           .maybeSingle()
 
         if (instanceError) {
-          console.error('Error fetching instance:', instanceError)
           // Only show toast for non-network errors
           if (!instanceError.message.includes('NetworkError') && 
-              !instanceError.message.includes('Failed to fetch') &&
-              !instanceError.message.includes('CORS')) {
+              !instanceError.message.includes('Failed to fetch')) {
+            console.error('Error fetching instance:', instanceError)
             toast({
               title: "Erro",
               description: "Falha ao carregar dados da instância. Tente novamente.",
@@ -72,18 +71,26 @@ export function InstanceSlotCard({
         return instanceData
       } catch (error) {
         console.error('Error in instance query:', error)
+        // Don't throw network errors to allow retries
+        if (error instanceof Error && 
+            (error.message.includes('NetworkError') || 
+             error.message.includes('Failed to fetch'))) {
+          return null
+        }
         throw error
       }
     },
     enabled: !!instance?.id && !!user?.id,
     refetchInterval: 30000,
     retry: (failureCount, error) => {
-      // Don't retry on 4xx errors
-      if (error instanceof Error && error.message.includes('4')) {
-        return false
+      // Retry network errors up to 3 times
+      if (error instanceof Error && 
+          (error.message.includes('NetworkError') || 
+           error.message.includes('Failed to fetch'))) {
+        return failureCount < 3
       }
-      // Retry up to 3 times for other errors
-      return failureCount < 3
+      // Don't retry other errors
+      return false
     },
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
     retryOnMount: true,
@@ -112,8 +119,6 @@ export function InstanceSlotCard({
       })
     }
   }
-
-  const isConnected = instance?.connection_status === 'connected'
 
   const handleConnect = async () => {
     if (!user) {
@@ -157,6 +162,8 @@ export function InstanceSlotCard({
       })
     }
   }
+
+  const isConnected = instance?.connection_status === 'connected'
 
   return (
     <>
