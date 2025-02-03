@@ -54,7 +54,7 @@ export function InstanceSlotCard({
 
         if (instanceError) {
           console.error('Erro ao buscar instância:', instanceError)
-          return null
+          throw instanceError
         }
 
         console.log('Dados da instância obtidos:', instanceData)
@@ -153,7 +153,6 @@ export function InstanceSlotCard({
 
   const isConnected = instance?.connection_status === 'connected'
 
-  // Render loading state or error fallback
   if (isLoadingInstance) {
     return (
       <div className="relative p-6 rounded-lg border bg-card text-card-foreground shadow-sm animate-pulse">
