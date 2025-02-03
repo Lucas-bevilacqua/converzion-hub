@@ -10,7 +10,7 @@ import { useAuth } from "@/contexts/auth/AuthContext"
 import { InstanceConnectionStatus } from "./InstanceConnectionStatus"
 import { InstanceActions } from "./InstanceActions"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
-import { Trash2 } from "lucide-react"
+import { Trash2, AlertCircle } from "lucide-react"
 import { useInstanceMutations } from "./InstanceMutations"
 
 interface InstanceSlotCardProps {
@@ -54,7 +54,7 @@ export function InstanceSlotCard({
 
         if (instanceError) {
           console.error('Erro ao buscar instância:', instanceError)
-          throw instanceError
+          return null
         }
 
         console.log('Dados da instância obtidos:', instanceData)
@@ -157,6 +157,25 @@ export function InstanceSlotCard({
     return (
       <div className="relative p-6 rounded-lg border bg-card text-card-foreground shadow-sm animate-pulse">
         <div className="h-20 bg-gray-200 rounded"></div>
+      </div>
+    )
+  }
+
+  if (!instanceData && instance) {
+    return (
+      <div className="relative p-6 rounded-lg border bg-card text-card-foreground shadow-sm">
+        <div className="flex items-center gap-2 text-destructive">
+          <AlertCircle className="h-4 w-4" />
+          <p className="text-sm">Erro ao carregar dados da instância</p>
+        </div>
+        <Button 
+          variant="outline" 
+          size="sm" 
+          onClick={() => refetchInstance()}
+          className="mt-4"
+        >
+          Tentar novamente
+        </Button>
       </div>
     )
   }
