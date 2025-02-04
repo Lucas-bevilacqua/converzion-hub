@@ -54,6 +54,11 @@ export function InstanceSlotCard({
 
         if (instanceError) {
           console.error('Erro ao buscar instância:', instanceError)
+          toast({
+            title: "Erro ao carregar instância",
+            description: "Não foi possível carregar os dados da instância. Tente novamente.",
+            variant: "destructive",
+          })
           return null
         }
 
@@ -61,6 +66,11 @@ export function InstanceSlotCard({
         return instanceData
       } catch (error) {
         console.error('Erro na consulta da instância:', error)
+        toast({
+          title: "Erro de conexão",
+          description: "Não foi possível conectar ao servidor. Tente novamente em alguns segundos.",
+          variant: "destructive",
+        })
         return null
       }
     },
