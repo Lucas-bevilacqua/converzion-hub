@@ -35,7 +35,7 @@ export function InstanceSlotCard({
 
   console.log('InstanceSlotCard - Renderizando com instância:', instance?.id)
 
-  const { data: instanceData, isLoading: isLoadingInstance, refetch: refetchInstance, error: instanceError } = useQuery({
+  const { data: instanceData, isLoading: isLoadingInstance, refetch: refetchInstance } = useQuery({
     queryKey: ['instance-data', instance?.id],
     queryFn: async () => {
       if (!instance?.id || !user) {
@@ -65,21 +65,10 @@ export function InstanceSlotCard({
       }
     },
     enabled: !!instance?.id && !!user?.id,
-    refetchInterval: 30000,
-    retry: 5,
-    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
-    retryOnMount: true,
-    staleTime: 1000 * 60 * 5,
-    meta: {
-      onError: (error: Error) => {
-        console.error('Erro na query da instância:', error)
-        toast({
-          title: "Erro de conexão",
-          description: "Não foi possível conectar ao servidor. Tentando novamente em alguns segundos...",
-          variant: "destructive",
-        })
-      }
-    }
+    staleTime: 1000 * 30, // 30 seconds
+    cacheTime: 1000 * 60 * 5, // 5 minutes
+    retry: 2,
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 10000),
   })
 
   const handleDelete = async () => {
@@ -153,31 +142,21 @@ export function InstanceSlotCard({
 
   const isConnected = instance?.connection_status === 'connected'
 
-  if (isLoadingInstance) {
-    return (
-      <div className="relative p-6 rounded-lg border bg-card text-card-foreground shadow-sm animate-pulse">
-        <div className="h-20 bg-gray-200 rounded"></div>
-      </div>
-    )
-  }
-
-  if (instanceError) {
+  // Empty slot
+  if (!isUsed) {
     return (
       <div className="relative p-6 rounded-lg border bg-card text-card-foreground shadow-sm">
-        <div className="flex flex-col items-center gap-4 p-4">
-          <AlertCircle className="h-8 w-8 text-destructive" />
-          <div className="text-center">
-            <p className="font-semibold text-destructive">Erro de conexão</p>
-            <p className="text-sm text-muted-foreground">Não foi possível carregar os dados da instância</p>
+        <div className="flex flex-col gap-4">
+          <div className="space-y-1">
+            <h3 className="font-medium leading-none">Nova Instância</h3>
+            <p className="text-sm text-muted-foreground">Número não conectado</p>
           </div>
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={() => refetchInstance()}
-            className="w-full"
+          <Button
+            variant="default"
+            size="sm"
+            onClick={onClick}
           >
-            <RefreshCw className="h-4 w-4 mr-2" />
-            Tentar novamente
+            Adicionar Número
           </Button>
         </div>
       </div>
@@ -238,25 +217,15 @@ export function InstanceSlotCard({
             )}
           </div>
 
-          {isUsed ? (
-            <InstanceActions
-              instance={instance!}
-              isConnected={isConnected}
-              isLoading={isLoadingInstance}
-              onConnect={handleConnect}
-              onDisconnect={onDisconnect}
-              onSettings={() => setShowSettings(true)}
-              onQRCode={() => setShowQRCode(true)}
-            />
-          ) : (
-            <Button
-              variant="default"
-              size="sm"
-              onClick={onClick}
-            >
-              Adicionar Número
-            </Button>
-          )}
+          <InstanceActions
+            instance={instance!}
+            isConnected={isConnected}
+            isLoading={isLoadingInstance}
+            onConnect={handleConnect}
+            onDisconnect={onDisconnect}
+            onSettings={() => setShowSettings(true)}
+            onQRCode={() => setShowQRCode(true)}
+          />
         </div>
       </div>
 
