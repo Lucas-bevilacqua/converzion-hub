@@ -161,22 +161,25 @@ export function InstanceSlotCard({
     )
   }
 
-  if (instanceError || (!instanceData && instance)) {
+  if (instanceError) {
     return (
       <div className="relative p-6 rounded-lg border bg-card text-card-foreground shadow-sm">
-        <div className="flex items-center gap-2 text-destructive">
-          <AlertCircle className="h-4 w-4" />
-          <p className="text-sm">Erro ao carregar dados da instância</p>
+        <div className="flex flex-col items-center gap-4 p-4">
+          <AlertCircle className="h-8 w-8 text-destructive" />
+          <div className="text-center">
+            <p className="font-semibold text-destructive">Erro de conexão</p>
+            <p className="text-sm text-muted-foreground">Não foi possível carregar os dados da instância</p>
+          </div>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={() => refetchInstance()}
+            className="w-full"
+          >
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Tentar novamente
+          </Button>
         </div>
-        <Button 
-          variant="outline" 
-          size="sm" 
-          onClick={() => refetchInstance()}
-          className="mt-4 w-full"
-        >
-          <RefreshCw className="h-4 w-4 mr-2" />
-          Tentar novamente
-        </Button>
       </div>
     )
   }
