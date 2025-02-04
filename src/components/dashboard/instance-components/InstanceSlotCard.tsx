@@ -10,7 +10,7 @@ import { useAuth } from "@/contexts/auth/AuthContext"
 import { InstanceConnectionStatus } from "./InstanceConnectionStatus"
 import { InstanceActions } from "./InstanceActions"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
-import { Trash2, AlertCircle, RefreshCw } from "lucide-react"
+import { Trash2 } from "lucide-react"
 import { useInstanceMutations } from "./InstanceMutations"
 
 interface InstanceSlotCardProps {
@@ -33,7 +33,7 @@ export function InstanceSlotCard({
   const { deleteMutation } = useInstanceMutations()
   const queryClient = useQueryClient()
 
-  console.log('InstanceSlotCard - Renderizando com instância:', instance?.id)
+  console.log('InstanceSlotCard - Renderizando com instância:', instance?.id ?? 'nenhuma')
 
   const { data: instanceData, isLoading: isLoadingInstance, refetch: refetchInstance } = useQuery({
     queryKey: ['instance-data', instance?.id],
@@ -72,7 +72,10 @@ export function InstanceSlotCard({
   })
 
   const handleDelete = async () => {
-    if (!instance?.id) return
+    if (!instance?.id) {
+      console.log('Tentativa de exclusão sem ID de instância')
+      return
+    }
 
     try {
       console.log('Excluindo instância:', instance.id)
@@ -104,11 +107,16 @@ export function InstanceSlotCard({
       return
     }
 
+    if (!instance?.id) {
+      console.error('Tentativa de conexão sem ID de instância')
+      return
+    }
+
     try {
-      console.log('Iniciando conexão para instância:', instance?.id)
+      console.log('Iniciando conexão para instância:', instance.id)
       
       const { data, error } = await supabase.functions.invoke('connect-evolution-instance', {
-        body: { instanceId: instance?.id }
+        body: { instanceId: instance.id }
       })
 
       if (error) {
@@ -163,6 +171,11 @@ export function InstanceSlotCard({
     )
   }
 
+  if (!instance) {
+    console.log('Renderizando slot sem dados de instância')
+    return null
+  }
+
   return (
     <>
       <div className="relative p-6 rounded-lg border bg-card text-card-foreground shadow-sm">
@@ -170,55 +183,53 @@ export function InstanceSlotCard({
           <div className="flex items-center justify-between">
             <div className="space-y-1">
               <h3 className="font-medium leading-none">
-                {instance?.name || "Nova Instância"}
+                {instance.name || "Nova Instância"}
               </h3>
               <p className="text-sm text-muted-foreground">
-                {instance?.phone_number || "Número não conectado"}
+                {instance.phone_number || "Número não conectado"}
               </p>
             </div>
-            {instance && (
-              <div className="flex items-center gap-2">
-                <InstanceConnectionStatus 
-                  instance={instance}
-                  stateData={null}
-                  isLoading={isLoadingInstance}
-                />
-                {isUsed && (
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="text-destructive hover:text-destructive/90"
+            <div className="flex items-center gap-2">
+              <InstanceConnectionStatus 
+                instance={instance}
+                stateData={null}
+                isLoading={isLoadingInstance}
+              />
+              {isUsed && (
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="text-destructive hover:text-destructive/90"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Excluir Instância</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Tem certeza que deseja excluir esta instância? Esta ação não pode ser desfeita.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                      <AlertDialogAction 
+                        onClick={handleDelete}
+                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                       >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>Excluir Instância</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          Tem certeza que deseja excluir esta instância? Esta ação não pode ser desfeita.
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                        <AlertDialogAction 
-                          onClick={handleDelete}
-                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                        >
-                          Excluir
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
-                )}
-              </div>
-            )}
+                        Excluir
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              )}
+            </div>
           </div>
 
           <InstanceActions
-            instance={instance!}
+            instance={instance}
             isConnected={isConnected}
             isLoading={isLoadingInstance}
             onConnect={handleConnect}
@@ -229,22 +240,18 @@ export function InstanceSlotCard({
         </div>
       </div>
 
-      {instance && (
-        <>
-          <QRCodeDialog
-            open={showQRCode}
-            onOpenChange={setShowQRCode}
-            qrCode={instanceData?.qr_code || null}
-          />
+      <QRCodeDialog
+        open={showQRCode}
+        onOpenChange={setShowQRCode}
+        qrCode={instanceData?.qr_code || null}
+      />
 
-          <InstancePromptDialog
-            open={showSettings}
-            onOpenChange={setShowSettings}
-            instanceId={instance.id}
-            currentPrompt={instance.system_prompt}
-          />
-        </>
-      )}
+      <InstancePromptDialog
+        open={showSettings}
+        onOpenChange={setShowSettings}
+        instanceId={instance.id}
+        currentPrompt={instance.system_prompt}
+      />
     </>
   )
 }
