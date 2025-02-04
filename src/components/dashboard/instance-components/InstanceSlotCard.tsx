@@ -66,7 +66,7 @@ export function InstanceSlotCard({
     },
     enabled: !!instance?.id && !!user?.id,
     staleTime: 1000 * 30, // 30 seconds
-    cacheTime: 1000 * 60 * 5, // 5 minutes
+    gcTime: 1000 * 60 * 5, // 5 minutes
     retry: 2,
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 10000),
   })
