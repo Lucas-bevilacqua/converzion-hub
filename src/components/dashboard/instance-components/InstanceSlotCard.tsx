@@ -10,7 +10,7 @@ import { useAuth } from "@/contexts/auth/AuthContext"
 import { InstanceConnectionStatus } from "./InstanceConnectionStatus"
 import { InstanceActions } from "./InstanceActions"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
-import { Trash2, AlertCircle } from "lucide-react"
+import { Trash2, AlertCircle, RefreshCw } from "lucide-react"
 import { useInstanceMutations } from "./InstanceMutations"
 
 interface InstanceSlotCardProps {
@@ -35,7 +35,7 @@ export function InstanceSlotCard({
 
   console.log('InstanceSlotCard - Renderizando com instância:', instance?.id)
 
-  const { data: instanceData, isLoading: isLoadingInstance, refetch: refetchInstance } = useQuery({
+  const { data: instanceData, isLoading: isLoadingInstance, refetch: refetchInstance, error: instanceError } = useQuery({
     queryKey: ['instance-data', instance?.id],
     queryFn: async () => {
       if (!instance?.id || !user) {
@@ -54,24 +54,14 @@ export function InstanceSlotCard({
 
         if (instanceError) {
           console.error('Erro ao buscar instância:', instanceError)
-          toast({
-            title: "Erro ao carregar instância",
-            description: "Não foi possível carregar os dados da instância. Tente novamente.",
-            variant: "destructive",
-          })
-          return null
+          throw instanceError
         }
 
         console.log('Dados da instância obtidos:', instanceData)
         return instanceData
       } catch (error) {
         console.error('Erro na consulta da instância:', error)
-        toast({
-          title: "Erro de conexão",
-          description: "Não foi possível conectar ao servidor. Tente novamente em alguns segundos.",
-          variant: "destructive",
-        })
-        return null
+        throw error
       }
     },
     enabled: !!instance?.id && !!user?.id,
@@ -171,7 +161,7 @@ export function InstanceSlotCard({
     )
   }
 
-  if (!instanceData && instance) {
+  if (instanceError || (!instanceData && instance)) {
     return (
       <div className="relative p-6 rounded-lg border bg-card text-card-foreground shadow-sm">
         <div className="flex items-center gap-2 text-destructive">
@@ -182,8 +172,9 @@ export function InstanceSlotCard({
           variant="outline" 
           size="sm" 
           onClick={() => refetchInstance()}
-          className="mt-4"
+          className="mt-4 w-full"
         >
+          <RefreshCw className="h-4 w-4 mr-2" />
           Tentar novamente
         </Button>
       </div>
