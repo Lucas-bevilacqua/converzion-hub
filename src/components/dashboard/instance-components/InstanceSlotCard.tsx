@@ -28,6 +28,7 @@ export function InstanceSlotCard({
 }: InstanceSlotCardProps) {
   const [showQRCode, setShowQRCode] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
+  const [isGeneratingQR, setIsGeneratingQR] = useState(false)
   const { toast } = useToast()
   const { user } = useAuth()
   const { deleteMutation } = useInstanceMutations()
@@ -113,6 +114,7 @@ export function InstanceSlotCard({
     }
 
     try {
+      setIsGeneratingQR(true)
       console.log('Iniciando conexão para instância:', instance.id)
       
       const { data, error } = await supabase.functions.invoke('connect-evolution-instance', {
@@ -130,13 +132,19 @@ export function InstanceSlotCard({
 
       console.log('QR Code gerado com sucesso')
       
-      setShowQRCode(true)
+      // Atualizar os dados da instância antes de mostrar o QR code
       await refetchInstance()
-
-      toast({
-        title: "Sucesso",
-        description: "QR Code gerado com sucesso. Escaneie para conectar.",
-      })
+      
+      // Só mostrar o QR code depois de ter certeza que foi gerado
+      if (instanceData?.qr_code) {
+        setShowQRCode(true)
+        toast({
+          title: "Sucesso",
+          description: "QR Code gerado com sucesso. Escaneie para conectar.",
+        })
+      } else {
+        throw new Error('QR Code não encontrado após geração')
+      }
     } catch (error) {
       console.error('Erro ao conectar:', error)
       const errorMessage = error instanceof Error ? error.message : "Erro ao conectar instância"
@@ -145,6 +153,8 @@ export function InstanceSlotCard({
         description: errorMessage,
         variant: "destructive",
       })
+    } finally {
+      setIsGeneratingQR(false)
     }
   }
 
@@ -231,11 +241,11 @@ export function InstanceSlotCard({
           <InstanceActions
             instance={instance}
             isConnected={isConnected}
-            isLoading={isLoadingInstance}
+            isLoading={isLoadingInstance || isGeneratingQR}
             onConnect={handleConnect}
             onDisconnect={onDisconnect}
             onSettings={() => setShowSettings(true)}
-            onQRCode={() => setShowQRCode(true)}
+            onQRCode={() => handleConnect()}
           />
         </div>
       </div>
