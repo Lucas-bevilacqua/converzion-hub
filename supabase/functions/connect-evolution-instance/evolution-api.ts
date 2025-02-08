@@ -50,25 +50,17 @@ export async function createInstance(baseUrl: string, evolutionApiKey: string, i
       })
     })
 
-    // Clone the response before consuming it
-    const responseClone = createResponse.clone()
-
-    // First try to parse as JSON
-    let responseData
-    try {
-      responseData = await createResponse.json()
-    } catch (e) {
-      // If JSON parsing fails, get the text content from the clone
-      const errorText = await responseClone.text()
+    if (!createResponse.ok) {
+      const errorText = await createResponse.text()
       console.error('Evolution API create instance error:', errorText)
-      
       if (!errorText.includes('already in use')) {
         throw new Error(`Failed to create instance: ${errorText}`)
       }
-      responseData = { error: errorText }
     }
 
+    const responseData = await createResponse.json()
     console.log('Create instance response:', responseData)
+    
     return responseData
   } catch (error) {
     console.error('Error creating instance:', error)
@@ -91,11 +83,8 @@ export async function connectInstance(baseUrl: string, evolutionApiKey: string, 
       }
     })
 
-    // Clone the response before consuming it
-    const responseClone = evolutionResponse.clone()
-
     if (!evolutionResponse.ok) {
-      const errorText = await responseClone.text()
+      const errorText = await evolutionResponse.text()
       console.error('Evolution API connect error:', errorText)
       throw new Error(`Evolution API returned status ${evolutionResponse.status}: ${errorText}`)
     }
